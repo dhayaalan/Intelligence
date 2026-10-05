@@ -16,6 +16,7 @@ import { apiRequest } from '../../core/api/client';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Pagination } from '../../components/ui/Pagination';
 
 export const TenantAdminWorkspace: React.FC = () => {
   const { user } = useAuth();
@@ -25,6 +26,12 @@ export const TenantAdminWorkspace: React.FC = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
+
+  // Pagination states
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(15);
 
   // User creation form state
   const [newName, setNewName] = useState('');
@@ -341,31 +348,51 @@ export const TenantAdminWorkspace: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-2.5 px-4">
-                          <div className="font-medium text-slate-900 dark:text-white">{u.name}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{u.email}</div>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <Badge variant={u.role === 'ANALYST' ? 'success' : 'info'} size="sm">
-                            {u.role}
-                          </Badge>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className="flex gap-1 flex-wrap">
-                            {u.assigned_modules.map((m) => (
-                              <Badge key={m} variant="mono" size="sm">
-                                {m}
-                              </Badge>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    filteredUsers
+                      .slice((userPage - 1) * userPageSize, userPage * userPageSize)
+                      .map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-2.5 px-4">
+                            <div className="font-medium text-slate-900 dark:text-white">{u.name}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{u.email}</div>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <Badge variant={u.role === 'ANALYST' ? 'success' : 'info'} size="sm">
+                              {u.role}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <div className="flex gap-1 flex-wrap">
+                              {u.assigned_modules.map((m) => (
+                                <Badge key={m} variant="mono" size="sm">
+                                  {m}
+                                </Badge>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>
+
+              {/* Users Pagination */}
+              {filteredUsers.length > userPageSize && (
+                <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+                  <Pagination
+                    currentPage={userPage}
+                    totalPages={Math.max(1, Math.ceil(filteredUsers.length / userPageSize))}
+                    totalItems={filteredUsers.length}
+                    pageSize={userPageSize}
+                    pageSizeOptions={[5, 10, 20, 50]}
+                    onPageChange={setUserPage}
+                    onPageSizeChange={(newSize) => {
+                      setUserPageSize(newSize);
+                      setUserPage(1);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -401,7 +428,10 @@ export const TenantAdminWorkspace: React.FC = () => {
                 type="text"
                 placeholder="Search audit trail..."
                 value={auditSearch}
-                onChange={(e) => setAuditSearch(e.target.value)}
+                onChange={(e) => {
+                  setAuditSearch(e.target.value);
+                  setAuditPage(1);
+                }}
                 className="w-full h-8 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none font-mono"
               />
             </div>
@@ -425,24 +455,44 @@ export const TenantAdminWorkspace: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredAuditLogs.map((l) => (
-                    <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                        {new Date(l.timestamp).toLocaleTimeString()}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                        {l.action}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono text-slate-700 dark:text-slate-300">{l.user_id}</td>
-                      <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-                        {l.resource_type}:{l.resource_id}
-                      </td>
-                    </tr>
-                  ))
+                  filteredAuditLogs
+                    .slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize)
+                    .map((l) => (
+                      <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                          {new Date(l.timestamp).toLocaleTimeString()}
+                        </td>
+                        <td className="py-2.5 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                          {l.action}
+                        </td>
+                        <td className="py-2.5 px-4 font-mono text-slate-700 dark:text-slate-300">{l.user_id}</td>
+                        <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                          {l.resource_type}:{l.resource_id}
+                        </td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Audit Pagination */}
+          {filteredAuditLogs.length > auditPageSize && (
+            <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+              <Pagination
+                currentPage={auditPage}
+                totalPages={Math.max(1, Math.ceil(filteredAuditLogs.length / auditPageSize))}
+                totalItems={filteredAuditLogs.length}
+                pageSize={auditPageSize}
+                pageSizeOptions={[10, 15, 30, 60]}
+                onPageChange={setAuditPage}
+                onPageSizeChange={(newSize) => {
+                  setAuditPageSize(newSize);
+                  setAuditPage(1);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

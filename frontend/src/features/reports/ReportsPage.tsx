@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText, Download, Clock, Shield, AlertTriangle, Hash, Layers,
   ChevronDown, ChevronRight
@@ -7,6 +7,7 @@ import { apiRequest } from '../../core/api/client';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Pagination } from '../../components/ui/Pagination';
 import { formatDate } from '../../lib/utils';
 
 interface Report {
@@ -41,6 +42,14 @@ export const ReportsPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
   const [selectedInvId, setSelectedInvId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const totalPages = Math.max(1, Math.ceil(reports.length / pageSize));
+  const paginatedReports = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return reports.slice(start, start + pageSize);
+  }, [reports, currentPage, pageSize]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -225,89 +234,108 @@ export const ReportsPage: React.FC = () => {
             No dossiers generated. Create an investigation and generate a comprehensive dossier.
           </div>
         ) : (
-          reports.map((report) => (
-            <Card key={report.id} className="hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
-              <CardContent className="p-0">
-                {/* Report Summary Row */}
-                <button
-                  className="w-full p-4 sm:p-5 flex items-start justify-between gap-4 text-left"
-                  onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
-                >
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getStatusBadge(report.status)} size="sm">{report.status}</Badge>
-                      <Badge variant={getTypeBadge(report.type)} size="sm">
-                        {report.type.replace(/_/g, ' ')}
-                      </Badge>
-                      <Badge variant="mono" size="sm">{report.classification}</Badge>
-                    </div>
-                    <h3 className="text-sm font-bold text-zinc-950 dark:text-white">{report.title}</h3>
-                    <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-                      <span className="flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3 text-zinc-400" />
-                        {report.finding_ids.length} Findings
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Hash className="w-3 h-3 text-zinc-400" />
-                        {report.evidence_citations.length} Evidence
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Layers className="w-3 h-3 text-zinc-400" />
-                        {report.entity_ids.length} Entities
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 text-zinc-400 mt-1">
-                    {expandedReport === report.id ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
-                    )}
-                  </div>
-                </button>
-
-                {/* Expanded Dossier Detail */}
-                {expandedReport === report.id && (
-                  <div className="px-5 pb-5 space-y-3 border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                    {/* Executive Summary */}
-                    <div>
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5">
-                        Executive Summary
-                      </span>
-                      <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed bg-zinc-50 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 p-3.5 rounded-lg">
-                        {report.executive_summary}
-                      </p>
+          <>
+            {paginatedReports.map((report) => (
+              <Card key={report.id} className="hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
+                <CardContent className="p-0">
+                  {/* Report Summary Row */}
+                  <button
+                    className="w-full p-4 sm:p-5 flex items-start justify-between gap-4 text-left"
+                    onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
+                  >
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={getStatusBadge(report.status)} size="sm">{report.status}</Badge>
+                        <Badge variant={getTypeBadge(report.type)} size="sm">
+                          {report.type.replace(/_/g, ' ')}
+                        </Badge>
+                        <Badge variant="mono" size="sm">{report.classification}</Badge>
+                      </div>
+                      <h3 className="text-sm font-bold text-zinc-950 dark:text-white">{report.title}</h3>
+                      <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-zinc-400" />
+                          {report.finding_ids.length} Findings
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Hash className="w-3 h-3 text-zinc-400" />
+                          {report.evidence_citations.length} Evidence
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-zinc-400" />
+                          {report.entity_ids.length} Entities
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Author & Metadata */}
-                    <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-                      <span>Author: <strong className="text-zinc-800 dark:text-zinc-200">{report.author}</strong></span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                        {formatDate(report.created_at)}
-                      </span>
+                    <div className="shrink-0 text-zinc-400 mt-1">
+                      {expandedReport === report.id ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
                     </div>
+                  </button>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExportMarkdown(report.id);
-                        }}
-                      >
-                        <Download className="w-3.5 h-3.5 mr-1" />
-                        Export Markdown
-                      </Button>
+                  {/* Expanded Dossier Detail */}
+                  {expandedReport === report.id && (
+                    <div className="px-5 pb-5 space-y-3 border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                      {/* Executive Summary */}
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1.5">
+                          Executive Summary
+                        </span>
+                        <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed bg-zinc-50 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 p-3.5 rounded-lg">
+                          {report.executive_summary}
+                        </p>
+                      </div>
+
+                      {/* Author & Metadata */}
+                      <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                        <span>Author: <strong className="text-zinc-800 dark:text-zinc-200">{report.author}</strong></span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                          {formatDate(report.created_at)}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportMarkdown(report.id);
+                          }}
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1" />
+                          Export Markdown
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+
+            {reports.length > pageSize && (
+              <div className="pt-2">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={reports.length}
+                  pageSize={pageSize}
+                  pageSizeOptions={[5, 10, 20, 50]}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

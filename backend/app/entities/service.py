@@ -63,6 +63,36 @@ class EntityService:
             return records
 
     @staticmethod
+    def list_entities_paginated(
+        tenant_id: str,
+        investigation_id: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None,
+        type: Optional[str] = None
+    ) -> dict:
+        with db._lock:
+            records = [EntityRecord(**d) for d in db.entities.values() if d.get("tenant_id") == tenant_id]
+            if investigation_id:
+                records = [r for r in records if r.investigation_id == investigation_id]
+            if type and type.upper() != 'ALL':
+                records = [r for r in records if r.type.value.upper() == type.upper() or r.type.upper() == type.upper()]
+            if search:
+                s = search.lower()
+                records = [r for r in records if s in r.value.lower()]
+            total = len(records)
+            skip = (page - 1) * page_size
+            paged = records[skip : skip + page_size]
+            total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+            return {
+                "items": paged,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            }
+
+    @staticmethod
     def get_entity(tenant_id: str, entity_id: str) -> Optional[EntityRecord]:
         with db._lock:
             data = db.entities.get(entity_id)

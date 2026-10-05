@@ -33,7 +33,11 @@ import {
   usePlatformAuditLogs,
   useCreateTenant,
   useToggleTenantStatus,
+  ToolItem,
 } from '../../core/api/hooks';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { ToolGrid, ToolRunModal } from '../../components/tools';
+import { Pagination } from '../../components/ui/Pagination';
 
 type SuperAdminNav =
   | 'dashboard'
@@ -63,6 +67,19 @@ export const SuperAdminLayout: React.FC = () => {
 
   const createTenantMutation = useCreateTenant();
   const toggleTenantStatusMutation = useToggleTenantStatus();
+
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+
+  // Live Tool Execution State
+  const [runningTool, setRunningTool] = useState<ToolItem | null>(null);
 
   // Create Tenant Form State
   const [formOrgName, setFormOrgName] = useState('');
@@ -144,6 +161,32 @@ export const SuperAdminLayout: React.FC = () => {
     }
     return matchesSearch;
   });
+
+  // Pagination states
+  const [tenantPage, setTenantPage] = useState(1);
+  const [tenantPageSize, setTenantPageSize] = useState(10);
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(15);
+
+  const paginatedTenants = React.useMemo(() => {
+    const start = (tenantPage - 1) * tenantPageSize;
+    return filteredTenants.slice(start, start + tenantPageSize);
+  }, [filteredTenants, tenantPage, tenantPageSize]);
+
+  const paginatedUsers = React.useMemo(() => {
+    const start = (userPage - 1) * userPageSize;
+    return filteredUsers.slice(start, start + userPageSize);
+  }, [filteredUsers, userPage, userPageSize]);
+
+  const paginatedAuditLogs = React.useMemo(() => {
+    const start = (auditPage - 1) * auditPageSize;
+    return auditLogs.slice(start, start + auditPageSize);
+  }, [auditLogs, auditPage, auditPageSize]);
+
+  React.useEffect(() => { setTenantPage(1); }, [tenantSearch]);
+  React.useEffect(() => { setUserPage(1); }, [userSearch, activeNav]);
 
   const filteredTools = tools.filter((t) => {
     const matchesSearch =
@@ -770,7 +813,7 @@ export const SuperAdminLayout: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                        {filteredTenants.map((t) => (
+                        {paginatedTenants.map((t) => (
                           <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                             <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
                               <div>{t.name}</div>
@@ -796,13 +839,24 @@ export const SuperAdminLayout: React.FC = () => {
                             </td>
                             <td className="py-4 px-6 text-right">
                               <button
-                                onClick={async () => {
-                                  const nextStatus = t.status === 'active' ? 'suspended' : 'active';
-                                  await toggleTenantStatusMutation.mutateAsync({
-                                    tenantId: t.id,
-                                    status: nextStatus,
+                                onClick={() => {
+                                  const isSuspending = t.status === 'active';
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: isSuspending ? `Suspend Tenant: ${t.name}` : `Activate Tenant: ${t.name}`,
+                                    description: isSuspending
+                                      ? `Are you sure you want to suspend "${t.name}"? All assigned tenant users, analysts, and investigators will immediately be blocked from accessing platform intelligence tools and cases.`
+                                      : `Restore platform access for "${t.name}"? Users and analysts in this organization will be able to log in and resume security operations.`,
+                                    confirmLabel: isSuspending ? 'Suspend Tenant' : 'Activate Tenant',
+                                    variant: isSuspending ? 'danger' : 'primary',
+                                    onConfirm: async () => {
+                                      await toggleTenantStatusMutation.mutateAsync({
+                                        tenantId: t.id,
+                                        status: isSuspending ? 'suspended' : 'active',
+                                      });
+                                      refetchTenants();
+                                    },
                                   });
-                                  refetchTenants();
                                 }}
                                 className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[11px] transition-colors cursor-pointer"
                               >
@@ -813,6 +867,27 @@ export const SuperAdminLayout: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+
+                    {filteredTenants.length > tenantPageSize && (
+                      <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span>
+                          Showing {(tenantPage - 1) * tenantPageSize + 1} to{' '}
+                          {Math.min(tenantPage * tenantPageSize, filteredTenants.length)} of {filteredTenants.length} tenants
+                        </span>
+                        <Pagination
+                          currentPage={tenantPage}
+                          totalPages={Math.ceil(filteredTenants.length / tenantPageSize)}
+                          totalItems={filteredTenants.length}
+                          pageSize={tenantPageSize}
+                          onPageChange={setTenantPage}
+                          onPageSizeChange={(sz) => {
+                            setTenantPageSize(sz);
+                            setTenantPage(1);
+                          }}
+                          pageSizeOptions={[5, 10, 25, 50]}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1095,7 +1170,7 @@ export const SuperAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {filteredUsers.map((u) => (
+                      {paginatedUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
                             <div>{u.name}</div>
@@ -1129,6 +1204,27 @@ export const SuperAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {filteredUsers.length > userPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      <span>
+                        Showing {(userPage - 1) * userPageSize + 1} to{' '}
+                        {Math.min(userPage * userPageSize, filteredUsers.length)} of {filteredUsers.length} users
+                      </span>
+                      <Pagination
+                        currentPage={userPage}
+                        totalPages={Math.ceil(filteredUsers.length / userPageSize)}
+                        totalItems={filteredUsers.length}
+                        pageSize={userPageSize}
+                        onPageChange={setUserPage}
+                        onPageSizeChange={(sz) => {
+                          setUserPageSize(sz);
+                          setUserPage(1);
+                        }}
+                        pageSizeOptions={[5, 10, 25, 50]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1150,69 +1246,11 @@ export const SuperAdminLayout: React.FC = () => {
                 </p>
               </div>
 
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search tools by name, category, or provider..."
-                    value={toolSearch}
-                    onChange={(e) => setToolSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-[#0f1424] border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-cyan-500 shadow-2xs"
-                  />
-                </div>
-                <select
-                  value={toolCategoryFilter}
-                  onChange={(e) => setToolCategoryFilter(e.target.value)}
-                  className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#0f1424] border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:border-cyan-500 font-mono shadow-2xs"
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="Username">Username</option>
-                  <option value="Email">Email</option>
-                  <option value="Phone">Phone</option>
-                  <option value="Infrastructure">Infrastructure</option>
-                  <option value="DNS">DNS</option>
-                  <option value="Metadata">Metadata</option>
-                  <option value="Threat Intelligence">Threat Intelligence</option>
-                </select>
-              </div>
-
-              {/* Tools Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredTools.map((t) => (
-                  <div
-                    key={t.id}
-                    className="bg-white dark:bg-[#0f1424] border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-5 flex flex-col justify-between space-y-4 hover:border-slate-400 dark:hover:border-slate-700 transition-colors shadow-xs"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-cyan-700 dark:text-cyan-400 font-mono text-[10px] font-semibold">
-                          {t.category}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
-                            t.status === 'AVAILABLE'
-                              ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
-                              : t.status === 'CONFIG_REQUIRED'
-                              ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{t.name}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{t.description}</p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                      <span>v{t.version}</span>
-                      <span>{t.execution_type}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ToolGrid
+                tools={tools}
+                onRunTool={(tool) => setRunningTool(tool)}
+                onViewDetails={(tool) => setRunningTool(tool)}
+              />
             </div>
           )}
 
@@ -1239,7 +1277,7 @@ export const SuperAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {auditLogs.map((log) => (
+                      {paginatedAuditLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors font-mono">
                           <td className="py-3 px-6 text-slate-500 dark:text-slate-400 text-[11px]">
                             {new Date(log.timestamp).toLocaleString()}
@@ -1256,6 +1294,27 @@ export const SuperAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {auditLogs.length > auditPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 font-sans">
+                      <span>
+                        Showing {(auditPage - 1) * auditPageSize + 1} to{' '}
+                        {Math.min(auditPage * auditPageSize, auditLogs.length)} of {auditLogs.length} audit entries
+                      </span>
+                      <Pagination
+                        currentPage={auditPage}
+                        totalPages={Math.ceil(auditLogs.length / auditPageSize)}
+                        totalItems={auditLogs.length}
+                        pageSize={auditPageSize}
+                        onPageChange={setAuditPage}
+                        onPageSizeChange={(sz) => {
+                          setAuditPageSize(sz);
+                          setAuditPage(1);
+                        }}
+                        pageSizeOptions={[15, 30, 50, 100]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1337,6 +1396,29 @@ export const SuperAdminLayout: React.FC = () => {
           )}
         </div>
       </main>
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={async () => {
+            await confirmDialog.onConfirm();
+            setConfirmDialog(null);
+          }}
+        />
+      )}
+
+      {runningTool && (
+        <ToolRunModal
+          tool={runningTool}
+          isOpen={Boolean(runningTool)}
+          onClose={() => setRunningTool(null)}
+        />
+      )}
     </div>
   );
 };

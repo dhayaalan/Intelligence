@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List, Optional, Any
 from app.identity.models import UserRecord, UserRole
 from app.identity.schemas import UserCreateRequest, UserUpdateRequest, UserResponse
 from app.identity.service import identity_service
@@ -8,13 +8,69 @@ from app.audit.logger import audit_logger
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.get("", response_model=List[UserResponse])
+from pydantic import BaseModel
+from fastapi import Query
+
+class PaginatedUsersResponse(BaseModel):
+    items: List[UserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+@router.get("/paginated", response_model=PaginatedUsersResponse)
+async def list_users_paginated(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    tenant_id: Optional[str] = None,
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    current_user: UserRecord = Depends(require_roles(UserRole.SUPER_ADMIN, UserRole.TENANT_ADMIN))
+):
+    target_tid = tenant_id if current_user.role == UserRole.SUPER_ADMIN else current_user.tenant_id
+    res = identity_service.list_users_paginated(
+        tenant_id=target_tid,
+        page=page,
+        page_size=page_size,
+        search=search,
+        role=role
+    )
+    return PaginatedUsersResponse(
+        items=[UserResponse(**u.dict()) for u in res["items"]],
+        total=res["total"],
+        page=res["page"],
+        page_size=res["page_size"],
+        total_pages=res["total_pages"]
+    )
+
+@router.get("", response_model=Any)
 async def list_users(
     tenant_id: Optional[str] = None,
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
     current_user: UserRecord = Depends(require_roles(UserRole.SUPER_ADMIN, UserRole.TENANT_ADMIN))
 ):
     # Enforce tenant isolation for Tenant Admin
     target_tid = tenant_id if current_user.role == UserRole.SUPER_ADMIN else current_user.tenant_id
+    if page is not None or page_size is not None:
+        p = page or 1
+        ps = page_size or 20
+        res = identity_service.list_users_paginated(
+            tenant_id=target_tid,
+            page=p,
+            page_size=ps,
+            search=search,
+            role=role
+        )
+        return {
+            "items": [UserResponse(**u.dict()) for u in res["items"]],
+            "total": res["total"],
+            "page": res["page"],
+            "page_size": res["page_size"],
+            "total_pages": res["total_pages"]
+        }
     users = identity_service.list_users(target_tid)
     return [UserResponse(**u.dict()) for u in users]
 

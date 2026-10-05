@@ -287,3 +287,100 @@ export function usePlatformAuditLogs(limit: number = 100) {
     queryFn: () => apiRequest<any[]>(`/platform/audit-logs?limit=${limit}`),
   });
 }
+
+// 8. Tool Execution & Deterministic Provider Operations
+export function useToolDetails(toolId: string) {
+  return useQuery<ToolItem>({
+    queryKey: ['tool-details', toolId],
+    queryFn: () => apiRequest<ToolItem>(`/tools/${toolId}`),
+    enabled: Boolean(toolId),
+  });
+}
+
+export function useRunTool() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ toolId, payload }: { toolId: string; payload: { target: string; target_type?: string; options?: Record<string, any>; investigation_id?: string } }) =>
+      apiRequest<any>(`/tools/${toolId}/run`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tool-history'] });
+      queryClient.invalidateQueries({ queryKey: ['searches'] });
+    },
+  });
+}
+
+export function useBatchRunTools() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { tool_ids: string[]; target: string; target_type?: string; options?: Record<string, any> }) =>
+      apiRequest<any>('/tools/batch-run', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tool-history'] });
+      queryClient.invalidateQueries({ queryKey: ['searches'] });
+    },
+  });
+}
+
+export function useToolHistory(limit: number = 50) {
+  return useQuery<any[]>({
+    queryKey: ['tool-history', limit],
+    queryFn: () => apiRequest<any[]>(`/tools/history/runs?limit=${limit}`),
+    refetchInterval: 10000,
+  });
+}
+
+// 9. Saved Searches
+export function useSavedSearches() {
+  return useQuery<any[]>({
+    queryKey: ['saved-searches'],
+    queryFn: () => apiRequest<any[]>('/search/saved'),
+  });
+}
+
+export function useCreateSavedSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { name: string; query: string; query_type?: string; module?: string; category?: string; selected_providers?: string[]; notes?: string; tags?: string[] }) =>
+      apiRequest<any>('/search/saved', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
+    },
+  });
+}
+
+export function useDeleteSavedSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (savedId: string) =>
+      apiRequest<any>(`/search/saved/${savedId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
+    },
+  });
+}
+
+export function useExecuteSavedSearch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (savedId: string) =>
+      apiRequest<any>(`/search/saved/${savedId}/execute`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['searches'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+  });
+}
+

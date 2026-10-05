@@ -34,6 +34,7 @@ from app.modules.threat_intelligence.engines.engines.scoutsuite_engine import Sc
 from app.modules.threat_intelligence.engines.engines.trivy_engine import TrivyEngine
 from app.modules.threat_intelligence.engines.engines.gitleaks_engine import GitleaksEngine
 from app.modules.threat_intelligence.engines.engines.semgrep_engine import SemgrepEngine
+from app.modules.threat_intelligence.engines.engines.crtsh_engine import CRTSHEngine
 
 logger = logging.getLogger("sentinel.scanner.registry")
 
@@ -64,6 +65,7 @@ class ScannerRegistry:
             DNSxEngine(),
             AmassEngine(),
             ASNMapEngine(),
+            CRTSHEngine(),
             CDNCheckEngine(),
             UncoverEngine(),
             # Network & Port Discovery
