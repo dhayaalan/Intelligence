@@ -188,6 +188,19 @@ CURATED_TOOL_DEFINITIONS = [
         "supported_inputs": ["domain", "email"],
     },
     {
+        "id": "tool_dns_recon",
+        "name": "DNS Reconnaissance & Enumeration Engine",
+        "category": "DNS",
+        "description": "Multi-type authoritative DNS record enumeration (A, AAAA, MX, TXT, NS, CNAME, SOA) with latency analysis.",
+        "provider": "Sential Resolver",
+        "module_id": "osint",
+        "version": "2.1.0",
+        "execution_type": "REAL_TIME",
+        "status": "AVAILABLE",
+        "requires_api_key": False,
+        "supported_inputs": ["domain", "ip"],
+    },
+    {
         "id": "tool_dns_whois",
         "name": "DNS & WHOIS Record Resolver",
         "category": "DNS",
@@ -355,3 +368,122 @@ async def list_tool_categories(
         "categories": categories,
         "total_tools": len(CURATED_TOOL_DEFINITIONS)
     }
+
+class ToolRunRequest(BaseModel):
+    target: str
+    target_type: Optional[str] = None
+    options: Dict[str, Any] = Field(default_factory=dict)
+    investigation_id: Optional[str] = None
+
+class BatchToolRunRequest(BaseModel):
+    tool_ids: List[str]
+    target: str
+    target_type: Optional[str] = None
+    options: Dict[str, Any] = Field(default_factory=dict)
+    investigation_id: Optional[str] = None
+
+@router.get("/{tool_id}", response_model=ToolItem)
+async def get_tool_details(
+    tool_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+) -> ToolItem:
+    """Returns specific tool details, input schemas, and configuration requirements."""
+    for t in CURATED_TOOL_DEFINITIONS:
+        if t["id"] == tool_id:
+            return ToolItem(**t)
+            
+    # Fallback to provider_registry
+    from app.core.provider_registry.registry import provider_registry
+    p = provider_registry.get_provider(tool_id)
+    if p:
+        return ToolItem(
+            id=p.id,
+            name=p.name,
+            category=p.category,
+            description=p.description or f"Operational {p.name} detection engine.",
+            provider=p.name,
+            module_id=p.provider_type.value,
+            version=p.version,
+            execution_type=p.execution_mode.value,
+            status="AVAILABLE" if p.enabled else "CONFIG_REQUIRED",
+            requires_api_key=p.requires_auth,
+            supported_inputs=p.supported_target_types,
+            usage_count=p.stats.get("total_executions", 0) if hasattr(p, "stats") else 0
+        )
+    raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found in registry.")
+
+@router.post("/{tool_id}/run")
+async def run_single_tool(
+    tool_id: str,
+    req: ToolRunRequest,
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Executes a specific OSINT or Threat Intelligence tool deterministically on a target."""
+    from app.modules.tool_executor import tool_executor
+    from app.audit.logger import audit_logger
+
+    res = await tool_executor.execute_tool(
+        tool_id=tool_id,
+        target=req.target,
+        target_type=req.target_type,
+        options=req.options,
+        user=current_user
+    )
+
+    audit_logger.log(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        action="TOOL_EXECUTED",
+        resource_type="tool",
+        resource_id=tool_id,
+        details={"target": req.target, "status": res.status, "duration_ms": res.duration_ms}
+    )
+
+    return res.dict()
+
+@router.post("/batch-run")
+async def run_batch_tools(
+    req: BatchToolRunRequest,
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Runs a batch of specified tools against a single target with concurrency control."""
+    from app.modules.tool_executor import tool_executor
+    import asyncio
+
+    semaphore = asyncio.Semaphore(10)
+
+    async def run_tool_limited(tid: str):
+        async with semaphore:
+            return await tool_executor.execute_tool(
+                tool_id=tid,
+                target=req.target,
+                target_type=req.target_type,
+                options=req.options,
+                user=current_user
+            )
+
+    tasks = [run_tool_limited(tid) for tid in req.tool_ids]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    processed_results = []
+    for r in results:
+        if isinstance(r, Exception):
+            processed_results.append({"status": "FAILED", "error": str(r)})
+        else:
+            processed_results.append(r.dict())
+
+    return {
+        "target": req.target,
+        "tools_executed": len(req.tool_ids),
+        "results": processed_results
+    }
+
+@router.get("/history/runs")
+async def get_tool_run_history(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserRecord = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    """Returns persistent tool execution audit and operational telemetry."""
+    from app.modules.tool_executor import tool_executor
+    return tool_executor.get_history(tenant_id=current_user.tenant_id, limit=limit)
+

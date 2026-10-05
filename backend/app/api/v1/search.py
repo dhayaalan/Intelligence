@@ -166,3 +166,111 @@ async def geolocate_target(
         pass
 
     raise HTTPException(status_code=502, detail=f"Unable to geolocate IP '{resolved_ip}'")
+
+# -----------------------------------------------------------------------------
+# SAVED SEARCHES REUSABLE ENDPOINTS (Section 18)
+# -----------------------------------------------------------------------------
+
+from pydantic import BaseModel, Field
+
+class SavedSearchCreateRequest(BaseModel):
+    name: str
+    query: str
+    target_type: Optional[str] = None
+    tools: List[str] = Field(default_factory=list)
+    filters: dict = Field(default_factory=dict)
+    tags: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+
+class SavedSearchRecord(BaseModel):
+    id: str
+    tenant_id: str
+    user_id: str
+    user_name: str
+    name: str
+    query: str
+    target_type: Optional[str] = None
+    tools: List[str] = Field(default_factory=list)
+    filters: dict = Field(default_factory=dict)
+    tags: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    created_at: str
+    last_executed_at: Optional[str] = None
+
+_saved_searches_store: List[dict] = []
+
+@router.post("/saved", response_model=SavedSearchRecord)
+async def create_saved_search(
+    req: SavedSearchCreateRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Creates and persists a saved intelligence search query for the tenant."""
+    import uuid
+    from datetime import datetime, timezone
+    
+    saved_id = f"saved_{uuid.uuid4().hex[:10]}"
+    now = datetime.now(timezone.utc).isoformat()
+    record = {
+        "id": saved_id,
+        "tenant_id": current_user.tenant_id,
+        "user_id": current_user.id,
+        "user_name": current_user.name,
+        "name": req.name.strip(),
+        "query": req.query.strip(),
+        "target_type": req.target_type,
+        "tools": req.tools,
+        "filters": req.filters,
+        "tags": req.tags,
+        "notes": req.notes,
+        "created_at": now,
+        "last_executed_at": None,
+    }
+    _saved_searches_store.insert(0, record)
+    return SavedSearchRecord(**record)
+
+@router.get("/saved", response_model=List[SavedSearchRecord])
+async def list_saved_searches(
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Returns all saved intelligence searches for the user's tenant."""
+    results = [s for s in _saved_searches_store if s.get("tenant_id") == current_user.tenant_id]
+    return [SavedSearchRecord(**s) for s in results]
+
+@router.delete("/saved/{saved_id}")
+async def delete_saved_search(
+    saved_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Deletes a saved search belonging to the user's tenant."""
+    global _saved_searches_store
+    initial_len = len(_saved_searches_store)
+    _saved_searches_store = [
+        s for s in _saved_searches_store
+        if not (s.get("id") == saved_id and s.get("tenant_id") == current_user.tenant_id)
+    ]
+    if len(_saved_searches_store) == initial_len:
+        raise HTTPException(status_code=404, detail="Saved search not found or unauthorized.")
+    return {"status": "deleted", "id": saved_id}
+
+@router.post("/saved/{saved_id}/execute", response_model=SearchResponse)
+async def execute_saved_search(
+    saved_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Re-executes a saved intelligence search directly with the search orchestrator."""
+    from datetime import datetime, timezone
+    match = next(
+        (s for s in _saved_searches_store if s.get("id") == saved_id and s.get("tenant_id") == current_user.tenant_id),
+        None
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail="Saved search not found.")
+    
+    match["last_executed_at"] = datetime.now(timezone.utc).isoformat()
+    req = SearchRequest(
+        query=match["query"],
+        target_type=match.get("target_type"),
+        options=match.get("filters", {})
+    )
+    return await execute_search(req, current_user)
+
