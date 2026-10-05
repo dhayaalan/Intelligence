@@ -57,15 +57,25 @@ htmlcov/
 
 # Environment Variables & Secrets
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 *.env
 !*.env.example
+!*.env.example*
 *.pem
 *.key
 *.cert
+*.id_rsa
+*.id_ecdsa
+*.id_ed25519
+*.pfx
+*.p12
+*.kdbx
+credentials.json
+service-account*.json
 secrets/
 
 # Database & Persistent storage
