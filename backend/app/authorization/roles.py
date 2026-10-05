@@ -1,0 +1,55 @@
+from typing import Dict, Set
+from app.identity.models import UserRole
+
+# Core Permission Constants
+PERM_PLATFORM_MANAGE = "platform:manage"
+PERM_TENANT_MANAGE = "tenant:manage"
+PERM_TENANT_USERS_MANAGE = "tenant:users:manage"
+PERM_SEARCH_EXECUTE = "search:execute"
+PERM_INVESTIGATION_CREATE = "investigation:create"
+PERM_INVESTIGATION_READ = "investigation:read"
+PERM_INVESTIGATION_UPDATE = "investigation:update"
+PERM_EVIDENCE_MANAGE = "evidence:manage"
+PERM_AUDIT_READ = "audit:read"
+
+ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
+    UserRole.SUPER_ADMIN: {
+        PERM_PLATFORM_MANAGE,
+        PERM_TENANT_MANAGE,
+        PERM_TENANT_USERS_MANAGE,
+        PERM_SEARCH_EXECUTE,
+        PERM_INVESTIGATION_CREATE,
+        PERM_INVESTIGATION_READ,
+        PERM_INVESTIGATION_UPDATE,
+        PERM_EVIDENCE_MANAGE,
+        PERM_AUDIT_READ,
+    },
+    UserRole.TENANT_ADMIN: {
+        PERM_TENANT_USERS_MANAGE,
+        PERM_SEARCH_EXECUTE,
+        PERM_INVESTIGATION_CREATE,
+        PERM_INVESTIGATION_READ,
+        PERM_INVESTIGATION_UPDATE,
+        PERM_EVIDENCE_MANAGE,
+        PERM_AUDIT_READ,
+    },
+    UserRole.ANALYST: {
+        PERM_SEARCH_EXECUTE,
+        PERM_INVESTIGATION_CREATE,
+        PERM_INVESTIGATION_READ,
+        PERM_INVESTIGATION_UPDATE,
+        PERM_EVIDENCE_MANAGE,
+    },
+    UserRole.INVESTIGATOR: {
+        PERM_SEARCH_EXECUTE,
+        PERM_INVESTIGATION_CREATE,
+        PERM_INVESTIGATION_READ,
+        PERM_INVESTIGATION_UPDATE,
+        PERM_EVIDENCE_MANAGE,
+    },
+    UserRole.USER: {
+        PERM_SEARCH_EXECUTE,
+        PERM_INVESTIGATION_READ,
+    },
+}
+

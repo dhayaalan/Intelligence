@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Crisp Modern Intelligence Platform Aesthetic */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-50: #f8fafc;
+  --surface-100: #ffffff;
+  --surface-200: #f1f5f9;
+  --surface-300: #e2e8f0;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-focus: #0f172a;
+  --text-muted: #64748b;
+}
+
+.dark {
+  --background: #090d16;
+  --foreground: #f8fafc;
+  --surface: #0f1422;
+  --surface-50: #0d121f;
+  --surface-100: #0f1422;
+  --surface-200: #161d31;
+  --surface-300: #232d4b;
+  --border: #1e293b;
+  --border-subtle: #141b2d;
+  --border-focus: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Minimalist Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Subtle Technical Grid */
+.bg-grid-minimal {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+}
+
+.dark .bg-grid-minimal {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Dialog entrance animation */
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Utility: line clamp */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Sidebar scrollbar refinement */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 9999px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Shadow utilities */
+.shadow-xs {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-2xs {
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.08);
+}
