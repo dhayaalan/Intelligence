@@ -481,9 +481,26 @@ async def run_batch_tools(
 @router.get("/history/runs")
 async def get_tool_run_history(
     limit: int = Query(50, ge=1, le=200),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=200),
     current_user: UserRecord = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
+) -> Any:
     """Returns persistent tool execution audit and operational telemetry."""
     from app.modules.tool_executor import tool_executor
-    return tool_executor.get_history(tenant_id=current_user.tenant_id, limit=limit)
+    history = tool_executor.get_history(tenant_id=current_user.tenant_id, limit=500)
+    if page is not None or page_size is not None:
+        p = page or 1
+        ps = page_size or 20
+        total = len(history)
+        skip = (p - 1) * ps
+        paged = history[skip : skip + ps]
+        total_pages = max(1, (total + ps - 1) // ps) if total > 0 else 1
+        return {
+            "items": paged,
+            "total": total,
+            "page": p,
+            "page_size": ps,
+            "total_pages": total_pages
+        }
+    return history[:limit]
 

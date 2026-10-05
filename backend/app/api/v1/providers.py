@@ -10,7 +10,51 @@ from app.audit.logger import audit_logger
 
 router = APIRouter(prefix="/providers", tags=["Provider Registry"])
 
-@router.get("", response_model=List[ProviderMetadata])
+from typing import List, Optional, Any
+from pydantic import BaseModel
+
+class PaginatedProvidersResponse(BaseModel):
+    items: List[ProviderMetadata]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+@router.get("/paginated", response_model=PaginatedProvidersResponse)
+async def list_providers_paginated(
+    module_id: Optional[str] = Query(None, description="Filter by module: 'osint' or 'threat_intelligence'"),
+    category: Optional[str] = Query(None, description="Filter by tool category"),
+    capability: Optional[str] = Query(None, description="Filter by capability (e.g. domain, ip, username)"),
+    target_type: Optional[str] = Query(None, description="Filter by target type"),
+    search: Optional[str] = Query(None, description="Search query"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    enabled_only: bool = Query(False, description="Filter only enabled providers"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=500),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    all_providers = provider_registry.list_providers(
+        module_id=module_id,
+        category=category,
+        capability=capability,
+        target_type=target_type,
+        search=search,
+        status=status,
+        enabled_only=enabled_only
+    )
+    total = len(all_providers)
+    skip = (page - 1) * page_size
+    paged = all_providers[skip : skip + page_size]
+    total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+    return PaginatedProvidersResponse(
+        items=paged,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+@router.get("", response_model=Any)
 async def list_providers(
     module_id: Optional[str] = Query(None, description="Filter by module: 'osint' or 'threat_intelligence'"),
     category: Optional[str] = Query(None, description="Filter by tool category"),
@@ -21,6 +65,8 @@ async def list_providers(
     enabled_only: bool = Query(False, description="Filter only enabled providers"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
     current_user: UserRecord = Depends(get_current_user)
 ):
     """
@@ -36,6 +82,20 @@ async def list_providers(
         status=status,
         enabled_only=enabled_only
     )
+    if page is not None or page_size is not None:
+        p = page or 1
+        ps = page_size or 24
+        total = len(all_providers)
+        skip = (p - 1) * ps
+        paged = all_providers[skip : skip + ps]
+        total_pages = max(1, (total + ps - 1) // ps) if total > 0 else 1
+        return {
+            "items": paged,
+            "total": total,
+            "page": p,
+            "page_size": ps,
+            "total_pages": total_pages
+        }
     return all_providers[offset : offset + limit]
 
 @router.get("/stats", response_model=ProviderStats)

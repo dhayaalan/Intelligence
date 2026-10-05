@@ -43,6 +43,29 @@ class TenancyService:
             return [TenantRecord(**d) for d in db.tenants.values()]
 
     @staticmethod
+    def list_tenants_paginated(
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None
+    ) -> dict:
+        with db._lock:
+            tenants = [TenantRecord(**d) for d in db.tenants.values()]
+            if search:
+                s = search.lower()
+                tenants = [t for t in tenants if s in t.name.lower() or s in t.id.lower()]
+            total = len(tenants)
+            skip = (page - 1) * page_size
+            paged = tenants[skip : skip + page_size]
+            total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+            return {
+                "items": paged,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            }
+
+    @staticmethod
     def update_tenant(tenant_id: str, request: TenantUpdateRequest) -> Optional[TenantRecord]:
         with db._lock:
             data = db.tenants.get(tenant_id)

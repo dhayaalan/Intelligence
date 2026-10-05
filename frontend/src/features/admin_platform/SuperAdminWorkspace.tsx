@@ -3,6 +3,7 @@ import { Shield, Building2, Users, Cpu, Activity, Settings, CheckCircle2, Toggle
 import { ModuleRegistryItem, Tenant, User, AuditLog, ProviderMetadata, ProviderStats } from '../../types';
 import { apiRequest } from '../../core/api/client';
 import { Button } from '../../components/ui/Button';
+import { Pagination } from '../../components/ui/Pagination';
 
 export const SuperAdminWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'providers' | 'tenants' | 'users' | 'audit'>('overview');
@@ -15,6 +16,19 @@ export const SuperAdminWorkspace: React.FC = () => {
   const [providerSearch, setProviderSearch] = useState('');
   const [providerModuleFilter, setProviderModuleFilter] = useState<'ALL' | 'osint' | 'threat_intelligence'>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Pagination states
+  const [providerPage, setProviderPage] = useState(1);
+  const [providerPageSize, setProviderPageSize] = useState(25);
+
+  const [tenantPage, setTenantPage] = useState(1);
+  const [tenantPageSize, setTenantPageSize] = useState(10);
+
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(15);
 
   // Tenant creation state
   const [newTenantName, setNewTenantName] = useState('');
@@ -378,7 +392,7 @@ export const SuperAdminWorkspace: React.FC = () => {
                         p.capabilities.some((c) => c.toLowerCase().includes(q))
                       );
                     })
-                    .slice(0, 150)
+                    .slice((providerPage - 1) * providerPageSize, providerPage * providerPageSize)
                     .map((p) => (
                       <tr key={p.provider_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="py-2.5 px-4">
@@ -436,6 +450,38 @@ export const SuperAdminWorkspace: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Providers Pagination */}
+            {(() => {
+              const totalFiltered = providers.filter((p) => {
+                if (providerModuleFilter !== 'ALL' && p.module_id !== providerModuleFilter) return false;
+                if (!providerSearch.trim()) return true;
+                const q = providerSearch.toLowerCase();
+                return (
+                  p.name.toLowerCase().includes(q) ||
+                  p.provider_id.toLowerCase().includes(q) ||
+                  p.category.toLowerCase().includes(q) ||
+                  p.capabilities.some((c) => c.toLowerCase().includes(q))
+                );
+              }).length;
+              const totalPages = Math.max(1, Math.ceil(totalFiltered / providerPageSize));
+              return (
+                <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+                  <Pagination
+                    currentPage={providerPage}
+                    totalPages={totalPages}
+                    totalItems={totalFiltered}
+                    pageSize={providerPageSize}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    onPageChange={setProviderPage}
+                    onPageSizeChange={(newSize) => {
+                      setProviderPageSize(newSize);
+                      setProviderPage(1);
+                    }}
+                  />
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -483,31 +529,51 @@ export const SuperAdminWorkspace: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                {tenants.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{t.name}</td>
-                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">{t.id}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-1.5 flex-wrap">
-                        {t.entitled_modules.map((m) => (
-                          <span
-                            key={m}
-                            className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-[10px] font-mono text-sky-600 dark:text-sky-400"
-                          >
-                            {m}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
-                        {t.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {tenants
+                  .slice((tenantPage - 1) * tenantPageSize, tenantPage * tenantPageSize)
+                  .map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">{t.name}</td>
+                      <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">{t.id}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1.5 flex-wrap">
+                          {t.entitled_modules.map((m) => (
+                            <span
+                              key={m}
+                              className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-[10px] font-mono text-sky-600 dark:text-sky-400"
+                            >
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
+                          {t.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+
+            {/* Tenants Pagination */}
+            {tenants.length > tenantPageSize && (
+              <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+                <Pagination
+                  currentPage={tenantPage}
+                  totalPages={Math.max(1, Math.ceil(tenants.length / tenantPageSize))}
+                  totalItems={tenants.length}
+                  pageSize={tenantPageSize}
+                  pageSizeOptions={[5, 10, 20, 50]}
+                  onPageChange={setTenantPage}
+                  onPageSizeChange={(newSize) => {
+                    setTenantPageSize(newSize);
+                    setTenantPage(1);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -525,27 +591,47 @@ export const SuperAdminWorkspace: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="font-semibold text-slate-900 dark:text-white">{u.name}</div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{u.email}</div>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs font-semibold text-sky-600 dark:text-sky-400">{u.role}</td>
-                  <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 text-xs">{u.tenant_id}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex gap-1 flex-wrap">
-                      {u.assigned_modules.map((m) => (
-                        <span key={m} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-700 dark:text-slate-300">
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {users
+                .slice((userPage - 1) * userPageSize, userPage * userPageSize)
+                .map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-900 dark:text-white">{u.name}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{u.email}</div>
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs font-semibold text-sky-600 dark:text-sky-400">{u.role}</td>
+                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 text-xs">{u.tenant_id}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {u.assigned_modules.map((m) => (
+                          <span key={m} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-700 dark:text-slate-300">
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
+
+          {/* Users Pagination */}
+          {users.length > userPageSize && (
+            <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+              <Pagination
+                currentPage={userPage}
+                totalPages={Math.max(1, Math.ceil(users.length / userPageSize))}
+                totalItems={users.length}
+                pageSize={userPageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                onPageChange={setUserPage}
+                onPageSizeChange={(newSize) => {
+                  setUserPageSize(newSize);
+                  setUserPage(1);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -563,21 +649,41 @@ export const SuperAdminWorkspace: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-              {auditLogs.map((l) => (
-                <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                    {new Date(l.timestamp).toLocaleTimeString()}
-                  </td>
-                  <td className="py-3 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{l.action}</td>
-                  <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">{l.user_id}</td>
-                  <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">{l.tenant_id}</td>
-                  <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
-                    {l.resource_type}:{l.resource_id}
-                  </td>
-                </tr>
-              ))}
+              {auditLogs
+                .slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize)
+                .map((l) => (
+                  <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                      {new Date(l.timestamp).toLocaleTimeString()}
+                    </td>
+                    <td className="py-3 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{l.action}</td>
+                    <td className="py-3 px-4 font-mono text-slate-700 dark:text-slate-300">{l.user_id}</td>
+                    <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">{l.tenant_id}</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
+                      {l.resource_type}:{l.resource_id}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
+
+          {/* Audit Pagination */}
+          {auditLogs.length > auditPageSize && (
+            <div className="p-3 border-t border-slate-200/90 dark:border-slate-800">
+              <Pagination
+                currentPage={auditPage}
+                totalPages={Math.max(1, Math.ceil(auditLogs.length / auditPageSize))}
+                totalItems={auditLogs.length}
+                pageSize={auditPageSize}
+                pageSizeOptions={[10, 15, 30, 60]}
+                onPageChange={setAuditPage}
+                onPageSizeChange={(newSize) => {
+                  setAuditPageSize(newSize);
+                  setAuditPage(1);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

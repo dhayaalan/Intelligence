@@ -104,6 +104,38 @@ class IdentityService:
             return users
 
     @staticmethod
+    def list_users_paginated(
+        tenant_id: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None,
+        role: Optional[str] = None
+    ) -> dict:
+        with db._lock:
+            users = [UserRecord(**u) for u in db.users.values()]
+            if tenant_id:
+                users = [u for u in users if u.tenant_id == tenant_id]
+            if role:
+                users = [u for u in users if u.role.value == role or u.role == role]
+            if search:
+                s = search.lower()
+                users = [
+                    u for u in users
+                    if s in u.name.lower() or s in u.email.lower() or s in u.tenant_id.lower()
+                ]
+            total = len(users)
+            skip = (page - 1) * page_size
+            paged = users[skip : skip + page_size]
+            total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+            return {
+                "items": paged,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            }
+
+    @staticmethod
     def update_user(user_id: str, request: UserUpdateRequest, actor: UserRecord) -> Optional[UserRecord]:
         target = IdentityService.get_user_by_id(user_id)
         if not target:
