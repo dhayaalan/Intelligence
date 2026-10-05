@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit AI Code Review Configuration
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: "en-US"
+early_access: false
+
+reviews:
+  # Review profile: "assertive" for thorough inspection of bugs, security, and standards
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Exclude noise, compiled artifacts, and lockfiles from AI review
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/.pytest_cache/**"
+    - "!**/__pycache__/**"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/*.min.*"
+    - "!**/*.svg"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.ico"
+    - "!**/*.zip"
+
+  # Repository-specific review instructions tailored to the Intelligence platform stack
+  path_instructions:
+    - path: "backend/app/**"
+      instructions: |
+        - Ensure strict FastAPI standards: valid route definitions, correct status codes, and robust Pydantic request/response schemas.
+        - Verify Multi-Tenant Isolation: all database queries and repository calls must enforce tenant_id boundaries. Prevent tenant data leaks.
+        - Verify Role-Based Access Control (RBAC): ensure endpoints properly enforce roles (SUPER_ADMIN, TENANT_ADMIN, ANALYST) using FastAPI dependencies.
+        - Review asynchronous code (async/await) and database access for connection handling, potential race conditions, or unhandled exceptions.
+        - Verify MongoDB operations (Motor/PyMongo): prevent injection risks, ensure appropriate indexing, and handle empty or null results cleanly.
+        - Verify that security-sensitive actions (authentication, tenant updates, tool executions, case changes) emit audit logs via audit_logger.
+
+    - path: "backend/tests/**"
+      instructions: |
+        - Ensure pytest tests test realistic scenarios: failure isolation, error handling, tenant boundary enforcement, and RBAC permissions.
+        - Verify fixtures and tests do not leak or hardcode production credentials, tokens, or sensitive data.
+
+    - path: "frontend/src/**"
+      instructions: |
+        - Review React 18 best practices: correct hook usage (useState, useEffect, useMemo), proper dependency arrays, and prevention of unnecessary re-renders.
+        - Verify TanStack React Query patterns: sensible cache keys, correct query invalidation on mutations, loading states, and robust error handling.
+        - Enforce TypeScript type safety: avoid the 'any' type, ensure comprehensive type definitions for API responses and component props.
+        - Check UI layout and accessibility: proper semantic elements, responsive design consistency, and clean styling with TailwindCSS.
+
+    - path: ".github/**"
+      instructions: |
+        - Review GitHub Actions workflows for security: ensure least-privilege permissions, safe concurrency groups, and no exposed secrets or tokens.
+        - Ensure CI validation steps (lint, typecheck, pytest, build, TruffleHog, CodeQL) maintain guardrails without introducing breaking false positives.
+
+chat:
+  auto_reply: true
