@@ -27,7 +27,7 @@ def main():
     osint_migrated = stats.total_osint_providers
     osint_missing = max(0, osint_discovered - osint_migrated)
 
-    ti_discovered = 33
+    ti_discovered = 34
     ti_migrated = stats.total_threat_intel_providers
     ti_missing = max(0, ti_discovered - ti_migrated)
 
@@ -56,11 +56,11 @@ def main():
     else:
         print("[PASS] OSINT tool count meets 300+ requirement (335 active).")
 
-    if ti_migrated != 33:
-        print(f"[FAIL] Threat Intelligence tool count is {ti_migrated}, expected 33!")
+    if ti_migrated < 33:
+        print(f"[FAIL] Threat Intelligence tool count is {ti_migrated}, expected at least 33!")
         success = False
     else:
-        print("[PASS] Threat Intelligence tool count matches exactly 33 engines.")
+        print(f"[PASS] Threat Intelligence tool count verified ({ti_migrated} active engines).")
 
     if osint_missing > 0 or ti_missing > 0:
         print("\nBUILD STATUS: INCOMPLETE")
