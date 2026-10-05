@@ -34,6 +34,7 @@ import {
   useCreateTenant,
   useToggleTenantStatus,
 } from '../../core/api/hooks';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 
 type SuperAdminNav =
   | 'dashboard'
@@ -63,6 +64,16 @@ export const SuperAdminLayout: React.FC = () => {
 
   const createTenantMutation = useCreateTenant();
   const toggleTenantStatusMutation = useToggleTenantStatus();
+
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
 
   // Create Tenant Form State
   const [formOrgName, setFormOrgName] = useState('');
@@ -796,13 +807,24 @@ export const SuperAdminLayout: React.FC = () => {
                             </td>
                             <td className="py-4 px-6 text-right">
                               <button
-                                onClick={async () => {
-                                  const nextStatus = t.status === 'active' ? 'suspended' : 'active';
-                                  await toggleTenantStatusMutation.mutateAsync({
-                                    tenantId: t.id,
-                                    status: nextStatus,
+                                onClick={() => {
+                                  const isSuspending = t.status === 'active';
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: isSuspending ? `Suspend Tenant: ${t.name}` : `Activate Tenant: ${t.name}`,
+                                    description: isSuspending
+                                      ? `Are you sure you want to suspend "${t.name}"? All assigned tenant users, analysts, and investigators will immediately be blocked from accessing platform intelligence tools and cases.`
+                                      : `Restore platform access for "${t.name}"? Users and analysts in this organization will be able to log in and resume security operations.`,
+                                    confirmLabel: isSuspending ? 'Suspend Tenant' : 'Activate Tenant',
+                                    variant: isSuspending ? 'danger' : 'primary',
+                                    onConfirm: async () => {
+                                      await toggleTenantStatusMutation.mutateAsync({
+                                        tenantId: t.id,
+                                        status: isSuspending ? 'suspended' : 'active',
+                                      });
+                                      refetchTenants();
+                                    },
                                   });
-                                  refetchTenants();
                                 }}
                                 className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[11px] transition-colors cursor-pointer"
                               >
@@ -1337,6 +1359,21 @@ export const SuperAdminLayout: React.FC = () => {
           )}
         </div>
       </main>
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={async () => {
+            await confirmDialog.onConfirm();
+            setConfirmDialog(null);
+          }}
+        />
+      )}
     </div>
   );
 };
