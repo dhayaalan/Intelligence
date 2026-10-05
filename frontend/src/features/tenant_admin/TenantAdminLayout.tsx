@@ -35,6 +35,7 @@ import {
   useAuditLogs,
   useCreateUser
 } from '../../core/api/hooks';
+import { Pagination } from '../../components/ui/Pagination';
 
 type TenantAdminNav =
   | 'dashboard'
@@ -117,6 +118,33 @@ export const TenantAdminLayout: React.FC = () => {
     if (activeNav === 'investigators') return matches && (u.role === 'INVESTIGATOR' || u.role === 'USER');
     return matches;
   });
+
+  // Pagination states
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberPageSize, setMemberPageSize] = useState(10);
+  const [casePage, setCasePage] = useState(1);
+  const [casePageSize, setCasePageSize] = useState(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(15);
+
+  const paginatedMembers = React.useMemo(() => {
+    const start = (memberPage - 1) * memberPageSize;
+    return filteredUsers.slice(start, start + memberPageSize);
+  }, [filteredUsers, memberPage, memberPageSize]);
+
+  const activeCasesOrInvs = activeNav === 'cases' ? cases : investigations;
+  const paginatedCasesOrInvs = React.useMemo(() => {
+    const start = (casePage - 1) * casePageSize;
+    return activeCasesOrInvs.slice(start, start + casePageSize);
+  }, [activeCasesOrInvs, casePage, casePageSize]);
+
+  const paginatedAuditLogs = React.useMemo(() => {
+    const start = (auditPage - 1) * auditPageSize;
+    return auditLogs.slice(start, start + auditPageSize);
+  }, [auditLogs, auditPage, auditPageSize]);
+
+  React.useEffect(() => { setMemberPage(1); }, [userSearch, activeNav]);
+  React.useEffect(() => { setCasePage(1); }, [activeNav]);
 
   return (
     <div className="flex h-screen bg-[#f8fafc] dark:bg-[#070b13] text-slate-900 dark:text-slate-100 overflow-hidden font-sans transition-colors">
@@ -706,7 +734,7 @@ export const TenantAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {filteredUsers.map((u) => (
+                      {paginatedMembers.map((u) => (
                         <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">{u.name}</td>
                           <td className="py-4 px-4 font-mono text-slate-700 dark:text-slate-300">{u.email}</td>
@@ -735,6 +763,27 @@ export const TenantAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {filteredUsers.length > memberPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      <span>
+                        Showing {(memberPage - 1) * memberPageSize + 1} to{' '}
+                        {Math.min(memberPage * memberPageSize, filteredUsers.length)} of {filteredUsers.length} members
+                      </span>
+                      <Pagination
+                        currentPage={memberPage}
+                        totalPages={Math.ceil(filteredUsers.length / memberPageSize)}
+                        totalItems={filteredUsers.length}
+                        pageSize={memberPageSize}
+                        onPageChange={setMemberPage}
+                        onPageSizeChange={(sz) => {
+                          setMemberPageSize(sz);
+                          setMemberPage(1);
+                        }}
+                        pageSizeOptions={[5, 10, 25, 50]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -875,7 +924,7 @@ export const TenantAdminLayout: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                        {(activeNav === 'cases' ? cases : investigations).map((item) => (
+                        {paginatedCasesOrInvs.map((item) => (
                           <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                             <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">{item.title}</td>
                             <td className="py-4 px-4 font-mono text-cyan-600 dark:text-cyan-400">{item.target}</td>
@@ -889,6 +938,27 @@ export const TenantAdminLayout: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+
+                    {activeCasesOrInvs.length > casePageSize && (
+                      <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span>
+                          Showing {(casePage - 1) * casePageSize + 1} to{' '}
+                          {Math.min(casePage * casePageSize, activeCasesOrInvs.length)} of {activeCasesOrInvs.length} entries
+                        </span>
+                        <Pagination
+                          currentPage={casePage}
+                          totalPages={Math.ceil(activeCasesOrInvs.length / casePageSize)}
+                          totalItems={activeCasesOrInvs.length}
+                          pageSize={casePageSize}
+                          onPageChange={setCasePage}
+                          onPageSizeChange={(sz) => {
+                            setCasePageSize(sz);
+                            setCasePage(1);
+                          }}
+                          pageSizeOptions={[5, 10, 25, 50]}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -943,7 +1013,7 @@ export const TenantAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {auditLogs.map((log) => (
+                      {paginatedAuditLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors font-mono">
                           <td className="py-3 px-6 text-slate-500 dark:text-slate-400 text-[11px]">
                             {new Date(log.timestamp).toLocaleString()}
@@ -959,6 +1029,27 @@ export const TenantAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {auditLogs.length > auditPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 font-sans">
+                      <span>
+                        Showing {(auditPage - 1) * auditPageSize + 1} to{' '}
+                        {Math.min(auditPage * auditPageSize, auditLogs.length)} of {auditLogs.length} audit entries
+                      </span>
+                      <Pagination
+                        currentPage={auditPage}
+                        totalPages={Math.ceil(auditLogs.length / auditPageSize)}
+                        totalItems={auditLogs.length}
+                        pageSize={auditPageSize}
+                        onPageChange={setAuditPage}
+                        onPageSizeChange={(sz) => {
+                          setAuditPageSize(sz);
+                          setAuditPage(1);
+                        }}
+                        pageSizeOptions={[15, 30, 50, 100]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

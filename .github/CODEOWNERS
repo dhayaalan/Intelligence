@@ -1,0 +1,22 @@
+# Sential Intelligence Platform — CODEOWNERS
+# These owners are required reviewers for pull requests touching their respective areas.
+# GitHub documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default global code ownership
+* @dhayaalan
+
+# Frontend application, design system, and UI components
+/frontend/ @dhayaalan
+
+# Backend application, API routes, and core database logic
+/backend/ @dhayaalan
+
+# Core intelligence provider integrations and module registry
+/backend/app/modules/ @dhayaalan
+/backend/app/core/provider_registry/ @dhayaalan
+
+# Verification and migration scripts
+/scripts/ @dhayaalan
+
+# CI/CD Workflows, security scanners, and repository configuration
+/.github/ @dhayaalan

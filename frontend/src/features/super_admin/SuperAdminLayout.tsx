@@ -37,6 +37,7 @@ import {
 } from '../../core/api/hooks';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { ToolGrid, ToolRunModal } from '../../components/tools';
+import { Pagination } from '../../components/ui/Pagination';
 
 type SuperAdminNav =
   | 'dashboard'
@@ -160,6 +161,32 @@ export const SuperAdminLayout: React.FC = () => {
     }
     return matchesSearch;
   });
+
+  // Pagination states
+  const [tenantPage, setTenantPage] = useState(1);
+  const [tenantPageSize, setTenantPageSize] = useState(10);
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(15);
+
+  const paginatedTenants = React.useMemo(() => {
+    const start = (tenantPage - 1) * tenantPageSize;
+    return filteredTenants.slice(start, start + tenantPageSize);
+  }, [filteredTenants, tenantPage, tenantPageSize]);
+
+  const paginatedUsers = React.useMemo(() => {
+    const start = (userPage - 1) * userPageSize;
+    return filteredUsers.slice(start, start + userPageSize);
+  }, [filteredUsers, userPage, userPageSize]);
+
+  const paginatedAuditLogs = React.useMemo(() => {
+    const start = (auditPage - 1) * auditPageSize;
+    return auditLogs.slice(start, start + auditPageSize);
+  }, [auditLogs, auditPage, auditPageSize]);
+
+  React.useEffect(() => { setTenantPage(1); }, [tenantSearch]);
+  React.useEffect(() => { setUserPage(1); }, [userSearch, activeNav]);
 
   const filteredTools = tools.filter((t) => {
     const matchesSearch =
@@ -786,7 +813,7 @@ export const SuperAdminLayout: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                        {filteredTenants.map((t) => (
+                        {paginatedTenants.map((t) => (
                           <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                             <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
                               <div>{t.name}</div>
@@ -840,6 +867,27 @@ export const SuperAdminLayout: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+
+                    {filteredTenants.length > tenantPageSize && (
+                      <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span>
+                          Showing {(tenantPage - 1) * tenantPageSize + 1} to{' '}
+                          {Math.min(tenantPage * tenantPageSize, filteredTenants.length)} of {filteredTenants.length} tenants
+                        </span>
+                        <Pagination
+                          currentPage={tenantPage}
+                          totalPages={Math.ceil(filteredTenants.length / tenantPageSize)}
+                          totalItems={filteredTenants.length}
+                          pageSize={tenantPageSize}
+                          onPageChange={setTenantPage}
+                          onPageSizeChange={(sz) => {
+                            setTenantPageSize(sz);
+                            setTenantPage(1);
+                          }}
+                          pageSizeOptions={[5, 10, 25, 50]}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1122,7 +1170,7 @@ export const SuperAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {filteredUsers.map((u) => (
+                      {paginatedUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
                             <div>{u.name}</div>
@@ -1156,6 +1204,27 @@ export const SuperAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {filteredUsers.length > userPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      <span>
+                        Showing {(userPage - 1) * userPageSize + 1} to{' '}
+                        {Math.min(userPage * userPageSize, filteredUsers.length)} of {filteredUsers.length} users
+                      </span>
+                      <Pagination
+                        currentPage={userPage}
+                        totalPages={Math.ceil(filteredUsers.length / userPageSize)}
+                        totalItems={filteredUsers.length}
+                        pageSize={userPageSize}
+                        onPageChange={setUserPage}
+                        onPageSizeChange={(sz) => {
+                          setUserPageSize(sz);
+                          setUserPage(1);
+                        }}
+                        pageSizeOptions={[5, 10, 25, 50]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1208,7 +1277,7 @@ export const SuperAdminLayout: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                      {auditLogs.map((log) => (
+                      {paginatedAuditLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors font-mono">
                           <td className="py-3 px-6 text-slate-500 dark:text-slate-400 text-[11px]">
                             {new Date(log.timestamp).toLocaleString()}
@@ -1225,6 +1294,27 @@ export const SuperAdminLayout: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {auditLogs.length > auditPageSize && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 font-sans">
+                      <span>
+                        Showing {(auditPage - 1) * auditPageSize + 1} to{' '}
+                        {Math.min(auditPage * auditPageSize, auditLogs.length)} of {auditLogs.length} audit entries
+                      </span>
+                      <Pagination
+                        currentPage={auditPage}
+                        totalPages={Math.ceil(auditLogs.length / auditPageSize)}
+                        totalItems={auditLogs.length}
+                        pageSize={auditPageSize}
+                        onPageChange={setAuditPage}
+                        onPageSizeChange={(sz) => {
+                          setAuditPageSize(sz);
+                          setAuditPage(1);
+                        }}
+                        pageSizeOptions={[15, 30, 50, 100]}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

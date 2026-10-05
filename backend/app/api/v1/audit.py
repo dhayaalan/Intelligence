@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
 from app.identity.models import UserRecord, UserRole
 from app.tenancy.context import get_current_user, require_roles

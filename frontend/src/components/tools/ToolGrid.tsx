@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ToolItem } from '../../core/api/hooks';
 import { ToolCard } from './ToolCard';
 import { SearchInput } from '../common/SearchInput';
 import { FilterBar, FilterOption } from '../common/FilterBar';
 import { EmptyState } from '../common/EmptyState';
+import { Pagination } from '../ui/Pagination';
 import { Wrench } from 'lucide-react';
 
 export interface ToolGridProps {
@@ -11,6 +12,7 @@ export interface ToolGridProps {
   onRunTool?: (tool: ToolItem) => void;
   onConfigureTool?: (tool: ToolItem) => void;
   onViewDetails?: (tool: ToolItem) => void;
+  initialPageSize?: number;
   className?: string;
 }
 
@@ -19,11 +21,14 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
   onRunTool,
   onConfigureTool,
   onViewDetails,
+  initialPageSize = 12,
   className = '',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
 
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -67,6 +72,18 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
     });
   }, [tools, searchQuery, selectedCategory, selectedStatus]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedCategory, selectedStatus]);
+
+  const totalItems = filteredTools.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  const paginatedTools = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredTools.slice(start, start + pageSize);
+  }, [filteredTools, page, pageSize]);
+
   const hasActiveFilters =
     Boolean(searchQuery) ||
     selectedCategory !== 'ALL' ||
@@ -76,6 +93,7 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
     setSearchQuery('');
     setSelectedCategory('ALL');
     setSelectedStatus('ALL');
+    setPage(1);
   };
 
   return (
@@ -123,17 +141,40 @@ export const ToolGrid: React.FC<ToolGridProps> = ({
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTools.map((tool) => (
-            <ToolCard
-              key={tool.id}
-              tool={tool}
-              onRun={onRunTool}
-              onConfigure={onConfigureTool}
-              onViewDetails={onViewDetails}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedTools.map((tool) => (
+              <ToolCard
+                key={tool.id}
+                tool={tool}
+                onRun={onRunTool}
+                onConfigure={onConfigureTool}
+                onViewDetails={onViewDetails}
+              />
+            ))}
+          </div>
+
+          {totalItems > pageSize && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
+              <span>
+                Showing {(page - 1) * pageSize + 1} to{' '}
+                {Math.min(page * pageSize, totalItems)} of {totalItems} tools
+              </span>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
+                }}
+                pageSizeOptions={[12, 24, 48, 96]}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

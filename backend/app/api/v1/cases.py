@@ -24,10 +24,50 @@ class CaseUpdateRequest(BaseModel):
     status: Optional[str] = None
     tags: Optional[List[str]] = None
 
+class PaginatedCasesResponse(BaseModel):
+    items: List[Dict[str, Any]]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+@router.get("/paginated", response_model=PaginatedCasesResponse)
+async def list_cases_paginated(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    cases = await case_repo.list_by_tenant(current_user.tenant_id)
+    if status and status.upper() != "ALL":
+        cases = [c for c in cases if str(c.get("status", "")).upper() == status.upper()]
+    if priority and priority.upper() != "ALL":
+        cases = [c for c in cases if str(c.get("priority", "")).upper() == priority.upper()]
+    if search and search.strip():
+        q = search.strip().lower()
+        cases = [c for c in cases if q in str(c.get("title", "")).lower() or q in str(c.get("description", "")).lower()]
+
+    total = len(cases)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    items = cases[start:start + page_size]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
+
 @router.get("")
 async def list_cases(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=100),
     current_user: UserRecord = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     cases = await case_repo.list_by_tenant(current_user.tenant_id)
@@ -35,6 +75,9 @@ async def list_cases(
         cases = [c for c in cases if str(c.get("status", "")).upper() == status.upper()]
     if priority and priority.upper() != "ALL":
         cases = [c for c in cases if str(c.get("priority", "")).upper() == priority.upper()]
+    if page and page_size:
+        start = (page - 1) * page_size
+        return cases[start:start + page_size]
     return cases
 
 @router.post("")

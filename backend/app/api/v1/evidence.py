@@ -2,8 +2,8 @@ import hashlib
 import os
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from typing import List, Optional, Dict, Any
 from app.identity.models import UserRecord
 from app.tenancy.context import get_current_user
 from app.evidence.models import EvidenceRecord
@@ -17,13 +17,57 @@ EVIDENCE_STORAGE_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../../storage/evidence")
 )
 
+from pydantic import BaseModel
+
+class PaginatedEvidenceResponse(BaseModel):
+    items: List[EvidenceRecord]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+@router.get("/paginated", response_model=PaginatedEvidenceResponse)
+async def list_evidence_paginated(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    investigation_id: Optional[str] = None,
+    search_id: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    records = evidence_service.list_evidence(current_user.tenant_id, investigation_id, search_id)
+    if search and search.strip():
+        q = search.strip().lower()
+        records = [
+            r for r in records
+            if q in str(r.title or "").lower() or q in str(r.description or "").lower() or q in str(r.source or "").lower()
+        ]
+    total = len(records)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    items = records[start:start + page_size]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
+
 @router.get("", response_model=List[EvidenceRecord])
 async def list_evidence(
     investigation_id: Optional[str] = None,
     search_id: Optional[str] = None,
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=100),
     current_user: UserRecord = Depends(get_current_user)
 ):
-    return evidence_service.list_evidence(current_user.tenant_id, investigation_id, search_id)
+    records = evidence_service.list_evidence(current_user.tenant_id, investigation_id, search_id)
+    if page and page_size:
+        start = (page - 1) * page_size
+        return records[start:start + page_size]
+    return records
 
 @router.post("", response_model=EvidenceRecord)
 async def store_evidence(

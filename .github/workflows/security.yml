@@ -1,0 +1,94 @@
+name: Security
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  secret-scan:
+    name: Secret Detection & Credential Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog Secret Scanner
+        uses: trufflesecurity/trufflehog@v3.88.15
+        with:
+          base: ${{ github.event.repository.default_branch || 'main' }}
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Static credential and private key verification
+        run: |
+          echo "Scanning for stray private keys and credential tokens..."
+          VIOLATIONS=0
+          if git grep -I -E "BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY" -- ':!*.lock' ':!node_modules' ':!.git' 2>/dev/null; then
+            echo "::error::Private key patterns detected in tracked files!"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+          if git grep -I -E "AKIA[0-9A-Z]{16}" -- ':!*.lock' ':!node_modules' ':!.git' 2>/dev/null; then
+            echo "::error::AWS Access Key ID pattern detected in tracked files!"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            exit 1
+          fi
+          echo "No static credentials or private keys detected."
+
+  codeql-analysis:
+    name: CodeQL SAST Analysis (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript-typescript']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-extended,security-and-quality
+
+      - name: Autobuild CodeQL
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  dependency-review:
+    name: PR Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: true
