@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Search, FolderGit2, Layers, ShieldAlert, FileText, Lock,
-  Share2, Globe, ChevronLeft, ChevronRight, LogOut
+  Share2, Globe, ChevronLeft, ChevronRight, LogOut, Wrench
 } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { SearchPage } from '../../features/search/SearchPage';
@@ -13,8 +13,11 @@ import { ReportsPage } from '../../features/reports/ReportsPage';
 import { GraphStudioPage } from '../../features/graph/GraphStudioPage';
 import { MapPage } from '../../features/map/MapPage';
 import { apiRequest } from '../../core/api/client';
+import { useTools, ToolItem } from '../../core/api/hooks';
+import { ToolGrid, ToolRunModal } from '../tools';
+import { PageHeader } from '../common/PageHeader';
 
-type NavView = 'search' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
+type NavView = 'search' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
 
 interface NavItem {
   id: NavView;
@@ -35,8 +38,12 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
   const [searchTarget, setSearchTarget] = useState<{ query: string; targetType?: string } | null>(null);
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
 
+  const { data: tools = [] } = useTools();
+  const [runningTool, setRunningTool] = useState<ToolItem | null>(null);
+
   const navItems: NavItem[] = [
     { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
+    { id: 'tools', label: 'Tool Workbench', icon: <Wrench className="w-4 h-4" /> },
     { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
     { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" />, dividerBefore: true },
     { id: 'graph', label: 'Relationships', icon: <Share2 className="w-4 h-4" /> },
@@ -233,6 +240,19 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
             }}
           />
         )}
+        {activeNav === 'tools' && (
+          <div className="max-w-7xl mx-auto space-y-6">
+            <PageHeader
+              title="Intelligence Tool Workbench"
+              description="Execute deterministic reconnaissance probers, DNS enumeration, CT-logs, WHOIS, and threat intelligence engines on target indicators."
+            />
+            <ToolGrid
+              tools={tools}
+              onRunTool={(tool) => setRunningTool(tool)}
+              onViewDetails={(tool) => setRunningTool(tool)}
+            />
+          </div>
+        )}
         {activeNav === 'investigations' && (
           <InvestigationsPage
             selectedInvestigationId={selectedInvId}
@@ -249,6 +269,14 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
         {activeNav === 'evidence' && <EvidencePage />}
         {activeNav === 'reports' && <ReportsPage />}
       </main>
+
+      {runningTool && (
+        <ToolRunModal
+          tool={runningTool}
+          isOpen={Boolean(runningTool)}
+          onClose={() => setRunningTool(null)}
+        />
+      )}
     </div>
   );
 };
