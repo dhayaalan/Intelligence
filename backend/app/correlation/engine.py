@@ -63,32 +63,33 @@ class CorrelationEngine:
             # Ingest evidence
             all_evidence.extend(mod_res.evidence)
             
-        # 2. Automatically infer root relationships between Target Query and top discovered entities
+        # 2. Only infer root relationships between Target Query and top discovered entities if few real relationships exist
         correlated_entities = list(entities_by_key.values())
-        for ent in correlated_entities:
-            if ent.value.lower().strip() == target_query.lower().strip():
-                continue
-                
-            inferred_type = RelationshipType.DISCOVERED_FROM
-            if target_type in ["domain", "subdomain"] and ent.type == EntityType.IP:
-                inferred_type = RelationshipType.RESOLVES_TO
-            elif target_type in ["domain"] and ent.type == EntityType.SUBDOMAIN:
-                inferred_type = RelationshipType.CONTAINS
-            elif ent.type in [EntityType.VULNERABILITY, EntityType.THREAT_INDICATOR]:
-                inferred_type = RelationshipType.EXPOSED_BY
-            elif ent.type in [EntityType.PERSON, EntityType.EMAIL, EntityType.USERNAME]:
-                inferred_type = RelationshipType.ASSOCIATED_WITH
-                
-            rel_key = (target_query.lower().strip(), inferred_type.value, ent.value.lower().strip())
-            if rel_key not in relationships_by_key:
-                relationships_by_key[rel_key] = RelationshipPayload(
-                    source_entity_value=target_query,
-                    target_entity_value=ent.value,
-                    relationship_type=inferred_type,
-                    confidence=ent.confidence,
-                    sources=ent.sources,
-                    metadata={"inferred_by": "core_correlation_engine"}
-                )
+        if len(relationships_by_key) < 10:
+            for ent in correlated_entities[:8]:
+                if ent.value.lower().strip() == target_query.lower().strip():
+                    continue
+                    
+                inferred_type = RelationshipType.DISCOVERED_FROM
+                if target_type in ["domain", "subdomain"] and ent.type == EntityType.IP:
+                    inferred_type = RelationshipType.RESOLVES_TO
+                elif target_type in ["domain"] and ent.type == EntityType.SUBDOMAIN:
+                    inferred_type = RelationshipType.CONTAINS
+                elif ent.type in [EntityType.VULNERABILITY, EntityType.THREAT_INDICATOR]:
+                    inferred_type = RelationshipType.EXPOSED_BY
+                elif ent.type in [EntityType.PERSON, EntityType.EMAIL, EntityType.USERNAME]:
+                    inferred_type = RelationshipType.ASSOCIATED_WITH
+                    
+                rel_key = (target_query.lower().strip(), inferred_type.value, ent.value.lower().strip())
+                if rel_key not in relationships_by_key:
+                    relationships_by_key[rel_key] = RelationshipPayload(
+                        source_entity_value=target_query,
+                        target_entity_value=ent.value,
+                        relationship_type=inferred_type,
+                        confidence=ent.confidence,
+                        sources=ent.sources,
+                        metadata={"inferred_by": "core_correlation_engine"}
+                    )
 
         return (
             correlated_entities,

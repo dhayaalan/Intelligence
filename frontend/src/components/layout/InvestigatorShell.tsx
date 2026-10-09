@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
   Search, FolderGit2, Layers, ShieldAlert, FileText, Lock,
-  Share2, Globe, ChevronLeft, ChevronRight, LogOut, Wrench
+  Share2, Globe, ChevronLeft, ChevronRight, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { SearchPage } from '../../features/search/SearchPage';
+import { NewsIntelligencePage } from '../../features/news_intelligence/NewsIntelligencePage';
 import { InvestigationsPage } from '../../features/investigations/InvestigationsPage';
 import { FindingsPage } from '../../features/findings/FindingsPage';
 import { EvidencePage } from '../../features/evidence/EvidencePage';
@@ -17,7 +18,8 @@ import { useTools, ToolItem } from '../../core/api/hooks';
 import { ToolGrid, ToolRunModal } from '../tools';
 import { PageHeader } from '../common/PageHeader';
 
-type NavView = 'search' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
+type NavView = 'search' | 'news' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
+
 
 interface NavItem {
   id: NavView;
@@ -37,15 +39,16 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchTarget, setSearchTarget] = useState<{ query: string; targetType?: string } | null>(null);
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
+  const [investigationsKey, setInvestigationsKey] = useState<number>(0);
 
   const { data: tools = [] } = useTools();
   const [runningTool, setRunningTool] = useState<ToolItem | null>(null);
 
   const navItems: NavItem[] = [
     { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
-    { id: 'tools', label: 'Tool Workbench', icon: <Wrench className="w-4 h-4" /> },
     { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
     { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" />, dividerBefore: true },
+
     { id: 'graph', label: 'Relationships', icon: <Share2 className="w-4 h-4" /> },
     { id: 'map', label: 'Geospatial Map', icon: <Globe className="w-4 h-4" /> },
     { id: 'findings', label: 'Findings', icon: <ShieldAlert className="w-4 h-4" />, dividerBefore: true },
@@ -75,6 +78,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
   };
 
   const handleNavClick = (id: NavView) => {
+    if (id === 'investigations') {
+      setSelectedInvId(null);
+      setInvestigationsKey((k) => k + 1);
+    }
     setActiveNav(id);
     onCloseSidebar(); // Close mobile sidebar on navigation
   };
@@ -240,6 +247,7 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
             }}
           />
         )}
+        {activeNav === 'news' && <NewsIntelligencePage />}
         {activeNav === 'tools' && (
           <div className="max-w-7xl mx-auto space-y-6">
             <PageHeader
@@ -255,7 +263,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
         )}
         {activeNav === 'investigations' && (
           <InvestigationsPage
+            key={investigationsKey}
             selectedInvestigationId={selectedInvId}
+            onSelectInvestigation={(id) => setSelectedInvId(id)}
+            onClearSelectedInvestigation={() => setSelectedInvId(null)}
             onNavigateToSearch={(target, targetType) => {
               setSearchTarget({ query: target, targetType });
               setActiveNav('search');

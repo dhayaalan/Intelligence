@@ -1,5 +1,6 @@
 import json
 import asyncio
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
@@ -8,6 +9,7 @@ from app.tenancy.context import get_current_user
 from app.search.schemas import SearchRequest, SearchResponse
 from app.search.orchestrator import search_orchestrator
 from app.core.database import db
+from app.core.logging import app_logger
 from app.audit.logger import audit_logger
 
 router = APIRouter(prefix="/search", tags=["Search Orchestrator"])
@@ -24,22 +26,42 @@ async def execute_search(
     try:
         from app.investigations.service import investigation_service
         from app.investigations.models import InvestigationCreateRequest
+        from app.infrastructure.mongodb.repositories import investigation_repo, case_repo
         import hashlib
         query_val = req.query.strip()
+        
+        executed_mods = [j.module for j in response.module_jobs if j.status in ["completed", "partial"]]
+        selected_modules = list(set(["osint", "threat_intelligence", "news_intelligence"] + executed_mods))
+
         existing = [
             inv for inv in investigation_service.list_investigations(current_user.tenant_id)
             if inv.target.lower() == query_val.lower()
         ]
         target_inv = None
+        rel_dicts = [rel.dict() if hasattr(rel, "dict") else dict(rel) for rel in response.relationships]
+
         if existing:
             target_inv = existing[0]
+            with db._lock:
+                inv_data = db.investigations.get(target_inv.id)
+                if inv_data:
+                    curr_mods = set(inv_data.get("selected_modules", []))
+                    curr_mods.update(selected_modules)
+                    inv_data["selected_modules"] = list(curr_mods)
+                    if rel_dicts:
+                        inv_data["relationships"] = rel_dicts
+                    investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
+                    case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
         else:
+            inv_desc = f"Automated intelligence investigation for target '{query_val}' synthesized across authorized engines."
             inv_req = InvestigationCreateRequest(
-                title=f"Target Investigation: {query_val}",
+                title=f"Investigation: {query_val}",
                 target=query_val,
                 target_type=response.target_type,
-                description=f"Automated intelligence investigation for target '{query_val}' synthesized across authorized engines.",
-                search_id=response.search_id
+                description=inv_desc,
+                selected_modules=selected_modules,
+                search_id=response.search_id,
+                relationships=rel_dicts
             )
             target_inv = investigation_service.create_investigation(
                 tenant_id=current_user.tenant_id,
@@ -50,15 +72,69 @@ async def execute_search(
         
         if target_inv:
             response.investigation_id = target_inv.id
+            from app.entities.service import entity_service
+            from app.evidence.service import evidence_service
+            import uuid
+
+            # 1. Upsert and persist every entity to DB linked to target_inv.id
             for ent in response.entities:
-                ent_id = getattr(ent, "id", None) or f"ent_{hashlib.md5(f'{ent.type}_{ent.value}'.encode()).hexdigest()[:10]}"
-                investigation_service.link_entity(current_user.tenant_id, target_inv.id, ent_id)
+                try:
+                    saved_ent = entity_service.upsert_entity(current_user.tenant_id, ent, investigation_id=target_inv.id)
+                    ent_id = getattr(saved_ent, "id", None) or getattr(ent, "id", None) or f"ent_{hashlib.md5(f'{ent.type}_{ent.value}'.encode()).hexdigest()[:10]}"
+                    investigation_service.link_entity(current_user.tenant_id, target_inv.id, ent_id)
+                except Exception as ent_err:
+                    app_logger.warning(f"Error persisting entity {ent}: {ent_err}")
+
+            # 2. Store and persist every evidence payload to DB linked to target_inv.id
             for ev in response.evidence:
-                ev_id = getattr(ev, "id", None) or getattr(ev, "hash", None)
-                if ev_id:
-                    investigation_service.link_evidence(current_user.tenant_id, target_inv.id, ev_id)
+                try:
+                    saved_ev = evidence_service.store_evidence(
+                        tenant_id=current_user.tenant_id,
+                        payload=ev,
+                        investigation_id=target_inv.id,
+                        search_id=response.search_id
+                    )
+                    ev_id = getattr(saved_ev, "id", None) or getattr(ev, "id", None) or getattr(ev, "hash", None)
+                    if ev_id:
+                        investigation_service.link_evidence(current_user.tenant_id, target_inv.id, ev_id)
+                except Exception as ev_err:
+                    app_logger.warning(f"Error persisting evidence {ev}: {ev_err}")
+
+            # 3. Store relationships on target_inv
+            with db._lock:
+                inv_data = db.investigations.get(target_inv.id)
+                if inv_data:
+                    inv_data["relationships"] = rel_dicts
+                    investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
+                    case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
+
+            # 4. Bridge News Intelligence into the investigation
+            try:
+                from app.modules.news_intelligence.service import news_intelligence_service
+                from app.modules.news_intelligence.models import AddToCaseRequest
+                existing_news = [
+                    n for n in news_intelligence_service.list_investigations(current_user.tenant_id)
+                    if n.original_query.lower() == query_val.lower()
+                ]
+                if not existing_news:
+                    news_inv = await news_intelligence_service.create_investigation(
+                        tenant_id=current_user.tenant_id,
+                        user=current_user,
+                        original_query=query_val,
+                        target_input=f"Automated news intelligence investigation on target '{query_val}'",
+                        preset_title=f"News Dossier: {query_val}",
+                        search_id=response.search_id,
+                    )
+                    await news_intelligence_service.attach_to_case(
+                        tenant_id=current_user.tenant_id,
+                        user=current_user,
+                        investigation_id=news_inv.id,
+                        req=AddToCaseRequest(case_id=target_inv.id, analyst_notes="Linked from Universal Search orchestration")
+                    )
+            except Exception as news_bridge_err:
+                app_logger.warning(f"Could not auto-bridge news investigation for '{query_val}': {news_bridge_err}")
+
     except Exception as e:
-        from app.core.logger import app_logger
         app_logger.warning(f"Could not auto-create investigation for query '{req.query}': {e}")
 
     audit_logger.log(

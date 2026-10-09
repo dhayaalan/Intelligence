@@ -10,6 +10,7 @@ from app.modules.test_intelligence.module import test_intelligence_module
 from app.identity.bootstrap import bootstrap_super_admin
 from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_connection
 from app.modules.example_intelligence.module import example_module
+from app.modules.news_intelligence.module import news_intelligence_module
 
 
 app = FastAPI(
@@ -22,6 +23,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +42,7 @@ async def startup_event():
     # 1. Register Independent Modules with Module Registry
     module_registry.register(osint_module, default_enabled=True)
     module_registry.register(threat_intelligence_module, default_enabled=True)
+    module_registry.register(news_intelligence_module, default_enabled=True)
     module_registry.register(example_module, default_enabled=True)
     module_registry.register(test_intelligence_module, default_enabled=True)
     

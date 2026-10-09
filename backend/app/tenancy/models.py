@@ -18,7 +18,7 @@ class TenantRecord(BaseModel):
 class TenantCreateRequest(BaseModel):
     name: str
     slug: str
-    entitled_modules: List[str] = ["osint", "threat_intelligence"]
+    entitled_modules: List[str] = ["osint", "threat_intelligence", "news_intelligence"]
 
 class TenantUpdateRequest(BaseModel):
     name: str = None

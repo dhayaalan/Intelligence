@@ -1,6 +1,8 @@
 import time
 import httpx
 import hashlib
+import re
+import urllib.parse
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
@@ -131,6 +133,78 @@ class OSINTPlatformAdapter(ProviderAdapter):
                     entities = []
                     evidence = []
 
+                    # Extract avatar/image from HTML response if available
+                    avatar_url = None
+                    try:
+                        og_match = re.search(
+                            r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image|twitter:image:src)["\'][^>]+content=["\']([^"\']+)["\']',
+                            body_text,
+                            re.IGNORECASE
+                        )
+                        if not og_match:
+                            og_match = re.search(
+                                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image|twitter:image:src)["\']',
+                                body_text,
+                                re.IGNORECASE
+                            )
+                        if og_match:
+                            extracted_img = og_match.group(1).strip()
+                            if extracted_img.startswith("//"):
+                                avatar_url = f"https:{extracted_img}"
+                            elif extracted_img.startswith("http"):
+                                avatar_url = extracted_img
+                            elif extracted_img.startswith("/"):
+                                parsed_orig = urllib.parse.urlparse(prof_url)
+                                avatar_url = f"{parsed_orig.scheme}://{parsed_orig.netloc}{extracted_img}"
+                    except Exception:
+                        pass
+
+                    # Platform-specific high-fidelity avatar resolvers
+                    pid = self._raw.get("platform_id", "").lower()
+                    if not avatar_url or any(x in avatar_url.lower() for x in ["default_profile", "placeholder", "logo-large", "favicon", "site-logo"]):
+                        if "twitter" in pid or pid in ["x", "x_com", "twitter_x"]:
+                            avatar_url = f"https://unavatar.io/x/{clean_handle}"
+                        elif "youtube" in pid:
+                            avatar_url = f"https://unavatar.io/youtube/{clean_handle}"
+                        elif "telegram" in pid:
+                            avatar_url = f"https://t.me/i/userpic/320/{clean_handle}.jpg"
+                        elif "instagram" in pid:
+                            avatar_url = f"https://unavatar.io/instagram/{clean_handle}"
+                        elif "tiktok" in pid:
+                            avatar_url = f"https://unavatar.io/tiktok/{clean_handle}"
+                        elif "github" in pid:
+                            avatar_url = f"https://github.com/{clean_handle}.png"
+                        elif "reddit" in pid:
+                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=ff4500"
+                        elif "linkedin" in pid:
+                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=0284c7"
+                        elif "pinterest" in pid:
+                            avatar_url = f"https://unavatar.io/pinterest/{clean_handle}"
+                        elif "twitch" in pid:
+                            avatar_url = f"https://unavatar.io/twitch/{clean_handle}"
+                        elif "soundcloud" in pid:
+                            avatar_url = f"https://unavatar.io/soundcloud/{clean_handle}"
+                        elif "vimeo" in pid:
+                            avatar_url = f"https://unavatar.io/vimeo/{clean_handle}"
+                        elif "substack" in pid:
+                            avatar_url = f"https://unavatar.io/substack/{clean_handle}"
+                        elif "bluesky" in pid:
+                            avatar_url = f"https://unavatar.io/bluesky/{clean_handle}"
+                        elif "mastodon" in pid:
+                            avatar_url = f"https://unavatar.io/mastodon/{clean_handle}"
+                        elif "discord" in pid:
+                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=5865f2"
+                        elif "keybase" in pid:
+                            avatar_url = f"https://keybase.io/{clean_handle}/picture"
+                        elif "gitlab" in pid:
+                            avatar_url = f"https://gitlab.com/uploads/-/system/user/avatar/{clean_handle}/avatar.png"
+                        elif "gravatar" in pid:
+                            h = hashlib.md5(clean_handle.lower().encode()).hexdigest()
+                            avatar_url = f"https://www.gravatar.com/avatar/{h}?d=identicon&s=200"
+                        else:
+                            # Universal unavatar / contextual identicon fallback
+                            avatar_url = avatar_url or f"https://unavatar.io/{pid}/{clean_handle}"
+
                     entity = EntityPayload(
                         type=EntityType.USERNAME,
                         value=f"{clean_handle}@{self._name.lower().replace(' ', '')}",
@@ -140,7 +214,10 @@ class OSINTPlatformAdapter(ProviderAdapter):
                             "platform": self._name,
                             "category": self._category,
                             "profile_url": prof_url,
-                            "status_code": resp.status_code
+                            "status_code": resp.status_code,
+                            "avatar_url": avatar_url,
+                            "image_url": avatar_url,
+                            "profile_image": avatar_url,
                         }
                     )
                     entities.append(entity.dict())

@@ -68,6 +68,9 @@ class ModuleRegistry:
     def list_all_modules(self) -> List[ModuleRegistryItem]:
         return list(self._status_records.values())
 
+    def list_modules(self) -> List[str]:
+        return list(self._modules.keys())
+
     def get_module_info(self, module_id: str) -> Optional[ModuleRegistryItem]:
         return self._status_records.get(module_id)
 

@@ -10,12 +10,15 @@ class EntityService:
     @staticmethod
     def upsert_entity(tenant_id: str, payload: EntityPayload, investigation_id: Optional[str] = None) -> EntityRecord:
         clean_val = payload.value.strip()
+        type_str = payload.type.value if hasattr(payload.type, "value") else str(payload.type).lower()
         with db._lock:
             # Check for existing entity with same type, value, tenant, and investigation
             for ent_id, data in db.entities.items():
+                existing_type = data.get("type")
+                existing_type_str = existing_type.value if hasattr(existing_type, "value") else str(existing_type).lower()
                 if (data.get("tenant_id") == tenant_id and
-                    data.get("investigation_id") == investigation_id and
-                    data.get("type") == payload.type.value and
+                    (not investigation_id or data.get("investigation_id") == investigation_id) and
+                    existing_type_str == type_str and
                     data.get("value", "").lower() == clean_val.lower()):
                     
                     # Merge sources
@@ -59,7 +62,9 @@ class EntityService:
         with db._lock:
             records = [EntityRecord(**d) for d in db.entities.values() if d.get("tenant_id") == tenant_id]
             if investigation_id:
-                records = [r for r in records if r.investigation_id == investigation_id]
+                inv_data = db.investigations.get(investigation_id, {})
+                linked_ids = set(inv_data.get("entity_ids", []))
+                records = [r for r in records if r.investigation_id == investigation_id or r.id in linked_ids]
             return records
 
     @staticmethod
@@ -74,7 +79,9 @@ class EntityService:
         with db._lock:
             records = [EntityRecord(**d) for d in db.entities.values() if d.get("tenant_id") == tenant_id]
             if investigation_id:
-                records = [r for r in records if r.investigation_id == investigation_id]
+                inv_data = db.investigations.get(investigation_id, {})
+                linked_ids = set(inv_data.get("entity_ids", []))
+                records = [r for r in records if r.investigation_id == investigation_id or r.id in linked_ids]
             if type and type.upper() != 'ALL':
                 records = [r for r in records if r.type.value.upper() == type.upper() or r.type.upper() == type.upper()]
             if search:

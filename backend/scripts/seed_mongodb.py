@@ -57,7 +57,7 @@ def seed_mongodb():
             "id": "tenant_global",
             "name": "Global Operations",
             "slug": "global-ops",
-            "entitled_modules": ["osint", "threat_intelligence", "test_intelligence"],
+            "entitled_modules": ["osint", "threat_intelligence", "test_intelligence", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00"
         },
@@ -65,7 +65,7 @@ def seed_mongodb():
             "id": "tenant_acme",
             "name": "Acme Cyber Defense Corp",
             "slug": "acme-corp",
-            "entitled_modules": ["osint", "threat_intelligence"],
+            "entitled_modules": ["osint", "threat_intelligence", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00"
         },
@@ -91,7 +91,7 @@ def seed_mongodb():
             "name": "Alex Vance (Super Admin)",
             "role": "SUPER_ADMIN",
             "tenant_id": "tenant_global",
-            "assigned_modules": ["osint", "threat_intelligence", "test_intelligence"],
+            "assigned_modules": ["osint", "threat_intelligence", "test_intelligence", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00",
             "last_login": None
@@ -103,7 +103,7 @@ def seed_mongodb():
             "name": "Sarah Connor (Tenant Admin)",
             "role": "TENANT_ADMIN",
             "tenant_id": "tenant_acme",
-            "assigned_modules": ["osint", "threat_intelligence"],
+            "assigned_modules": ["osint", "threat_intelligence", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00",
             "last_login": None
@@ -115,7 +115,7 @@ def seed_mongodb():
             "name": "Marcus Wright (Lead Analyst)",
             "role": "ANALYST",
             "tenant_id": "tenant_acme",
-            "assigned_modules": ["osint", "threat_intelligence"],
+            "assigned_modules": ["osint", "threat_intelligence", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00",
             "last_login": None
@@ -127,7 +127,7 @@ def seed_mongodb():
             "name": "Elena Fisher (Investigator)",
             "role": "USER",
             "tenant_id": "tenant_acme",
-            "assigned_modules": ["osint"],
+            "assigned_modules": ["osint", "news_intelligence"],
             "status": "active",
             "created_at": "2026-10-01T00:00:00",
             "last_login": None

@@ -8,7 +8,7 @@ class EntitlementService:
     def get_tenant_entitled_modules(tenant_id: str) -> List[str]:
         if tenant_id == "platform_admin" or tenant_id == "system":
             # Platform admins have access to all system capabilities
-            return ["osint", "threat_intelligence", "test_intelligence"]
+            return ["osint", "threat_intelligence", "test_intelligence", "news_intelligence"]
             
         tenant = tenancy_service.get_tenant(tenant_id)
         if not tenant:

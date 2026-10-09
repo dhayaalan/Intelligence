@@ -11,6 +11,8 @@ PERM_INVESTIGATION_READ = "investigation:read"
 PERM_INVESTIGATION_UPDATE = "investigation:update"
 PERM_EVIDENCE_MANAGE = "evidence:manage"
 PERM_AUDIT_READ = "audit:read"
+PERM_NEWS_SEARCH = "news:search"
+PERM_NEWS_INVESTIGATE = "news:investigate"
 
 ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
     UserRole.SUPER_ADMIN: {
@@ -23,6 +25,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
         PERM_INVESTIGATION_UPDATE,
         PERM_EVIDENCE_MANAGE,
         PERM_AUDIT_READ,
+        PERM_NEWS_SEARCH,
+        PERM_NEWS_INVESTIGATE,
     },
     UserRole.TENANT_ADMIN: {
         PERM_TENANT_USERS_MANAGE,
@@ -32,6 +36,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
         PERM_INVESTIGATION_UPDATE,
         PERM_EVIDENCE_MANAGE,
         PERM_AUDIT_READ,
+        PERM_NEWS_SEARCH,
+        PERM_NEWS_INVESTIGATE,
     },
     UserRole.ANALYST: {
         PERM_SEARCH_EXECUTE,
@@ -39,6 +45,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
         PERM_INVESTIGATION_READ,
         PERM_INVESTIGATION_UPDATE,
         PERM_EVIDENCE_MANAGE,
+        PERM_NEWS_SEARCH,
+        PERM_NEWS_INVESTIGATE,
     },
     UserRole.INVESTIGATOR: {
         PERM_SEARCH_EXECUTE,
@@ -46,6 +54,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[str]] = {
         PERM_INVESTIGATION_READ,
         PERM_INVESTIGATION_UPDATE,
         PERM_EVIDENCE_MANAGE,
+        PERM_NEWS_SEARCH,
+        PERM_NEWS_INVESTIGATE,
     },
     UserRole.USER: {
         PERM_SEARCH_EXECUTE,

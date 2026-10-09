@@ -57,6 +57,26 @@ class AuditLogger:
         return entry
 
     @staticmethod
+    def log_action(
+        tenant_id: str,
+        user_id: str,
+        action: str,
+        target: str = "",
+        details: Optional[Dict[str, Any]] = None,
+        resource_type: str = "general",
+        ip_address: str = "127.0.0.1"
+    ) -> AuditLogEntry:
+        return AuditLogger.log(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=target,
+            details=details,
+            ip_address=ip_address
+        )
+
+    @staticmethod
     def list_logs_paginated(
         tenant_id: Optional[str] = None,
         page: int = 1,
