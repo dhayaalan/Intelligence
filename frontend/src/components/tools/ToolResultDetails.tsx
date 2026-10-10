@@ -134,7 +134,7 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
                         </span>
                       )}
                       <span className="font-semibold text-foreground">
-                        {item.title || item.type || `Record #${idx + 1}`}
+                        {item.metadata?.title || item.title || item.type || `Record #${idx + 1}`}
                       </span>
                     </div>
                     {item.severity && (

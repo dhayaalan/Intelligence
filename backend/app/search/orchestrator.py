@@ -11,7 +11,7 @@ from app.core.logging import app_logger
 from app.identity.models import UserRecord
 from app.authorization.service import authorization_service
 from app.module_registry.registry import module_registry
-from app.module_sdk.models import SearchContext, NormalizedModuleResult
+from app.module_sdk.models import SearchContext, NormalizedModuleResult, EntityType
 from app.correlation.engine import correlation_engine
 from app.search.classifier import target_classifier
 from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord
@@ -39,18 +39,23 @@ class SearchOrchestrator:
         # 2. Scope-based module mapping
         selected_scopes = request.selected_scopes or ["ALL INTELLIGENCE"]
         all_registered_module_ids = module_registry.list_modules()
-        extra_pluggable_modules = [m for m in all_registered_module_ids if m not in ["osint", "threat_intelligence", "news_intelligence"]]
+        extra_pluggable_modules = [m for m in all_registered_module_ids if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]]
+
+        all_core_mods = ["osint", "news_intelligence", "social_media_intelligence"]
+        if is_technical:
+            all_core_mods.append("threat_intelligence")
 
         scope_module_map = {
-            "ALL INTELLIGENCE": list(set(intent_info.get("applicable_modules", ["news_intelligence", "osint"]) + extra_pluggable_modules)),
+            "ALL INTELLIGENCE": list(set(all_core_mods + extra_pluggable_modules)),
             "OSINT": ["osint"] + extra_pluggable_modules,
             "THREAT INTELLIGENCE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
             "NEWS INTELLIGENCE": ["news_intelligence"] + extra_pluggable_modules,
+            "SOCIAL MEDIA INTELLIGENCE": ["social_media_intelligence"] + extra_pluggable_modules,
             "DIGITAL INFRASTRUCTURE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
-            "PEOPLE & IDENTITIES": ["osint", "news_intelligence"] + extra_pluggable_modules,
+            "PEOPLE & IDENTITIES": ["osint", "social_media_intelligence", "news_intelligence"] + extra_pluggable_modules,
             "GEO INTELLIGENCE": ["news_intelligence", "osint"] + extra_pluggable_modules,
-            "MEDIA": ["news_intelligence", "osint"] + extra_pluggable_modules,
-            "EVIDENCE": ["news_intelligence", "osint", "threat_intelligence"] + extra_pluggable_modules,
+            "MEDIA": ["news_intelligence", "social_media_intelligence", "osint"] + extra_pluggable_modules,
+            "EVIDENCE": ["news_intelligence", "social_media_intelligence", "osint", "threat_intelligence"] + extra_pluggable_modules,
         }
 
         if request.selected_modules:
@@ -220,8 +225,32 @@ class SearchOrchestrator:
         articles = [e for e in corr_entities if e.type in ["article", "news"] or "article" in str(e.type).lower()]
         infra_ents = [e for e in corr_entities if e.type in ["domain", "ip", "subdomain", "hostname", "url"]]
         identity_ents = [e for e in corr_entities if e.type in ["person", "organization", "username", "email"]]
+        social_profiles = [
+            e for e in corr_entities
+            if e.type == EntityType.USERNAME
+            or e.metadata.get("platform")
+            or e.metadata.get("profile_url")
+            or "social" in str(e.metadata.get("category", "")).lower()
+        ]
 
         key_findings: List[Dict[str, Any]] = []
+        if social_profiles:
+            discovered_platforms = list(set([
+                e.metadata.get("platform", "") for e in social_profiles if e.metadata.get("platform")
+            ]))
+            key_findings.append({
+                "id": f"fnd_social_{uuid.uuid4().hex[:6]}",
+                "title": f"Social Media & Identity Footprint ({len(social_profiles)} profiles identified)",
+                "description": f"Verified {len(social_profiles)} digital accounts and social footprints across {max(1, len(discovered_platforms))} platforms ({', '.join(discovered_platforms[:4]) or 'Social Networks'}).",
+                "why_it_matters": "Confirms active handles, cross-platform persona reuse, communication footprints, and account existence.",
+                "confidence": "HIGH" if any(e.confidence >= 0.85 for e in social_profiles) else "MEDIUM",
+                "priority": "HIGH",
+                "evidence_count": len(social_profiles),
+                "sources": discovered_platforms[:5] or ["Social Media Collectors", "OSINT Identity Recon"],
+                "action_type": "PROFILES",
+                "action_target": social_profiles[0].value
+            })
+
         if articles:
             publishers = list(set([e.metadata.get("publisher", "") for e in articles if e.metadata.get("publisher")]))
             key_findings.append({
@@ -313,6 +342,7 @@ class SearchOrchestrator:
             "evidence_count": len(all_evidence),
             "sources_count": max(1, len(unique_sources)),
             "news_stories_count": len(articles),
+            "social_profiles_count": len(social_profiles),
             "high_priority_leads_count": len(investigative_leads),
             "potential_contradictions_count": 2 if len(articles) > 3 else (1 if len(articles) > 1 else 0),
             "unverified_claims_count": max(1, len([e for e in corr_entities if e.confidence < 0.8]))

@@ -191,9 +191,9 @@ class TargetClassifier:
                 "intent": "USERNAME",
                 "category": "IDENTITY",
                 "is_technical_target": False,
-                "explanation": "Social or platform username handle. Routing to public account profiling and footprint tracking.",
-                "recommended_scopes": ["PEOPLE & IDENTITIES", "OSINT"],
-                "applicable_modules": ["osint"]
+                "explanation": "Social or platform username handle. Routing to public account profiling, social media intelligence, and footprint tracking.",
+                "recommended_scopes": ["PEOPLE & IDENTITIES", "OSINT", "SOCIAL MEDIA INTELLIGENCE"],
+                "applicable_modules": ["osint", "social_media_intelligence"]
             }
 
         # 9. Multi-Entity / Geopolitical / Event Queries ("India vs China", "Israel Iran conflict", etc.)
@@ -207,8 +207,8 @@ class TargetClassifier:
                 "category": "GEOPOLITICAL_NEWS",
                 "is_technical_target": False,
                 "explanation": "Geopolitical event & multi-entity news topic. Port/network scanning disabled; routing to global news discovery, source lineage, and narrative verification.",
-                "recommended_scopes": ["NEWS INTELLIGENCE", "OSINT", "GEO INTELLIGENCE", "MEDIA"],
-                "applicable_modules": ["news_intelligence", "osint"]
+                "recommended_scopes": ["NEWS INTELLIGENCE", "OSINT", "SOCIAL MEDIA INTELLIGENCE", "GEO INTELLIGENCE", "MEDIA"],
+                "applicable_modules": ["news_intelligence", "osint", "social_media_intelligence"]
             }
 
         if has_event_keyword:
@@ -216,9 +216,9 @@ class TargetClassifier:
                 "intent": "EVENT",
                 "category": "GEOPOLITICAL_NEWS",
                 "is_technical_target": False,
-                "explanation": "Event occurrence inquiry. Routing to temporal timelines, media verification, and claim extraction.",
-                "recommended_scopes": ["NEWS INTELLIGENCE", "GEO INTELLIGENCE", "MEDIA", "EVIDENCE"],
-                "applicable_modules": ["news_intelligence", "osint"]
+                "explanation": "Event occurrence inquiry. Routing to temporal timelines, media verification, social narrative dispatches, and claim extraction.",
+                "recommended_scopes": ["NEWS INTELLIGENCE", "OSINT", "SOCIAL MEDIA INTELLIGENCE", "GEO INTELLIGENCE", "MEDIA", "EVIDENCE"],
+                "applicable_modules": ["news_intelligence", "osint", "social_media_intelligence"]
             }
 
         if has_geopolitical_entity:
@@ -227,8 +227,8 @@ class TargetClassifier:
                 "category": "GEOPOLITICAL_NEWS",
                 "is_technical_target": False,
                 "explanation": "Geographic / nation-state intelligence target. Routing to geospatial context, regional news feeds, and entity intelligence.",
-                "recommended_scopes": ["NEWS INTELLIGENCE", "GEO INTELLIGENCE", "OSINT"],
-                "applicable_modules": ["news_intelligence", "osint"]
+                "recommended_scopes": ["NEWS INTELLIGENCE", "GEO INTELLIGENCE", "OSINT", "SOCIAL MEDIA INTELLIGENCE"],
+                "applicable_modules": ["news_intelligence", "osint", "social_media_intelligence"]
             }
 
         # 10. Check Person Names (e.g. "Narendra Modi", "Joe Biden")
@@ -237,9 +237,9 @@ class TargetClassifier:
                 "intent": "PERSON",
                 "category": "IDENTITY",
                 "is_technical_target": False,
-                "explanation": "Public or private individual named inquiry. Routing to biographical intelligence, media quotes, and public footprint.",
-                "recommended_scopes": ["PEOPLE & IDENTITIES", "NEWS INTELLIGENCE", "OSINT"],
-                "applicable_modules": ["news_intelligence", "osint"]
+                "explanation": "Public or private individual named inquiry. Routing to biographical intelligence, media quotes, social media footprint, and public records.",
+                "recommended_scopes": ["PEOPLE & IDENTITIES", "NEWS INTELLIGENCE", "OSINT", "SOCIAL MEDIA INTELLIGENCE"],
+                "applicable_modules": ["news_intelligence", "osint", "social_media_intelligence"]
             }
 
         # 11. General Research default
@@ -247,9 +247,9 @@ class TargetClassifier:
             "intent": "GENERAL_RESEARCH",
             "category": "RESEARCH",
             "is_technical_target": False,
-            "explanation": "General investigative research query. Synthesizing across open sources, news intelligence, and entity registries.",
-            "recommended_scopes": ["ALL INTELLIGENCE", "NEWS INTELLIGENCE", "OSINT"],
-            "applicable_modules": ["news_intelligence", "osint"]
+            "explanation": "General investigative research query. Synthesizing across open sources, news intelligence, social media dispatches, and entity registries.",
+            "recommended_scopes": ["ALL INTELLIGENCE", "NEWS INTELLIGENCE", "OSINT", "SOCIAL MEDIA INTELLIGENCE"],
+            "applicable_modules": ["news_intelligence", "osint", "social_media_intelligence"]
         }
 
 target_classifier = TargetClassifier()

@@ -16,6 +16,8 @@ from app.api.v1.providers import router as providers_router
 from app.api.v1.platform import router as platform_router
 from app.api.v1.tools import router as tools_router
 from app.api.v1.news import router as news_router
+from app.api.v1.social import router as social_router
+from app.ml_contracts.router import router as ml_router
 
 api_v1_router = APIRouter()
 
@@ -23,6 +25,8 @@ api_v1_router.include_router(auth_router)
 api_v1_router.include_router(platform_router)
 api_v1_router.include_router(tools_router)
 api_v1_router.include_router(news_router)
+api_v1_router.include_router(social_router)
+api_v1_router.include_router(ml_router)
 api_v1_router.include_router(dashboard_router)
 api_v1_router.include_router(cases_router)
 api_v1_router.include_router(search_router)

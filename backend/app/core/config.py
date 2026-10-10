@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     PROVIDER_TIMEOUT_SECONDS: int = int(os.getenv("PROVIDER_TIMEOUT_SECONDS", "10"))
     MAX_CONCURRENT_MODULES: int = 10
     
+    # External ML Microservice (Operated independently by ML Team)
+    ML_SERVICE_URL: Optional[str] = os.getenv("ML_SERVICE_URL", None)
+    ML_SERVICE_API_KEY: Optional[str] = os.getenv("ML_SERVICE_API_KEY", None)
+    ML_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("ML_SERVICE_TIMEOUT_SECONDS", "30"))
+    
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

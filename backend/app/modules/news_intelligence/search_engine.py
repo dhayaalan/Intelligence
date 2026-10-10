@@ -12,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.core.logging import app_logger
+from app.core.network_safety import network_safety
 from app.modules.news_intelligence.models import (
     ArticleSection,
     ClaimInvestigationResult,
@@ -43,6 +44,7 @@ from app.modules.news_intelligence.models import (
     WhyMisleadingReason,
 )
 from app.modules.news_intelligence.repository import news_article_repo
+from app.modules.news_intelligence.dossier_compiler import news_dossier_compiler
 
 
 class QueryParser:
@@ -192,13 +194,9 @@ class MultiSourceRetrievalEngine:
             if isinstance(r, list):
                 raw_items.extend(r)
 
-        # Always synthesize resilient query records if needed to ensure global coverage & robust fallbacks
-        synthesized = self._synthesize_resilient_query_records(req.query, parsed)
+        # Use query-bound synthesis only as a resilient fallback if external wire endpoints yielded zero results
         if not raw_items:
-            raw_items = synthesized
-        else:
-            # Combine real results with enriched investigative items to guarantee depth
-            raw_items.extend(synthesized[:4])
+            raw_items = self._synthesize_resilient_query_records(req.query, parsed)
 
         # Deduplication by canonical URL and headline similarity
         deduped = self._deduplicate_items(raw_items)
@@ -273,6 +271,9 @@ class MultiSourceRetrievalEngine:
                     search_explanation=explanation,
                     thumbnail_url=hero_img,
                     hero_image=hero_img,
+                    image_url=item.get("image_url") or hero_img,
+                    is_video=bool(item.get("is_video") or item.get("content_type") == "video"),
+                    video_embed_url=item.get("video_embed_url") or (item.get("media_indicators") or {}).get("embed_url"),
                 )
                 scored_items.append(item_obj)
                 self._items_cache[item_id] = item_obj
@@ -361,943 +362,32 @@ class MultiSourceRetrievalEngine:
         query_val = query_hint or (item.title if item else "Intelligence Inquiry")
         title = item.title if item else f"Investigative Report: {query_val}"
         summary = item.summary if item else f"Comprehensive intelligence dossier examining verified assertions, source lineage, and telemetry concerning {query_val}."
+        canonical_url = item.canonical_url if item else "https://wire.reuters.com/investigations/target-report"
         publisher = item.publisher if item else "Global Wire Intelligence"
         country = item.country if item else "International"
         hero_img = (item.hero_image if item and item.hero_image else None) or self._pick_default_hero_image(query_val, 0)
-        domain = self._classify_query_domain(query_val)
+        entities = item.detected_entities if (item and item.detected_entities) else [query_val, publisher, "DisinfoLab"]
+        is_video = bool(item.is_video if item else False)
+        video_embed_url = item.video_embed_url if item else None
+        relevance_score = float(item.relevance_score if item else 96.0)
+        publication_date = item.publication_date if item and item.publication_date else "Oct 7, 2026"
 
-        if domain == "GEOPOLITICAL":
-            sections = [
-                ArticleSection(
-                    heading="1. Operational Background & Narrative Genesis",
-                    paragraphs=[
-                        f"In recent global press telemetry, assertions regarding '{query_val}' circulated widely across multiple syndication networks. Initial dispatch reporting originated from border frontier wire bulletins before gaining rapid international visibility.",
-                        f"Investigators tracking the narrative trajectory noted significant divergence in headline emphasis between primary wire dispatches and localized secondary rewrites. While primary dispatches cited scheduled military commander consultations, derivative reporting omitted crucial operational context to frame the events as sudden unilateral confrontation.",
-                    ],
-                    quote=f"Primary telemetry and orbital monitoring confirm that disengagement protocols and diplomatic channels remain operational despite derivative online amplification.",
-                    quote_author="Dr. Aris Vance, Senior Research Fellow in Geopolitical Forensics",
-                ),
-                ArticleSection(
-                    heading="2. Forensic Telemetry & Multispectral Sensor Verification",
-                    paragraphs=[
-                        f"To establish the evidentiary veracity of assertions surrounding '{query_val}', analysts cross-referenced primary bilateral registers, orbital SAR satellite passes, and official military liaison records.",
-                        f"Analysis revealed that viral social media assertions alleging rapid escalation cited uncorroborated single-source claims, directly contradicted by high-resolution multispectral telemetry.",
-                    ],
-                    data_table={
-                        "headers": ["Metric / Claimed Assertion", "Reported Wire Value", "Verified Telemetry / Finding", "Status"],
-                        "rows": [
-                            ["Forward Posture / Deployment Claim", "Rapid Unilateral Build-up", "Phased Disengagement Corroborated via SAR", "Context Mismatch"],
-                            ["High-Altitude Airspace Incursions", "Multiple Violations Claimed", "Transponder Telemetry Shows Routine Scheduled Patrols", "Overstated"],
-                            ["Diplomatic Liaison Mechanisms", "Severed Communications", "Active Working Mechanism (WMCC) Dialogues Logged", "Disproven"],
-                            ["Multispectral Sensor Integrity", "Unverified Online Assertion", "Sentinel-2 & Landsat Multi-pass Corroboration", "Verified"],
-                        ]
-                    }
-                ),
-                ArticleSection(
-                    heading="3. Geopolitical & Regional Framing Divergence",
-                    paragraphs=[
-                        f"An examination of reporting across international jurisdictions highlights sharply contrasting framing. Western publications emphasized Indo-Pacific balance of power and deterrence, whereas regional commentators focused on sovereign territorial integrity and border peace accords.",
-                        f"Crucially, official joint statements issued by diplomatic and military liaison working groups were frequently omitted or relegated to closing paragraphs in secondary commentary.",
-                    ],
-                    quote=f"When analyzing synchronized dispatches, the critical vulnerability is not just what is reported, but what is systematically omitted.",
-                    quote_author="International Disinformation Analysis Bureau",
-                ),
-                ArticleSection(
-                    heading="4. Investigative Conclusions & Evidentiary Synthesis",
-                    paragraphs=[
-                        f"Based on sealed satellite imagery, chronological milestone tracking, and source lineage verification, the core assertions under investigation require severe contextual qualification.",
-                        f"Analysts recommend treating derivative social media amplification with high skepticism until official bilateral working group communiques and verified sensor feeds are reviewed.",
-                    ]
-                ),
-            ]
-
-            key_takeaways = [
-                f"Primary assertions regarding '{query_val}' trace back to uncorroborated online rumors rather than verified field incidents.",
-                "Visual and textual telemetry shows significant framing divergence between international wire services and regional amplifiers.",
-                "Official bilateral communiques and multispectral satellite imagery directly contradict alarming claims circulating online.",
-                "Source lineage analysis flags 8 derivative publications as identical syndicated copies rather than independent verification.",
-            ]
-
-            claims = [
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Claims state that '{query_val}' represents an imminent military confrontation without warning.",
-                    claim_type=ClaimType.FACTUAL,
-                    confidence=89.0,
-                    verification_status="MISLEADING",
-                    provenance="Social media commentary citing anonymous channels",
-                ),
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Official diplomatic and border consultation channels were claimed to have collapsed regarding '{query_val}'.",
-                    claim_type=ClaimType.ATTRIBUTION,
-                    confidence=94.0,
-                    verification_status="CONTRADICTED",
-                    provenance="Bilateral Foreign Ministry Joint Statement",
-                ),
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Independent multispectral satellite passes confirm phased buffer zone disengagement protocols remain in effect.",
-                    claim_type=ClaimType.SCIENTIFIC,
-                    confidence=92.0,
-                    verification_status="VERIFIED",
-                    provenance="Multispectral orbital sensor registry",
-                ),
-            ]
-
-            global_coverage = [
-                GlobalCoverageItem(
-                    country="United States",
-                    region="North America",
-                    publisher="Reuters / AP Syndicate",
-                    headline=f"Wire Analysis: Strategic Balance & Diplomatic Review of {query_val}",
-                    framing="Institutional stability & bilateral deterrence",
-                    stance="NEUTRAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Initial community reaction", "Local protest quotes"],
-                    highlighted_aspects=["Official regulatory statements", "Audit timeline"],
-                ),
-                GlobalCoverageItem(
-                    country="United Kingdom",
-                    region="Europe",
-                    publisher="BBC World News",
-                    headline=f"Deep Dive: Explaining the Border Dynamics and Geopolitical Stakes of {query_val}",
-                    framing="Analytical background & strategic balance",
-                    stance="NEUTRAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Tactical military unit designations"],
-                    highlighted_aspects=["Comparative international standards", "Diplomatic history"],
-                ),
-                GlobalCoverageItem(
-                    country="India",
-                    region="South Asia",
-                    publisher="The Hindu / PTI",
-                    headline=f"External Affairs Ministry & Military Command Reaffirm Peace Along Frontier for {query_val}",
-                    framing="Sovereignty, strategic dialogue, and established disengagement protocols",
-                    stance="SUPPORTIVE",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Opposition memorandum detailed quotes"],
-                    highlighted_aspects=["Corps Commander dialogue", "Joint disengagement protocols"],
-                ),
-                GlobalCoverageItem(
-                    country="Qatar / Middle East",
-                    region="Middle East",
-                    publisher="Al Jazeera International",
-                    headline=f"Asian Powers Balance Diplomacy and Frontier Security in {query_val}",
-                    framing="Regional power balance and non-aligned multilateralism",
-                    stance="CRITICAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Standard technical calibration procedures"],
-                    highlighted_aspects=["Diplomatic statements", "Social media virality"],
-                ),
-                GlobalCoverageItem(
-                    country="France",
-                    region="Europe",
-                    publisher="Le Monde Diplomatique",
-                    headline=f"Geopolitical Order in Asia: The Enduring Strategic Equations of {query_val}",
-                    framing="Comparative international relations and strategic autonomy",
-                    stance="NEUTRAL",
-                    publication_date="Oct 6, 2026",
-                    omitted_facts=["Local tactical details"],
-                    highlighted_aspects=["Global security trends", "Bilateral treaties"],
-                ),
-            ]
-
-            timeline = [
-                TemporalTimelineEvent(
-                    id="tme_01",
-                    timestamp="2026-10-06T08:15:00Z",
-                    title="First Report: Regional Wire Dispatch",
-                    description=f"Initial wire bulletin notes queries raised concerning {query_val} in select frontier sectors.",
-                    source_name="Regional News Wire",
-                    event_type="FIRST_PUBLICATION",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_02",
-                    timestamp="2026-10-06T10:30:00Z",
-                    title="International Media Pick-Up",
-                    description="International agencies syndicate the story with generalized geopolitical framing.",
-                    source_name="Reuters Syndicate",
-                    event_type="SYNDICATED",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_03",
-                    timestamp="2026-10-06T13:45:00Z",
-                    title="Social Media Amplification Wave",
-                    description="Unverified claims of widespread escalation circulate on social channels with out-of-context video.",
-                    source_name="Social Telemetry",
-                    event_type="AMPLIFICATION",
-                    is_anomaly=True,
-                    anomaly_note="Archival footage from past border skirmish identified in circulating video clips",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_04",
-                    timestamp="2026-10-06T16:00:00Z",
-                    title="Official Diplomatic Communique",
-                    description="Foreign Ministries and military liaison publish joint statement and disengagement logs.",
-                    source_name="Joint Diplomatic Secretariat",
-                    event_type="OFFICIAL_STATEMENT",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_05",
-                    timestamp="2026-10-07T09:00:00Z",
-                    title="Independent Forensic Fact-Check",
-                    description="Fact-checking bureaus confirm circulating video was repurposed from an unrelated previous conflict.",
-                    source_name="DisinfoLab Open Source",
-                    event_type="CORRECTION",
-                ),
-            ]
-
-            evidence = [
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="PRIMARY_STATEMENT",
-                    evidence_code="EV-001",
-                    source="Joint Diplomatic Gazette",
-                    source_url="https://diplomacy.local/gazette/bilateral-accord",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-06T16:00:00Z",
-                    hash_value="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    extracted_text=f"Bilateral Working Mechanism (WMCC) reaffirms commitment to peaceful border management and maintenance of tranquility.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=98.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Primary diplomatic gazette notification",
-                    extraction_method="OFFICIAL_REGULATORY_DISPATCH_SCRAPING",
-                    provenance_quality="OFFICIAL_PRIMARY",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="MEDIA_METADATA",
-                    evidence_code="EV-002",
-                    source="Video Keyframe Reverse Search",
-                    source_url="https://archive.local/video-registry/historical-clash",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2021-05-10T11:20:00Z",
-                    hash_value="8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
-                    extracted_text=f"Reverse image search confirms circulating video matches earlier border standoff footage, published years prior. Authentic video, but false context.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=96.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Historical archive visual similarity match",
-                    extraction_method="PERCEPTUAL_HASH_KEYFRAME_MATCHING",
-                    provenance_quality="FORENSIC_ARCHIVE",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="ARCHIVED_REPORT",
-                    evidence_code="EV-003",
-                    source="Associated Press Archive",
-                    source_url="https://apnews.com/archive",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-06T10:30:00Z",
-                    hash_value="9b61d31e9c56fa9b47e8ad9c0861dd5b948b84920b7280cb03598502d99723cf",
-                    extracted_text=f"Initial wire dispatch noted standard diplomatic consultations were scheduled under existing bilateral agreements.",
-                    claim_relationship="CONTEXTUAL",
-                    reliability_score=92.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Wire origin baseline",
-                    extraction_method="WIRE_CHRONOLOGY_INGESTION",
-                    provenance_quality="SECONDARY_WIRE",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="WITNESS_OR_OBSERVER_LOG",
-                    evidence_code="EV-004",
-                    source="Multispectral Satellite Registry (Sentinel-2)",
-                    source_url="https://sentinel.esa.int/data-access",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-07T08:15:00Z",
-                    hash_value="7c1b5a2e8f99d0c2e3a1f8b6d4e2c0a9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3",
-                    extracted_text="Multispectral SAR passes confirm no unauthorized infrastructure build-up or buffer incursions across audited sectors.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=95.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Orbital satellite telemetry pass",
-                    extraction_method="INDEPENDENT_AUDIT_LOG_VERIFICATION",
-                    provenance_quality="PRIMARY_OBSERVER",
-                ),
-            ]
-
-            why_reasons = [
-                WhyMisleadingReason(
-                    id="wmr_01",
-                    summary_text=f"Circulating viral video is AUTHENTIC original footage, but presented in FALSE CONTEXT (recorded during historical border tensions).",
-                    linked_evidence_id=evidence[1].id,
-                    factor_category="AUTHENTIC_MEDIA_FALSE_CONTEXT",
-                ),
-                WhyMisleadingReason(
-                    id="wmr_02",
-                    summary_text="Derivative outlets amplified assertions as independent confirmation when all 8 reprints traced back to a single wire bulletin.",
-                    linked_evidence_id=evidence[2].id,
-                    factor_category="ECHO_CHAMBER_AMPLIFICATION",
-                ),
-                WhyMisleadingReason(
-                    id="wmr_03",
-                    summary_text="Official bilateral communiques and multispectral satellite passes confirm standard disengagement protocols operated as planned.",
-                    linked_evidence_id=evidence[0].id,
-                    factor_category="OFFICIAL_AUDIT_REFUTATION",
-                ),
-            ]
-
-            assessment = InvestigationAssessment(
-                verdict=VerificationVerdict.AUTHENTIC_MEDIA_FALSE_CONTEXT,
-                confidence_breakdown=ConfidenceBreakdown(
-                    evidence_quality=95.0,
-                    source_independence=88.0,
-                    temporal_consistency=94.0,
-                    media_verification=97.0,
-                    cross_source_corroboration=91.0,
-                    contradiction_strength=96.0,
-                    overall_confidence=94.2,
-                ),
-                primary_reason=f"The media is AUTHENTIC raw footage, but is being deployed with FALSE CONTEXT to misrepresent frontier stability regarding {query_val}.",
-                detailed_explanation=(
-                    f"Comprehensive reverse-search forensics (EV-002) confirmed the circulating video footage was recorded during earlier regional tensions. "
-                    "The media itself is authentic and unmanipulated, but its present-day temporal framing is false. "
-                    "Furthermore, orbital radar telemetry and diplomatic communiques confirmed that bilateral disengagement protocols remain in effect."
-                ),
-                why_misleading_reasons=why_reasons,
-            )
-
-            resolved_entities = [
-                ResolvedEntity(
-                    canonical_id="ent_mea_01",
-                    canonical_name="Ministry of External Affairs / Foreign Affairs Bureau",
-                    entity_type="ORGANIZATION",
-                    aliases=["External Affairs", "Foreign Ministry", "MEA", "Diplomatic Secretariat"],
-                    mention_count=24,
-                    confidence=98.5,
-                    role="Diplomatic Authority",
-                ),
-                ResolvedEntity(
-                    canonical_id=f"ent_geo_{hashlib.md5(query_val.encode()).hexdigest()[:6]}",
-                    canonical_name=f"{query_val} Strategic Frontier",
-                    entity_type="LOCATION",
-                    aliases=[query_val, f"{query_val} Sector", "Line of Actual Control", "Border Demarcation"],
-                    mention_count=32,
-                    confidence=97.0,
-                    role="Target Theater",
-                ),
-                ResolvedEntity(
-                    canonical_id="ent_reuters_01",
-                    canonical_name="Reuters Global Wire Bureau",
-                    entity_type="ORGANIZATION",
-                    aliases=["Reuters", "Thomson Reuters", "Reuters Syndicate", "Reuters Dispatch"],
-                    mention_count=16,
-                    confidence=96.0,
-                    role="Wire Publisher",
-                ),
-                ResolvedEntity(
-                    canonical_id="ent_forensics_01",
-                    canonical_name="International Media Forensics Working Group",
-                    entity_type="ORGANIZATION",
-                    aliases=["DisinfoLab", "Media Forensics Lab", "Geospatial Bureau"],
-                    mention_count=9,
-                    confidence=94.5,
-                    role="Verification Laboratory",
-                ),
-                ResolvedEntity(
-                    canonical_id=f"ent_loc_{hashlib.md5(country.encode()).hexdigest()[:6]}",
-                    canonical_name=country if country != "International" else "India",
-                    entity_type="LOCATION",
-                    aliases=[country, "Regional Strategic Jurisdiction"],
-                    mention_count=28,
-                    confidence=99.0,
-                    role="Geographic Focus",
-                ),
-            ]
-
-            related_news = [
-                RelatedNewsItem(
-                    id="rel_01",
-                    title="Line of Actual Control: How Satellite Imagery Verifies Disengagement Accords",
-                    publisher="The Hindu Strategic Desk",
-                    country="India",
-                    published_date="Oct 6, 2026",
-                    relevance_score=94.0,
-                    connection_reason="Direct technical explanation of operational disengagement and verification procedures",
-                    thumbnail_url="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80",
-                ),
-                RelatedNewsItem(
-                    id="rel_02",
-                    title="Diplomatic Communique Analysis: High-Level Military Dialogue on Border Security",
-                    publisher="Commonwealth Strategic Review",
-                    country="United Kingdom",
-                    published_date="Oct 5, 2026",
-                    relevance_score=89.0,
-                    connection_reason="Independent analysis of bilateral liaison protocols",
-                    thumbnail_url="https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&q=80",
-                ),
-                RelatedNewsItem(
-                    id="rel_03",
-                    title="How Recycled Videos Spread Ahead of Diplomatic Summits: A Forensic Case Study",
-                    publisher="DisinfoLab Open Source",
-                    country="International",
-                    published_date="Oct 4, 2026",
-                    relevance_score=92.0,
-                    connection_reason="Forensic pattern match with historical recycled media incidents",
-                    thumbnail_url="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600&q=80",
-                ),
-            ]
-
-            narratives = [
-                NarrativeCluster(
-                    id="nar_01",
-                    narrative_title="Immediate Escalation Narrative",
-                    core_assertion=f"Unilateral confrontation initiated without warning regarding {query_val}",
-                    framing_angle="Alarmist / Sensationalized",
-                    first_detected_date="2026-10-06T08:00:00Z",
-                    recurrence_count=14,
-                    amplification_speed="HIGH",
-                    associated_entities=["Social Media Channels", "Derivative Blogs"],
-                    associated_claims=["Unilateral confrontation initiated without warning"],
-                    counter_evidence_summary="Disproven by orbital radar telemetry and official bilateral communiques.",
-                ),
-                NarrativeCluster(
-                    id="nar_02",
-                    narrative_title="Diplomatic Stabilization Narrative",
-                    core_assertion=f"Bilateral liaison and satellite verification confirm stability regarding {query_val}",
-                    framing_angle="Administrative / Verified Telemetry",
-                    first_detected_date="2026-10-06T09:30:00Z",
-                    recurrence_count=8,
-                    amplification_speed="MODERATE",
-                    associated_entities=["Foreign Ministry Bureau", "The Hindu", "Reuters"],
-                    associated_claims=["Satellite and liaison verification confirmed stability."],
-                    counter_evidence_summary=None,
-                ),
-            ]
-        else:
-            # Construct generalized DisInfoLab-style structured long-form sections
-            sections = [
-                ArticleSection(
-                    heading="1. Operational Background & Narrative Genesis",
-                    paragraphs=[
-                        f"In recent global press telemetry, assertions regarding '{query_val}' circulated widely across multiple syndication networks. Initial dispatch reporting originated from wire reports before gaining rapid international visibility.",
-                        f"Investigators tracking the narrative trajectory noted significant divergence in headline emphasis between primary wire dispatches and localized secondary rewrites. While primary sources maintained factual qualifiers, derivative reporting omitted crucial operational context.",
-                    ],
-                    quote=f"Primary records and telemetry demonstrate that initial assertions were amplified without independent technical corroboration.",
-                    quote_author=f"Dr. Aris Vance, Senior Research Fellow in Media Forensics",
-                ),
-                ArticleSection(
-                    heading="2. Forensic Telemetry & Cross-Source Verification",
-                    paragraphs=[
-                        f"To establish the evidentiary veracity of claims surrounding '{query_val}', analysts performed cross-referencing against primary registers, official regulatory filings, and digital telemetry.",
-                        f"Analysis revealed that multiple subsequent publications cited the exact same single wire dispatch rather than providing independent corroborating evidence, creating an artificial appearance of consensus.",
-                    ],
-                    data_table={
-                        "headers": ["Metric / Claimed Assertion", "Reported Wire Value", "Verified Telemetry / Finding", "Status"],
-                        "rows": [
-                            ["Incident Severity Rating", "Extreme / Unprecedented", "Localized / Standard Protocol", "Overstated"],
-                            ["Scope / Scale of Claims", "Uncorroborated Estimate", "Documented Primary Incidents", "Context Mismatch"],
-                            ["Primary Source Corroboration", "Multiple Independent Outlets", "Single Syndicated Wire Service", "Echo Chamber Detected"],
-                            ["Cryptographic Integrity Hash", "SHA-256 Verified", "f892c9b104...d391", "Evidence Sealed"],
-                        ]
-                    }
-                ),
-                ArticleSection(
-                    heading="3. Geopolitical & Regional Framing Divergence",
-                    paragraphs=[
-                        f"An examination of reporting across international jurisdictions highlights sharply contrasting framing. Western publications emphasized institutional integrity and procedural transparency, whereas regional commentators framed the incident within broader political contestation.",
-                        f"Crucially, technical statements issued by regulatory and inspection bodies were frequently omitted or relegated to closing paragraphs in secondary commentary.",
-                    ],
-                    quote=f"When analyzing synchronized dispatches, the critical vulnerability is not just what is reported, but what is systematically omitted.",
-                    quote_author="International Disinformation Analysis Bureau",
-                ),
-                ArticleSection(
-                    heading="4. Investigative Conclusions & Evidentiary Synthesis",
-                    paragraphs=[
-                        f"Based on sealed evidence, chronological milestone tracking, and source lineage verification, the core assertions under investigation require severe contextual qualification.",
-                        f"Analysts recommend treating derivative social media amplification with high skepticism until full cryptographic logging and official audit records are made publicly available.",
-                    ]
-                ),
-            ]
-
-            key_takeaways = [
-                f"Primary assertions regarding '{query_val}' trace back to a single wire syndicate rather than multiple independent investigations.",
-                "Visual and textual telemetry shows significant framing divergence between international wire services and regional amplifiers.",
-                "Official audit records and technical logs directly contradict several of the more alarming claims circulating online.",
-                "Source lineage analysis flags 8 derivative publications as identical syndicated copies rather than independent verification.",
-            ]
-
-            claims = [
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Claims state that '{query_val}' represents an unprecedented system failure without precedent.",
-                    claim_type=ClaimType.FACTUAL,
-                    confidence=88.0,
-                    verification_status="MISLEADING",
-                    provenance="Wire dispatch paragraph 2",
-                ),
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Official regulatory bodies were claimed to have ignored warnings concerning '{query_val}'.",
-                    claim_type=ClaimType.ATTRIBUTION,
-                    confidence=94.0,
-                    verification_status="CONTRADICTED",
-                    provenance="Social media commentary citing anonymous sources",
-                ),
-                ExtractedClaim(
-                    id=f"clm_{uuid.uuid4().hex[:8]}",
-                    claim_text=f"Independent technical telemetry confirms standard operational safeguards functioned as designed.",
-                    claim_type=ClaimType.SCIENTIFIC,
-                    confidence=92.0,
-                    verification_status="VERIFIED",
-                    provenance="Official audit log release",
-                ),
-            ]
-
-            global_coverage = [
-                GlobalCoverageItem(
-                    country="United States",
-                    region="North America",
-                    publisher="Reuters / AP Syndicate",
-                    headline=f"Wire Analysis: Officials Address Inquiries Over {query_val}",
-                    framing="Institutional stability & procedural compliance",
-                    stance="NEUTRAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Initial community reaction", "Local protest quotes"],
-                    highlighted_aspects=["Official regulatory statements", "Audit timeline"],
-                ),
-                GlobalCoverageItem(
-                    country="United Kingdom",
-                    region="Europe",
-                    publisher="BBC World News",
-                    headline=f"Deep Dive: Explaining the Context Surrounding {query_val}",
-                    framing="Analytical background & public trust examination",
-                    stance="NEUTRAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Specific vendor technical serials"],
-                    highlighted_aspects=["Comparative international standards", "Procedural history"],
-                ),
-                GlobalCoverageItem(
-                    country="India",
-                    region="South Asia",
-                    publisher="The Hindu / PTI",
-                    headline=f"Regulatory & Technical Teams Clarify Status of {query_val}",
-                    framing="Legal framework, institutional guarantees, strict denial of irregularities",
-                    stance="SUPPORTIVE",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Opposition memorandum detailed quotes"],
-                    highlighted_aspects=["Full administrative audit", "Verified audit trail"],
-                ),
-                GlobalCoverageItem(
-                    country="Qatar / Middle East",
-                    region="Middle East",
-                    publisher="Al Jazeera International",
-                    headline=f"Debate Intensifies as Observers Question {query_val}",
-                    framing="Public interest contestation and civil society skepticism",
-                    stance="CRITICAL",
-                    publication_date="Oct 7, 2026",
-                    omitted_facts=["Standard technical calibration procedures"],
-                    highlighted_aspects=["Stakeholder statements", "Social media virality"],
-                ),
-                GlobalCoverageItem(
-                    country="France",
-                    region="Europe",
-                    publisher="Le Monde Diplomatique",
-                    headline=f"Institutional Integrity Under Scrutiny: The Case of {query_val}",
-                    framing="Comparative institutional vulnerability & algorithmic trust",
-                    stance="NEUTRAL",
-                    publication_date="Oct 6, 2026",
-                    omitted_facts=["Local municipal details"],
-                    highlighted_aspects=["Global information trends", "Audit protocols"],
-                ),
-            ]
-
-            timeline = [
-                TemporalTimelineEvent(
-                    id="tme_01",
-                    timestamp="2026-10-06T08:15:00Z",
-                    title="First Report: Local Wire Dispatch",
-                    description=f"Initial wire bulletin notes queries raised concerning {query_val}.",
-                    source_name="Regional News Wire",
-                    event_type="FIRST_PUBLICATION",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_02",
-                    timestamp="2026-10-06T10:30:00Z",
-                    title="International Media Pick-Up",
-                    description="International agencies syndicate the story with generalized framing.",
-                    source_name="Reuters Syndicate",
-                    event_type="SYNDICATED",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_03",
-                    timestamp="2026-10-06T13:45:00Z",
-                    title="Social Media Amplification Wave",
-                    description="Unverified claims circulate on social channels with out-of-context media.",
-                    source_name="Social Telemetry",
-                    event_type="AMPLIFICATION",
-                    is_anomaly=True,
-                    anomaly_note="Archival footage identified in circulating media clips",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_04",
-                    timestamp="2026-10-06T16:00:00Z",
-                    title="Official Regulatory Clarification",
-                    description="Official authorities publish technical audit logs and formal clarification.",
-                    source_name="Official Oversight Registry",
-                    event_type="OFFICIAL_STATEMENT",
-                ),
-                TemporalTimelineEvent(
-                    id="tme_05",
-                    timestamp="2026-10-07T09:00:00Z",
-                    title="Independent Forensic Fact-Check",
-                    description="Fact-checking bureaus confirm circulating media was repurposed from an unrelated event.",
-                    source_name="DisinfoLab Open Source",
-                    event_type="CORRECTION",
-                ),
-            ]
-
-            evidence = [
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="PRIMARY_STATEMENT",
-                    evidence_code="EV-001",
-                    source="Official Regulatory Gazette",
-                    source_url="https://regulatory.local/gazette/2026-audit",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-06T16:00:00Z",
-                    hash_value="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    extracted_text=f"All operational systems underwent dual-blind randomized technical audits. Zero unauthorized modifications detected.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=98.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Primary legal gazette notification",
-                    extraction_method="OFFICIAL_REGULATORY_DISPATCH_SCRAPING",
-                    provenance_quality="OFFICIAL_PRIMARY",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="MEDIA_METADATA",
-                    evidence_code="EV-002",
-                    source="Video Keyframe Reverse Search",
-                    source_url="https://archive.local/video-registry/archive-sample",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2022-04-12T11:20:00Z",
-                    hash_value="8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
-                    extracted_text=f"Reverse image search confirms circulating media matches earlier historical records. Authentic media, but false context.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=96.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Historical archive visual similarity match",
-                    extraction_method="PERCEPTUAL_HASH_KEYFRAME_MATCHING",
-                    provenance_quality="FORENSIC_ARCHIVE",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="ARCHIVED_REPORT",
-                    evidence_code="EV-003",
-                    source="Associated Press Archive",
-                    source_url="https://apnews.com/archive",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-06T10:30:00Z",
-                    hash_value="9b61d31e9c56fa9b47e8ad9c0861dd5b948b84920b7280cb03598502d99723cf",
-                    extracted_text=f"Initial wire dispatch noted queries were raised during standard pre-audit verification.",
-                    claim_relationship="CONTEXTUAL",
-                    reliability_score=92.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Wire origin baseline",
-                    extraction_method="WIRE_CHRONOLOGY_INGESTION",
-                    provenance_quality="SECONDARY_WIRE",
-                ),
-                NewsEvidenceItem(
-                    id=f"nev_{uuid.uuid4().hex[:8]}",
-                    investigation_id=f"inv_{article_id[:8]}",
-                    type="WITNESS_OR_OBSERVER_LOG",
-                    evidence_code="EV-004",
-                    source="International Observation Registry",
-                    source_url="https://observers.local/reports/integrity-audit",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    original_publication_time="2026-10-07T08:15:00Z",
-                    hash_value="7c1b5a2e8f99d0c2e3a1f8b6d4e2c0a9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3",
-                    extracted_text="Physical tamper-evident serialized seals inspected intact across 100% of audited candidate samples.",
-                    claim_relationship="CONTRADICTS",
-                    reliability_score=95.0,
-                    verification_status="VERIFIED",
-                    retrieval_reason="Observer credentialed audit log",
-                    extraction_method="INDEPENDENT_AUDIT_LOG_VERIFICATION",
-                    provenance_quality="PRIMARY_OBSERVER",
-                ),
-            ]
-
-            why_reasons = [
-                WhyMisleadingReason(
-                    id="wmr_01",
-                    summary_text="Circulating viral video is AUTHENTIC original footage, but presented in FALSE CONTEXT.",
-                    linked_evidence_id=evidence[1].id,
-                    factor_category="AUTHENTIC_MEDIA_FALSE_CONTEXT",
-                ),
-                WhyMisleadingReason(
-                    id="wmr_02",
-                    summary_text="Derivative outlets amplified assertions as independent confirmation when all 8 reprints traced back to a single wire bulletin.",
-                    linked_evidence_id=evidence[2].id,
-                    factor_category="ECHO_CHAMBER_AMPLIFICATION",
-                ),
-                WhyMisleadingReason(
-                    id="wmr_03",
-                    summary_text="Official regulatory telemetry and randomized paper audit trails confirm standard protocols operated without failure.",
-                    linked_evidence_id=evidence[0].id,
-                    factor_category="OFFICIAL_AUDIT_REFUTATION",
-                ),
-            ]
-
-            assessment = InvestigationAssessment(
-                verdict=VerificationVerdict.AUTHENTIC_MEDIA_FALSE_CONTEXT,
-                confidence_breakdown=ConfidenceBreakdown(
-                    evidence_quality=95.0,
-                    source_independence=88.0,
-                    temporal_consistency=94.0,
-                    media_verification=97.0,
-                    cross_source_corroboration=91.0,
-                    contradiction_strength=96.0,
-                    overall_confidence=94.2,
-                ),
-                primary_reason="The media is AUTHENTIC raw footage, but is being deployed with FALSE CONTEXT to misrepresent standard procedures.",
-                detailed_explanation=(
-                    "Comprehensive reverse-search forensics (EV-002) confirmed the circulating video footage was recorded during an earlier "
-                    "procedural simulation. The media itself is authentic and unmanipulated, but its present-day temporal framing is false. "
-                    "Furthermore, cross-source independence analysis established that 8 regional stories were syndicated duplicates of a single "
-                    "wire dispatch rather than independent confirmations."
-                ),
-                why_misleading_reasons=why_reasons,
-            )
-
-            resolved_entities = [
-                ResolvedEntity(
-                    canonical_id="ent_reg_01",
-                    canonical_name="Official Oversight Registry",
-                    entity_type="ORGANIZATION",
-                    aliases=["Regulatory Authority", "Inspection Bureau", "Standards Commission"],
-                    mention_count=24,
-                    confidence=98.5,
-                    role="Regulatory Authority",
-                ),
-                ResolvedEntity(
-                    canonical_id=f"ent_tech_{hashlib.md5(query_val.encode()).hexdigest()[:6]}",
-                    canonical_name=f"{query_val} Core System",
-                    entity_type="TECHNOLOGY",
-                    aliases=[query_val, f"{query_val} Unit", "Verified Telemetry"],
-                    mention_count=32,
-                    confidence=97.0,
-                    role="Target System",
-                ),
-                ResolvedEntity(
-                    canonical_id="ent_reuters_01",
-                    canonical_name="Reuters Global Wire Bureau",
-                    entity_type="ORGANIZATION",
-                    aliases=["Reuters", "Thomson Reuters", "Reuters Syndicate", "Reuters Dispatch"],
-                    mention_count=16,
-                    confidence=96.0,
-                    role="Wire Publisher",
-                ),
-                ResolvedEntity(
-                    canonical_id="ent_forensics_01",
-                    canonical_name="International Media Forensics Working Group",
-                    entity_type="ORGANIZATION",
-                    aliases=["DisinfoLab", "Media Forensics Lab", "Verification Bureau"],
-                    mention_count=9,
-                    confidence=94.5,
-                    role="Verification Laboratory",
-                ),
-                ResolvedEntity(
-                    canonical_id=f"ent_loc_{hashlib.md5(country.encode()).hexdigest()[:6]}",
-                    canonical_name=country if country != "International" else "India",
-                    entity_type="LOCATION",
-                    aliases=[country, "National Jurisdiction", "Regional Oversight Bureau"],
-                    mention_count=28,
-                    confidence=99.0,
-                    role="Geographic Focus",
-                ),
-            ]
-
-            related_news = [
-                RelatedNewsItem(
-                    id="rel_01",
-                    title="Technical Audit Protocols & Operational Verification Explained",
-                    publisher="The National Bureau",
-                    country=country if country != "International" else "India",
-                    published_date="Oct 6, 2026",
-                    relevance_score=94.0,
-                    connection_reason="Direct technical explanation of operational verification procedures",
-                    thumbnail_url="https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&q=80",
-                ),
-                RelatedNewsItem(
-                    id="rel_02",
-                    title="International Observation Report on System Reliability",
-                    publisher="Global Observer Group",
-                    country="United Kingdom",
-                    published_date="Oct 5, 2026",
-                    relevance_score=89.0,
-                    connection_reason="Independent third-party international certification of hardware",
-                    thumbnail_url="https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=600&q=80",
-                ),
-                RelatedNewsItem(
-                    id="rel_03",
-                    title="How Recycled Videos Spread Online: A Forensic Case Study",
-                    publisher="DisinfoLab Open Source",
-                    country="International",
-                    published_date="Oct 4, 2026",
-                    relevance_score=92.0,
-                    connection_reason="Forensic pattern match with historical recycled media incidents",
-                    thumbnail_url="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600&q=80",
-                ),
-            ]
-
-            narratives = [
-                NarrativeCluster(
-                    id="nar_01",
-                    narrative_title="Systemic Vulnerability Narrative",
-                    core_assertion="Hardware or system integrity compromised without physical access",
-                    framing_angle="Alarmist / Sensationalized",
-                    first_detected_date="2026-10-06T08:00:00Z",
-                    recurrence_count=14,
-                    amplification_speed="HIGH",
-                    associated_entities=["Social Media Channels", "Derivative Blogs"],
-                    associated_claims=["Hardware or system integrity compromised"],
-                    counter_evidence_summary="Disproven by hardware tamper seals and independent audit.",
-                ),
-                NarrativeCluster(
-                    id="nar_02",
-                    narrative_title="Procedural Integrity & Audit Narrative",
-                    core_assertion="Multi-layered randomized verification functioned normally",
-                    framing_angle="Administrative / Verified Telemetry",
-                    first_detected_date="2026-10-06T09:30:00Z",
-                    recurrence_count=8,
-                    amplification_speed="MODERATE",
-                    associated_entities=["Official Oversight Registry", "Reuters"],
-                    associated_claims=["Physical and cryptographic verification confirmed integrity."],
-                    counter_evidence_summary=None,
-                ),
-            ]
-
-        # Source Lineage
-        lineage_nodes = [
-            SourceLineageNode(id="sl_01", name="Local District Wire", domain="districtwire.in", role="ORIGINAL_SOURCE", first_publication_time="2026-10-06 08:15", independence_score=95.0),
-            SourceLineageNode(id="sl_02", name="Reuters / AP News Syndicate", domain="reuters.com", role="WIRE_SERVICE", first_publication_time="2026-10-06 10:30", independence_score=90.0),
-            SourceLineageNode(id="sl_03", name="Syndicated Regional Reprints (x8)", domain="regionalnews.net", role="SYNDICATED_COPY", first_publication_time="2026-10-06 11:45", independence_score=25.0, is_duplicate_copy=True),
-            SourceLineageNode(id="sl_04", name="Viral Social Channels", domain="social.platform", role="SOCIAL_AMPLIFIER", first_publication_time="2026-10-06 13:45", independence_score=10.0),
-        ]
-        lineage_edges = [
-            SourceLineageEdge(source_id="sl_01", target_id="sl_02", relationship="SYNDICATED_TO"),
-            SourceLineageEdge(source_id="sl_02", target_id="sl_03", relationship="REWRITTEN_BY"),
-            SourceLineageEdge(source_id="sl_03", target_id="sl_04", relationship="AMPLIFIED_BY"),
-        ]
-
-        # Story Graph (Connecting Event -> Article -> Claims -> Sources -> Media -> Narratives -> Evidence)
-        story_graph = StoryGraph(
-            nodes=[
-                StoryGraphNode(id="ev_01", label=f"Event: {query_val[:24]}", node_type="EVENT", metadata={"details": "Root event triggering investigation"}),
-                StoryGraphNode(id="art_01", label="Primary Dossier Article", node_type="ARTICLE", metadata={"details": "Sentinel investigative dossier"}),
-                StoryGraphNode(id="src_01", label=publisher[:22], node_type="SOURCE", metadata={"details": "Primary reporting source"}),
-                StoryGraphNode(id="src_02", label="Syndicated Reprints (x8)", node_type="SOURCE", metadata={"details": "Echo chamber reprint network"}),
-                StoryGraphNode(id="clm_01", label="Claim 1: Systemic Breakdown", node_type="CLAIM", metadata={"details": "Viral assertion of unverified failure"}),
-                StoryGraphNode(id="clm_02", label="Claim 2: Official Telemetry Verified", node_type="CLAIM", metadata={"details": "Audit telemetry confirming integrity"}),
-                StoryGraphNode(id="med_01", label="Media: Archival Repurposed Video", node_type="MEDIA", metadata={"details": "Archival video recirculated with false context"}),
-                StoryGraphNode(id="nar_01", label="Narrative: Systemic Vulnerability", node_type="NARRATIVE", metadata={"details": "Alarmist amplification theme"}),
-                StoryGraphNode(id="nar_02", label="Narrative: Regulatory Integrity", node_type="NARRATIVE", metadata={"details": "Audit verified procedure narrative"}),
-                StoryGraphNode(id="evi_01", label="EV-001: Regulatory Gazette", node_type="EVIDENCE", metadata={"details": "Primary official gazette notification"}),
-                StoryGraphNode(id="evi_02", label="EV-002: Keyframe Hash Match", node_type="EVIDENCE", metadata={"details": "Reverse video archive match"}),
-                StoryGraphNode(id="evi_04", label="EV-004: Observation Log", node_type="EVIDENCE", metadata={"details": "Primary observer verified record"}),
-            ],
-            edges=[
-                StoryGraphEdge(source_id="art_01", target_id="ev_01", relationship="references"),
-                StoryGraphEdge(source_id="src_01", target_id="art_01", relationship="published"),
-                StoryGraphEdge(source_id="src_01", target_id="src_02", relationship="syndicated_to"),
-                StoryGraphEdge(source_id="art_01", target_id="clm_01", relationship="investigates"),
-                StoryGraphEdge(source_id="art_01", target_id="clm_02", relationship="investigates"),
-                StoryGraphEdge(source_id="med_01", target_id="clm_01", relationship="amplified"),
-                StoryGraphEdge(source_id="evi_01", target_id="clm_02", relationship="supports"),
-                StoryGraphEdge(source_id="evi_02", target_id="med_01", relationship="contradicts"),
-                StoryGraphEdge(source_id="evi_04", target_id="clm_02", relationship="supports"),
-                StoryGraphEdge(source_id="clm_01", target_id="nar_01", relationship="originated"),
-                StoryGraphEdge(source_id="clm_02", target_id="nar_02", relationship="originated"),
-            ]
-        )
-
-        source_independence_breakdown = {
-            "independent_sources_count": 5,
-            "syndicated_reprints_count": 8,
-            "copied_social_count": 21,
-            "official_statements_count": 2,
-            "independence_score": 88.0,
-            "verdict_summary": "8 syndicated articles detected; analyzed as 1 single wire source lineage rather than 8 independent confirmations.",
-        }
-
-        claim_review_interoperability = [
-            {
-                "@context": "https://schema.org",
-                "@type": "ClaimReview",
-                "url": item.canonical_url if item else "https://wire.reuters.com/investigations/target-report",
-                "claimReviewed": f"Circulating video footage demonstrates widespread crisis in {query_val}.",
-                "itemReviewed": {
-                    "@type": "CreativeWork",
-                    "author": {"@type": "Organization", "name": "Social Amplification Network"},
-                    "datePublished": "2026-10-06",
-                },
-                "author": {
-                    "@type": "Organization",
-                    "name": "Sentinel Global News Intelligence",
-                    "url": "https://sentinel.local/investigations",
-                },
-                "reviewRating": {
-                    "@type": "Rating",
-                    "ratingValue": 2,
-                    "bestRating": 5,
-                    "worstRating": 1,
-                    "alternateName": "AUTHENTIC MEDIA (FALSE CONTEXT)",
-                    "ratingExplanation": "The video footage is authentic recording from an earlier historical event, recirculated with misleading present-day context.",
-                },
-            }
-        ]
-
-        article = NewsArticle(
-            id=article_id,
+        # Compile extracted news data into structured investigative dossier
+        article = news_dossier_compiler.compile_article(
+            article_id=article_id,
             title=title,
-            subtitle="An in-depth investigative intelligence inquiry examining source provenance, forensic telemetry, and global media framing",
-            category="Geopolitical & Strategic Intelligence" if domain == "GEOPOLITICAL" else "Investigative Research & Verification",
+            summary=summary,
+            content=summary,
+            canonical_url=canonical_url,
             publisher=publisher,
-            source=publisher,
-            domain=urllib.parse.urlparse(item.canonical_url).netloc if item and item.canonical_url else "wire.reuters.com",
             country=country,
-            language="en",
-            author=item.author if item and item.author else "Sentinel Intelligence Bureau",
-            publication_date=item.publication_date if item and item.publication_date else "Oct 7, 2026",
-            updated_date="Oct 7, 2026 12:30 UTC",
-            relevance_score=item.relevance_score if item else 96.0,
-            investigation_status="VERIFIED_DOSSIER",
-            canonical_url=item.canonical_url if item else "https://wire.reuters.com/investigations/target-report",
+            publication_date=publication_date,
             hero_image=hero_img,
-            hero_image_caption=f"Archival photography and digital telemetry documenting reporting surrounding {query_val}.",
-            hero_image_forensic_note="Image metadata verified: SHA-256 sealed. EXIF camera telemetry unmanipulated; context verified against wire archive.",
-            key_takeaways=key_takeaways,
-            sections=sections,
-            body_paragraphs=[p for sec in sections for p in sec.paragraphs],
-            detected_entities=item.detected_entities if (item and item.detected_entities) else [query_val, publisher, "DisinfoLab"],
-            claims=claims,
-            timeline=timeline,
-            evidence=evidence,
-            lineage_nodes=lineage_nodes,
-            lineage_edges=lineage_edges,
-            global_coverage=global_coverage,
-            narratives=narratives,
-            story_cluster=item.story_cluster if item else None,
-            related_news=related_news,
-            assessment=assessment,
-            why_misleading_reasons=why_reasons,
-            resolved_entities=resolved_entities,
-            story_graph=story_graph,
-            source_independence_breakdown=source_independence_breakdown,
-            claim_review_interoperability=claim_review_interoperability,
-            read_time_minutes=item.read_time_minutes if item else 6,
+            detected_entities=entities,
+            is_video=is_video,
+            video_embed_url=video_embed_url,
+            query_hint=query_val,
+            relevance_score=relevance_score,
         )
 
         self._article_cache[article_id] = article
@@ -1591,6 +681,24 @@ class MultiSourceRetrievalEngine:
                     for entry in channel.findall("item")[:10]:
                         title = entry.findtext("title") or ""
                         link = entry.findtext("link") or ""
+                        if "url=" in link:
+                            try:
+                                parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(link).query)
+                                direct_u = parsed_qs.get("url", [""])[0]
+                                if direct_u and direct_u.startswith("http"):
+                                    link = direct_u
+                            except Exception:
+                                pass
+
+                        publisher_name = "International Wire"
+                        if link.startswith("http"):
+                            try:
+                                domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
+                                if domain and "bing.com" not in domain:
+                                    publisher_name = domain
+                            except Exception:
+                                pass
+
                         pub_date = entry.findtext("pubDate") or ""
                         desc = entry.findtext("description") or ""
                         clean_desc = ""
@@ -1618,8 +726,8 @@ class MultiSourceRetrievalEngine:
                             "title": title,
                             "summary": clean_desc or title,
                             "canonical_url": link,
-                            "source": "Bing News Feed",
-                            "publisher": "International Wire",
+                            "source": publisher_name,
+                            "publisher": publisher_name,
                             "publication_date": pub_date,
                             "content_type": "article",
                             "media_indicators": {"has_image": bool(img_url)},
@@ -1731,6 +839,11 @@ class MultiSourceRetrievalEngine:
             }
 
         # 2. General web article with OpenGraph extraction
+        is_safe, reason = network_safety.validate_url(url)
+        if not is_safe:
+            app_logger.warning(f"SSRF blocked direct URL artifact fetch for '{url}': {reason}")
+            return None
+
         try:
             resp = await self.client.get(url)
             if resp.status_code == 200:
@@ -1883,23 +996,30 @@ class MultiSourceRetrievalEngine:
             canon = it.get("canonical_url", "")
             if not canon or not canon.startswith("http"):
                 return
+            is_safe, _ = network_safety.validate_url(canon)
+            if not is_safe:
+                return
             try:
-                resp = await self.client.get(canon, timeout=2.2)
+                resp = await self.client.get(canon, timeout=5.0)
                 if resp.status_code == 200 and resp.text:
-                    soup = BeautifulSoup(resp.text[:60000], "html.parser")
+                    soup = BeautifulSoup(resp.text[:65000], "html.parser")
                     og = (
                         soup.find("meta", attrs={"property": "og:image"}) or
                         soup.find("meta", attrs={"name": "twitter:image"}) or
-                        soup.find("meta", attrs={"name": "image"})
+                        soup.find("meta", attrs={"name": "image"}) or
+                        soup.find("meta", attrs={"name": "thumbnail"}) or
+                        soup.find("link", attrs={"rel": "image_src"})
                     )
-                    if og and og.get("content"):
-                        img_val = og.get("content", "").strip()
+                    img_val = ""
+                    if og:
+                        img_val = (og.get("content") or og.get("href") or "").strip()
+                    if img_val:
                         if img_val.startswith("//"):
                             img_val = f"https:{img_val}"
                         elif img_val.startswith("/"):
                             parsed_u = urllib.parse.urlparse(str(resp.url))
                             img_val = f"{parsed_u.scheme}://{parsed_u.netloc}{img_val}"
-                        if img_val.startswith("http") and not any(x in img_val.lower() for x in ["favicon", "pixel", "1x1", "blank.gif"]):
+                        if img_val.startswith("http") and not any(x in img_val.lower() for x in ["favicon", "pixel", "1x1", "blank.gif", "tracking"]):
                             it["hero_image"] = img_val
                             it["thumbnail_url"] = img_val
                             if "media_indicators" in it and isinstance(it["media_indicators"], dict):
@@ -2205,6 +1325,16 @@ class MultiSourceRetrievalEngine:
             + (0.05 * geo_score)
             + (0.10 * source_score)
         )
+
+        # Boost media when query seeks video / footage / visual intelligence
+        if any(w in query_lower for w in ["video", "footage", "clip", "watch", "broadcast", "youtube"]):
+            if item.get("is_video") or item.get("content_type") == "video" or "embed_url" in (item.get("media_indicators") or {}):
+                hybrid_score += 18.0
+
+        # Boost items with verified authentic lead image
+        if item.get("hero_image") and "images.unsplash.com" not in item.get("hero_image", ""):
+            hybrid_score += 4.0
+
         final_score = max(5.0, min(99.0, hybrid_score))
 
         explanation = (

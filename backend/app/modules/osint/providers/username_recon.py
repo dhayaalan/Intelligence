@@ -28,9 +28,11 @@ class UsernameReconProvider(ProviderAdapter):
         
         matches: List[Dict[str, Any]] = []
         entities: List[Dict[str, Any]] = []
+        evidence: List[Dict[str, Any]] = []
 
         if t_type in ["username", "email", "person", "identity", "handle"] or " " not in target:
-            username = target.split("@")[0].strip()
+            raw_user = target.split("@")[0].strip().replace(" ", "")
+            username = "".join(c for c in raw_user if c.isalnum() or c in "._-") or raw_user
             
             platforms_config = [
                 {
@@ -276,6 +278,16 @@ class UsernameReconProvider(ProviderAdapter):
                             "is_verified": True,
                         }
                     })
+                    evidence.append({
+                        "source": f"OSINT Profile Recon - {item['platform']}",
+                        "provider": self.provider_id,
+                        "module": "osint",
+                        "collection_method": "http_probe",
+                        "reference": item["url"],
+                        "confidence": 0.95,
+                        "raw_data": item,
+                        "hash": f"ev_user_{abs(hash(item['url']))}"
+                    })
 
         duration = round((time.time() - start_time) * 1000, 2)
         return ProviderResponse(
@@ -285,6 +297,7 @@ class UsernameReconProvider(ProviderAdapter):
                 "target_username": target,
                 "profiles_found": matches,
                 "entities": entities,
+                "evidence": evidence,
                 "found": bool(entities),
                 "total_platforms_scanned": len(matches)
             },

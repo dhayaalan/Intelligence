@@ -141,6 +141,9 @@ class NewsSearchResultItem(BaseModel):
     search_explanation: str = ""
     thumbnail_url: Optional[str] = None
     hero_image: Optional[str] = None
+    image_url: Optional[str] = None
+    is_video: bool = False
+    video_embed_url: Optional[str] = None
     source_type: str = "NEWS"  # PRIMARY, SECONDARY, TERTIARY, OFFICIAL, NEWS, ACADEMIC, ARCHIVE, SOCIAL
     is_independent: bool = True
 

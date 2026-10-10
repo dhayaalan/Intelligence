@@ -126,6 +126,7 @@ export const HighlightMatch: React.FC<{
 export const AVAILABLE_SCOPES = [
   { id: 'ALL INTELLIGENCE', label: 'ALL INTELLIGENCE', desc: 'Auto-route across all modules based on target intent' },
   { id: 'OSINT', label: 'OSINT', desc: 'Public records, social footprints, DNS & identities' },
+  { id: 'SOCIAL MEDIA INTELLIGENCE', label: 'SOCIAL MEDIA', desc: 'Bluesky, Telegram, Reddit, Mastodon, YouTube & CIB' },
   { id: 'THREAT INTELLIGENCE', label: 'THREAT INTELLIGENCE', desc: 'Malware feeds, IOCs & network infrastructure' },
   { id: 'NEWS INTELLIGENCE', label: 'NEWS INTELLIGENCE', desc: 'Global wire services, narratives & claims' },
   { id: 'DIGITAL INFRASTRUCTURE', label: 'DIGITAL INFRASTRUCTURE', desc: 'IPs, ASNs, certificates & domains' },
@@ -1337,7 +1338,11 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  if (fnd.action_target) {
+                                  if (fnd.action_type === 'PROFILES') {
+                                    setActiveTab('profiles');
+                                  } else if (fnd.action_type === 'NEWS') {
+                                    setActiveTab('news');
+                                  } else if (fnd.action_target) {
                                     setInResultSearch(fnd.action_target);
                                     setActiveTab('entities');
                                   } else {

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.identity.models import UserRecord
 from app.tenancy.context import get_current_user
+from app.core.network_safety import network_safety
 from app.modules.news_intelligence.models import (
     AddToCaseRequest,
     ClaimInvestigationResult,
@@ -168,6 +169,13 @@ async def create_news_investigation(
     Creates a new news investigation scoped to the investigator's query
     and executes full deep claim decomposition and forensic verification.
     """
+    # Guard against SSRF if target_input or canonical_url is an HTTP/HTTPS link
+    for u in [payload.target_input, payload.canonical_url]:
+        if u and (u.startswith("http://") or u.startswith("https://")):
+            is_safe, reason = network_safety.validate_url(u)
+            if not is_safe:
+                raise HTTPException(status_code=400, detail=f"SSRF Protection: {reason}")
+
     return await news_intelligence_service.create_investigation(
         tenant_id=current_user.tenant_id,
         user=current_user,
@@ -295,4 +303,7 @@ async def extract_url_content(
     current_user: UserRecord = Depends(get_current_user),
 ):
     """Extracts live content and metadata from any public URL without opening an external page."""
+    is_safe, reason = network_safety.validate_url(payload.url)
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=f"SSRF Protection: {reason}")
     return await news_retrieval_engine.extract_article(payload.url)

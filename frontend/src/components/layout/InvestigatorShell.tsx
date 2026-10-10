@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import {
-  Search, FolderGit2, Layers, ShieldAlert, FileText, Lock,
-  Share2, Globe, ChevronLeft, ChevronRight, LogOut
+  Search, Newspaper, FolderGit2, Layers, ShieldAlert, FileText, Lock,
+  Share2, Globe, ChevronLeft, ChevronRight, LogOut, Bot, MessageSquare, Wrench
 } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { SearchPage } from '../../features/search/SearchPage';
 import { NewsIntelligencePage } from '../../features/news_intelligence/NewsIntelligencePage';
+import { SocialIntelligencePage } from '../../features/social_intelligence/SocialIntelligencePage';
+import { AgentsPage } from '../../features/agents/AgentsPage';
 import { InvestigationsPage } from '../../features/investigations/InvestigationsPage';
 import { FindingsPage } from '../../features/findings/FindingsPage';
 import { EvidencePage } from '../../features/evidence/EvidencePage';
@@ -18,7 +20,7 @@ import { useTools, ToolItem } from '../../core/api/hooks';
 import { ToolGrid, ToolRunModal } from '../tools';
 import { PageHeader } from '../common/PageHeader';
 
-type NavView = 'search' | 'news' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
+type NavView = 'search' | 'social' | 'agents' | 'news' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
 
 
 interface NavItem {
@@ -46,9 +48,12 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
 
   const navItems: NavItem[] = [
     { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
-    { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
-    { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" />, dividerBefore: true },
-
+    { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" />, dividerBefore: true },
+    // { id: 'social', label: 'Social Intelligence', icon: <MessageSquare className="w-4 h-4" /> },
+    // { id: 'agents', label: 'ML Services', icon: <Bot className="w-4 h-4" /> },
+    // { id: 'news', label: 'News Intelligence', icon: <Newspaper className="w-4 h-4" /> },
+    // { id: 'tools', label: 'Tool Workbench', icon: <Wrench className="w-4 h-4" /> },
+    { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" /> },
     { id: 'graph', label: 'Relationships', icon: <Share2 className="w-4 h-4" /> },
     { id: 'map', label: 'Geospatial Map', icon: <Globe className="w-4 h-4" /> },
     { id: 'findings', label: 'Findings', icon: <ShieldAlert className="w-4 h-4" />, dividerBefore: true },
@@ -90,11 +95,9 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
     <div className="flex-1 flex overflow-hidden relative">
       {/* Sidebar */}
       <aside
-        className={`${
-          isCollapsed ? 'md:w-20' : 'md:w-64'
-        } w-64 border-r border-slate-200/80 bg-white/95 backdrop-blur-md flex flex-col fixed top-14 left-0 bottom-0 transition-all duration-300 z-30 dark:border-slate-800/80 dark:bg-[#0e131f]/95 shadow-xs ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
+        className={`${isCollapsed ? 'md:w-20' : 'md:w-64'
+          } w-64 border-r border-slate-200/80 bg-white/95 backdrop-blur-md flex flex-col fixed top-14 left-0 bottom-0 transition-all duration-300 z-30 dark:border-slate-800/80 dark:bg-[#0e131f]/95 shadow-xs ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          }`}
       >
         {/* Collapse toggle header on desktop */}
         <div className={`hidden md:flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} border-b border-slate-200/80 dark:border-slate-800/80`}>
@@ -141,21 +144,18 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
                 <button
                   onClick={() => handleNavClick(item.id)}
                   title={item.label}
-                  className={`w-full flex items-center ${
-                    isCollapsed ? 'justify-center h-10 px-0' : 'justify-start px-3 py-2'
-                  } rounded-xl text-xs font-medium transition-all group cursor-pointer ${
-                    isActive
+                  className={`w-full flex items-center ${isCollapsed ? 'justify-center h-10 px-0' : 'justify-start px-3 py-2'
+                    } rounded-xl text-xs font-medium transition-all group cursor-pointer ${isActive
                       ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900/80'
-                  }`}
+                    }`}
                 >
                   <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                     <span
-                      className={`transition-colors ${
-                        isActive
-                          ? 'text-white dark:text-slate-950'
-                          : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'
-                      }`}
+                      className={`transition-colors ${isActive
+                        ? 'text-white dark:text-slate-950'
+                        : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'
+                        }`}
                     >
                       {item.icon}
                     </span>
@@ -231,9 +231,8 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
 
       {/* Dynamic Route Content with Smooth Transition */}
       <main
-        className={`flex-1 ${
-          isCollapsed ? 'md:ml-20' : 'md:ml-64'
-        } overflow-y-auto h-[calc(100vh-3.5rem)] px-3 sm:px-5 py-5 bg-[#f8fafc] dark:bg-[#090d16] w-full min-w-0 transition-all duration-300`}
+        className={`flex-1 ${isCollapsed ? 'md:ml-20' : 'md:ml-64'
+          } overflow-y-auto h-[calc(100vh-3.5rem)] px-3 sm:px-5 py-5 bg-[#f8fafc] dark:bg-[#090d16] w-full min-w-0 transition-all duration-300`}
       >
 
         {activeNav === 'search' && (
@@ -247,6 +246,8 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
             }}
           />
         )}
+        {activeNav === 'social' && <SocialIntelligencePage />}
+        {activeNav === 'agents' && <AgentsPage />}
         {activeNav === 'news' && <NewsIntelligencePage />}
         {activeNav === 'tools' && (
           <div className="max-w-7xl mx-auto space-y-6">
