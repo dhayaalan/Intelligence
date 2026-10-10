@@ -21,6 +21,7 @@ from app.modules.osint.providers.maltego import MaltegoProvider
 from app.modules.osint.providers.theharvester import TheHarvesterProvider
 from app.modules.osint.providers.google_dork import GoogleDorkProvider
 from app.modules.osint.providers.image_engine import ImageOSINTProvider
+from app.modules.osint.providers.username_recon import UsernameReconProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -48,7 +49,8 @@ class OsintModule(IntelligenceModule):
             ("theharvester", TheHarvesterProvider(), "IDENTITY_OSINT", ["email", "domain", "person"], ["domain", "email"]),
             ("google_dork", GoogleDorkProvider(), "SEARCH_OPERATORS", ["domain", "dorks", "files"], ["domain"]),
             ("maltego", MaltegoProvider(), "TRANSFORMS", ["domain", "ip", "dns", "whois"], ["domain", "ip"]),
-            ("image_osint", ImageOSINTProvider(), "IMAGE_METADATA", ["image", "exif", "person"], ["image", "url", "person"])
+            ("image_osint", ImageOSINTProvider(), "IMAGE_METADATA", ["image", "exif", "person"], ["image", "url", "person"]),
+            ("username_recon", UsernameReconProvider(), "SOCIAL_IDENTITY", ["username", "handle", "person", "email"], ["username", "handle", "person"])
         ]
 
         for pid, provider, category, caps, targets in primary_providers:

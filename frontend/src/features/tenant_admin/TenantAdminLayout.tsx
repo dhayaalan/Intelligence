@@ -73,8 +73,27 @@ export const TenantAdminLayout: React.FC = () => {
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState<'ANALYST' | 'INVESTIGATOR' | 'USER'>('INVESTIGATOR');
+  const [formModules, setFormModules] = useState<string[]>([
+    'osint',
+    'threat_intelligence',
+    'investigations',
+    'cases',
+    'evidence',
+    'findings',
+    'reports'
+  ]);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const availableModules = [
+    { id: 'osint', label: 'OSINT' },
+    { id: 'threat_intelligence', label: 'Threat Intelligence' },
+    { id: 'investigations', label: 'Investigations' },
+    { id: 'cases', label: 'Case Management' },
+    { id: 'evidence', label: 'Evidence' },
+    { id: 'findings', label: 'Findings' },
+    { id: 'reports', label: 'Reports' },
+  ];
 
   // Search filter
   const [userSearch, setUserSearch] = useState('');
@@ -95,7 +114,7 @@ export const TenantAdminLayout: React.FC = () => {
         email: formEmail.trim().toLowerCase(),
         password: formPassword,
         role: formRole,
-        assigned_modules: ['osint', 'threat_intelligence'],
+        assigned_modules: formModules,
       });
 
       setFormSuccess(`User '${formName}' (${formRole}) successfully created in your organization!`);
@@ -869,6 +888,38 @@ export const TenantAdminLayout: React.FC = () => {
                     <option value="ANALYST">Analyst (Reviews results, contributes to findings and reports)</option>
                     <option value="USER">User (Standard member with search and read access)</option>
                   </select>
+                </div>
+
+                {/* Module Entitlements Checklist */}
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Assigned Modules
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                    {availableModules.map((m) => {
+                      const isChecked = formModules.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setFormModules(formModules.filter((id) => id !== m.id));
+                              } else {
+                                setFormModules([...formModules, m.id]);
+                              }
+                            }}
+                            className="rounded border-slate-300 dark:border-slate-700 text-cyan-600 focus:ring-cyan-500"
+                          />
+                          <span className="font-medium">{m.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">

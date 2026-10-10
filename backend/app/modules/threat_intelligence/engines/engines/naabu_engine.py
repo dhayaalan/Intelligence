@@ -72,14 +72,25 @@ class NaabuEngine(ScannerEngine):
     async def execute(self, target: str, target_type: str, context: Dict[str, Any]) -> RawEngineOutput:
         start_time = time.time()
         discovered_ports = []
-        target_host = target.split("/")[0].replace("https://", "").replace("http://", "")
+        target_host = target.split("/")[0].replace("https://", "").replace("http://", "").strip()
 
-        # Standard top ports audit: 80, 443, 8080, 8443, 22, 21, 25, 53, 3306, 5432, 6379, 27017
+        # Guard: Only probe valid hosts or IPs. Never scan general multi-word queries.
+        is_valid_host = bool(target_host and " " not in target_host and ("." in target_host or ":" in target_host))
+        if not is_valid_host:
+            duration = (time.time() - start_time) * 1000
+            return RawEngineOutput(
+                engine_id=self.engine_id(),
+                success=True,
+                duration_ms=duration,
+                raw_data={"services": [], "target": target_host, "skipped_reason": "Target is not a valid network host"}
+            )
+
+        # Standard top ports audit: 80, 443, 8080, 8443, 22, 53, 3306, 5432
         probe_ports = [80, 443, 8080, 8443, 22, 53, 3306, 5432]
 
         for port in probe_ports:
             try:
-                # Fast connection test with 0.1s timeout
+                # Fast connection test with 0.15s timeout
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(0.15)
                 res = s.connect_ex((target_host, port))
@@ -94,15 +105,6 @@ class NaabuEngine(ScannerEngine):
                 s.close()
             except Exception:
                 pass
-
-        if not discovered_ports:
-            discovered_ports.append({
-                "host": target_host,
-                "port": 443,
-                "protocol": "tcp",
-                "state": "open",
-                "service": "https"
-            })
 
         duration = (time.time() - start_time) * 1000
         return RawEngineOutput(

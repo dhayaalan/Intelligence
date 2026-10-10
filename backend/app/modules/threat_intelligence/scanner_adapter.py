@@ -124,7 +124,7 @@ class ThreatIntelEngineAdapter(ProviderAdapter):
             findings = []
             evidence = []
 
-            # 1. Findings
+            # 1. Findings & Vulnerabilities
             for f in norm_res.findings:
                 findings.append({
                     "title": f.title,
@@ -134,10 +134,45 @@ class ThreatIntelEngineAdapter(ProviderAdapter):
                     "cve": f.cve,
                     "cwe": f.cwe,
                     "remediation": f.remediation,
+                    "endpoint": f.endpoint,
+                    "owasp_category": f.owasp_category,
                     "source_engine": self.provider_id
                 })
+                # Emit first-class VULNERABILITY entity for intelligence graph and search results
+                entities.append(EntityPayload(
+                    type=EntityType.VULNERABILITY,
+                    value=f.title,
+                    confidence=0.92 if str(f.confidence).upper() == "HIGH" else 0.82,
+                    sources=[self.provider_id],
+                    metadata={
+                        "severity": f.severity,
+                        "finding_type": f.finding_type,
+                        "endpoint": f.endpoint,
+                        "cwe": f.cwe,
+                        "cve": f.cve,
+                        "remediation": f.remediation,
+                        "owasp_category": f.owasp_category,
+                        "description": f.description,
+                        "source": self.name
+                    }
+                ).dict())
 
-            # 2. Discovered Subdomains
+            # 2. Discovered Application Endpoints (from ZAP Spider & Crawlers)
+            for ep in getattr(norm_res, "endpoints", []):
+                entities.append(EntityPayload(
+                    type=EntityType.URL,
+                    value=ep.url,
+                    confidence=0.90,
+                    sources=[self.provider_id],
+                    metadata={
+                        "method": ep.method,
+                        "status_code": ep.status_code,
+                        "content_type": ep.content_type,
+                        "source_engine": ep.source_engine
+                    }
+                ).dict())
+
+            # 3. Discovered Subdomains
             for sub in norm_res.subdomains:
                 if sub != target:
                     entities.append(EntityPayload(
@@ -148,14 +183,22 @@ class ThreatIntelEngineAdapter(ProviderAdapter):
                         metadata={"parent_domain": target}
                     ).dict())
 
-            # 3. Discovered Services & Ports
+            # 4. Discovered Services & Ports
             for svc in norm_res.services:
+                host_str = str(svc.host or target).strip()
+                # Strictly reject multi-word queries or non-hosts from becoming domain entities
+                if not host_str or " " in host_str or not ("." in host_str or ":" in host_str):
+                    continue
+                if svc.state != "open":
+                    continue
+
                 entities.append(EntityPayload(
-                    type=EntityType.HOSTNAME if svc.host != target else EntityType.DOMAIN,
-                    value=f"{svc.host}:{svc.port}",
+                    type=EntityType.HOSTNAME,
+                    value=f"{host_str}:{svc.port}",
                     confidence=0.90,
                     sources=[self.provider_id],
                     metadata={
+                        "host": host_str,
                         "port": svc.port,
                         "protocol": svc.protocol,
                         "service": svc.service,
@@ -164,7 +207,7 @@ class ThreatIntelEngineAdapter(ProviderAdapter):
                     }
                 ).dict())
 
-            # 4. Technologies
+            # 5. Technologies
             for tech in norm_res.technologies:
                 entities.append(EntityPayload(
                     type=EntityType.TECHNOLOGY,

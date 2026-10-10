@@ -35,7 +35,13 @@ class EvidenceService:
         with db._lock:
             records = [EvidenceRecord(**d) for d in db.evidence.values() if d.get("tenant_id") == tenant_id]
             if investigation_id:
-                records = [r for r in records if r.investigation_id == investigation_id]
+                inv_data = db.investigations.get(investigation_id, {})
+                linked_ids = set(inv_data.get("evidence_ids", []))
+                inv_search_id = inv_data.get("search_id")
+                records = [
+                    r for r in records
+                    if r.investigation_id == investigation_id or r.id in linked_ids or (inv_search_id and r.search_id == inv_search_id)
+                ]
             if search_id:
                 records = [r for r in records if r.search_id == search_id]
             return records

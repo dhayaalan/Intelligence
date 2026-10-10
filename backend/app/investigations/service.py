@@ -7,6 +7,7 @@ from app.investigations.models import (
     InvestigationUpdateRequest, InvestigationStatus, TimelineEvent, InvestigationNote
 )
 from app.infrastructure.mongodb.repositories import investigation_repo, case_repo
+from app.investigations.summary_builder import summary_builder
 
 class InvestigationService:
     @staticmethod
@@ -57,18 +58,62 @@ class InvestigationService:
         return record
 
     @staticmethod
+    def _enrich_investigation_data(data: dict) -> dict:
+        ent_ids = data.get("entity_ids", [])
+        ev_ids = data.get("evidence_ids", [])
+        target = data.get("target", "Target")
+        t_type = data.get("target_type", "GENERAL")
+        priority = data.get("priority", "HIGH")
+
+        # Resolve actual entity and evidence objects from database
+        with db._lock:
+            ent_objs = [db.entities.get(eid, {}) for eid in ent_ids if eid in db.entities]
+            ev_objs = [db.evidence.get(evid, {}) for evid in ev_ids if evid in db.evidence]
+
+        # Generate dynamically grounded intelligence analysis
+        summary_res = summary_builder.generate_summary(
+            target=target,
+            target_type=t_type,
+            entities=ent_objs,
+            evidence=ev_objs,
+            findings=[],
+            priority=priority
+        )
+
+        if not data.get("investigative_summary"):
+            data["investigative_summary"] = {
+                "what_we_know": summary_res.what_we_know,
+                "what_we_dont_know": summary_res.what_we_dont_know,
+                "key_findings": summary_res.key_findings,
+                "investigative_leads": summary_res.investigative_leads,
+            }
+
+        if not data.get("open_questions"):
+            data["open_questions"] = summary_res.open_questions
+
+        if not data.get("recommended_actions"):
+            data["recommended_actions"] = summary_res.recommended_actions
+
+        if not data.get("investigation_health"):
+            data["investigation_health"] = summary_res.investigation_health
+
+        return data
+
+    @staticmethod
     def get_investigation(tenant_id: str, investigation_id: str) -> Optional[InvestigationRecord]:
         with db._lock:
             data = db.investigations.get(investigation_id)
             if data and data.get("tenant_id") == tenant_id:
-                return InvestigationRecord(**data)
+                enriched = InvestigationService._enrich_investigation_data(data)
+                return InvestigationRecord(**enriched)
         col = investigation_repo.sync_collection
         if col is not None:
             doc = col.find_one({"id": investigation_id, "tenant_id": tenant_id}, {"_id": 0})
             if doc:
+                enriched = InvestigationService._enrich_investigation_data(doc)
                 with db._lock:
-                    db.investigations[investigation_id] = doc
-                return InvestigationRecord(**doc)
+                    db.investigations[investigation_id] = enriched
+                return InvestigationRecord(**enriched)
         return None
 
     @staticmethod

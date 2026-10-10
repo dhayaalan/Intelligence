@@ -253,6 +253,63 @@ export const LoginPage: React.FC = () => {
             </p>
           </div>
 
+          {/* Quick Demo Personas */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              <span>Quick Login Demo Personas:</span>
+              <span className="text-[10px] text-slate-400">Click to fill</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('analyst@acme.com');
+                  setPassword('Analyst123!');
+                  setError(null);
+                }}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422] hover:border-emerald-500/60 hover:bg-emerald-500/5 text-left transition-all cursor-pointer shadow-2xs group"
+              >
+                <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Lead Analyst</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate">analyst@acme.com</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('superadmin@sential.io');
+                  setPassword('SuperAdmin123!');
+                  setError(null);
+                }}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422] hover:border-purple-500/60 hover:bg-purple-500/5 text-left transition-all cursor-pointer shadow-2xs group"
+              >
+                <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400">Super Admin</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate">superadmin@sential.io</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@acme.com');
+                  setPassword('TenantAdmin123!');
+                  setError(null);
+                }}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422] hover:border-sky-500/60 hover:bg-sky-500/5 text-left transition-all cursor-pointer shadow-2xs group"
+              >
+                <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-sky-600 dark:group-hover:text-sky-400">Tenant Admin</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate">admin@acme.com</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('user@acme.com');
+                  setPassword('User123!');
+                  setError(null);
+                }}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422] hover:border-amber-500/60 hover:bg-amber-500/5 text-left transition-all cursor-pointer shadow-2xs group"
+              >
+                <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-amber-400">Investigator</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate">user@acme.com</div>
+              </button>
+            </div>
+          </div>
 
           {/* Error Banner */}
           {error && (

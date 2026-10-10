@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBadge } from '../common/StatusBadge';
 import { Button } from '../ui/Button';
-import { CheckCircle2, AlertTriangle, Clock, RefreshCw, Copy, Check } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, RefreshCw, Copy, Check, ExternalLink, Play, Video } from 'lucide-react';
 
 export interface ToolResultDetailsProps {
   result: {
@@ -117,30 +117,91 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
           </div>
 
           <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-card overflow-hidden">
-            {result.results.map((item, idx) => (
-              <div key={idx} className="p-3 text-xs space-y-1 hover:bg-muted/20">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">
-                    {item.title || item.type || `Record #${idx + 1}`}
-                  </span>
-                  {item.severity && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
-                      {item.severity}
-                    </span>
+            {result.results.map((item, idx) => {
+              const avatar = item.metadata?.avatar_url || item.metadata?.image_url || item.metadata?.thumbnail_url || item.metadata?.hero_image;
+              const profileUrl = item.metadata?.profile_url || item.metadata?.watch_url || item.metadata?.url;
+              const isVideo = item.metadata?.is_video || item.type === 'VIDEO';
+              const embedUrl = item.metadata?.embed_url;
+              const platform = item.metadata?.platform;
+
+              return (
+                <div key={idx} className="p-3.5 text-xs space-y-2 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {platform && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                          {platform}
+                        </span>
+                      )}
+                      <span className="font-semibold text-foreground">
+                        {item.metadata?.title || item.title || item.type || `Record #${idx + 1}`}
+                      </span>
+                    </div>
+                    {item.severity && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
+                        {item.severity}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    {avatar && (
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatar}
+                          alt="Extracted Media"
+                          className={isVideo ? "w-24 h-16 rounded-lg object-cover border border-border" : "w-10 h-10 rounded-xl object-cover border border-border"}
+                          onError={(e) => {
+                            (e.target as any).style.display = 'none';
+                          }}
+                        />
+                        {isVideo && (
+                          <div className="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center">
+                            <Play className="w-4 h-4 fill-white text-white" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      {item.value && (
+                        <p className="font-mono text-muted-foreground break-all">
+                          {item.value}
+                        </p>
+                      )}
+                      {profileUrl && (
+                        <div className="pt-1">
+                          <a
+                            href={profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-sans text-primary hover:underline font-medium"
+                          >
+                            {isVideo ? "Open YouTube Video" : "Open Public Profile"} <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {embedUrl && (
+                    <div className="aspect-video w-full max-w-md rounded-lg overflow-hidden border border-border bg-black mt-2">
+                      <iframe
+                        src={embedUrl}
+                        title="Embedded Media Player"
+                        allowFullScreen
+                        className="w-full h-full border-0"
+                      />
+                    </div>
+                  )}
+
+                  {item.raw && typeof item.raw === 'object' && (
+                    <pre className="p-2 rounded bg-muted/40 font-mono text-[11px] overflow-x-auto text-muted-foreground">
+                      {JSON.stringify(item.raw, null, 2)}
+                    </pre>
                   )}
                 </div>
-                {item.value && (
-                  <p className="font-mono text-muted-foreground break-all">
-                    {item.value}
-                  </p>
-                )}
-                {item.raw && typeof item.raw === 'object' && (
-                  <pre className="p-2 rounded bg-muted/40 font-mono text-[11px] overflow-x-auto text-muted-foreground">
-                    {JSON.stringify(item.raw, null, 2)}
-                  </pre>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

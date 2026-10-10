@@ -41,11 +41,15 @@ import { InvestigationDetailPage } from './InvestigationDetailPage';
 interface InvestigationsPageProps {
   onNavigateToSearch?: (target: string, targetType?: string) => void;
   selectedInvestigationId?: string | null;
+  onSelectInvestigation?: (id: string | null) => void;
+  onClearSelectedInvestigation?: () => void;
 }
 
 export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
   onNavigateToSearch,
   selectedInvestigationId,
+  onSelectInvestigation,
+  onClearSelectedInvestigation,
 }) => {
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +80,8 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
   // Linked items for selected investigation
   const [evidenceList, setEvidenceList] = useState<Evidence[]>([]);
   const [entityList, setEntityList] = useState<Entity[]>([]);
+  const [modalEntityPage, setModalEntityPage] = useState(1);
+  const [modalEvidencePage, setModalEvidencePage] = useState(1);
   const [newNote, setNewNote] = useState('');
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
@@ -95,7 +101,9 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
         page: String(page),
         page_size: String(pageSize),
       });
-      if (selectedModuleTab !== 'ALL') queryParams.append('module', selectedModuleTab);
+      if (selectedModuleTab !== 'ALL') {
+        queryParams.append('module', selectedModuleTab);
+      }
       if (statusFilter !== 'ALL') queryParams.append('status', statusFilter);
       if (priorityFilter !== 'ALL') queryParams.append('priority', priorityFilter);
       if (searchTerm.trim()) queryParams.append('search', searchTerm.trim());
@@ -153,11 +161,14 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
           .then((inv) => setSelectedInv(inv))
           .catch((err) => console.error('Failed to load selected investigation', err));
       }
+    } else {
+      setSelectedInv(null);
     }
-  }, [selectedInvestigationId, investigations]);
+  }, [selectedInvestigationId]);
 
   const fetchInvestigationDetails = (inv: Investigation) => {
     setSelectedInv(inv);
+    onSelectInvestigation?.(inv.id);
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -238,6 +249,7 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
         investigationId={selectedInv.id}
         onBack={() => {
           setSelectedInv(null);
+          onClearSelectedInvestigation?.();
           fetchInvestigations();
         }}
         onNavigateToSearch={onNavigateToSearch}
@@ -716,14 +728,22 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
                       </td>
                       <td className="py-3.5 px-3">
                         <div className="flex items-center gap-1 flex-wrap">
-                          {invModules.map((mid) => (
-                            <span
-                              key={mid}
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                            >
-                              {mid.toLowerCase().includes('threat') ? 'CTI' : 'OSINT'}
-                            </span>
-                          ))}
+                          {invModules.map((mid) => {
+                            const isTI = mid.toLowerCase().includes('threat') || mid.toLowerCase().includes('ti');
+                            return (
+                              <span
+                                key={mid}
+                                className={cn(
+                                  'text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                                  isTI
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                )}
+                              >
+                                {isTI ? 'CTI' : 'OSINT'}
+                              </span>
+                            );
+                          })}
                         </div>
                       </td>
                       <td className="py-3.5 px-3">
@@ -1075,26 +1095,57 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
                     <span>No entities linked to this case file yet. Run an investigation search to correlate indicators.</span>
                   </div>
                 ) : (
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                    {entityList.map((ent, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[9px] uppercase">
-                            {ent.type}
-                          </Badge>
-                          <span className="font-semibold text-slate-900 dark:text-white break-all">
-                            {ent.value}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          {ent.sources?.join(', ') || 'Correlated'}
+                  <>
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                      {entityList
+                        .slice((modalEntityPage - 1) * 10, modalEntityPage * 10)
+                        .map((ent, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[9px] uppercase">
+                                {ent.type}
+                              </Badge>
+                              <span className="font-semibold text-slate-900 dark:text-white break-all">
+                                {ent.value}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">
+                              {ent.sources?.join(', ') || 'Correlated'}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                    {entityList.length > 10 && (
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 dark:border-slate-800">
+                        <span>
+                          Page {modalEntityPage} of {Math.max(1, Math.ceil(entityList.length / 10))} ({entityList.length} items)
                         </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={modalEntityPage <= 1}
+                            onClick={() => setModalEntityPage((p) => Math.max(1, p - 1))}
+                            className="h-6 w-6 p-0 cursor-pointer"
+                          >
+                            <ChevronLeft className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={modalEntityPage >= Math.ceil(entityList.length / 10)}
+                            onClick={() => setModalEntityPage((p) => p + 1)}
+                            className="h-6 w-6 p-0 cursor-pointer"
+                          >
+                            <ChevronRight className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -1107,24 +1158,55 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
                     <span>No cryptographic evidence items sealed in this case yet.</span>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {evidenceList.map((ev, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-900 dark:text-white uppercase text-[10px]">
-                            {ev.provider || ev.module} • {ev.collection_method}
-                          </span>
-                          <span className="text-[9px] text-slate-400">{formatDate(ev.timestamp)}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 truncate">
-                          SHA256: <code>{ev.hash}</code>
+                  <>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {evidenceList
+                        .slice((modalEvidencePage - 1) * 10, modalEvidencePage * 10)
+                        .map((ev, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900 dark:text-white uppercase text-[10px]">
+                                {ev.provider || ev.module} • {ev.collection_method}
+                              </span>
+                              <span className="text-[9px] text-slate-400">{formatDate(ev.timestamp)}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate">
+                              SHA256: <code>{ev.hash}</code>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    {evidenceList.length > 10 && (
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 dark:border-slate-800">
+                        <span>
+                          Page {modalEvidencePage} of {Math.max(1, Math.ceil(evidenceList.length / 10))} ({evidenceList.length} items)
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={modalEvidencePage <= 1}
+                            onClick={() => setModalEvidencePage((p) => Math.max(1, p - 1))}
+                            className="h-6 w-6 p-0 cursor-pointer"
+                          >
+                            <ChevronLeft className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={modalEvidencePage >= Math.ceil(evidenceList.length / 10)}
+                            onClick={() => setModalEvidencePage((p) => p + 1)}
+                            className="h-6 w-6 p-0 cursor-pointer"
+                          >
+                            <ChevronRight className="w-3 h-3" />
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

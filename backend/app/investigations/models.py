@@ -40,8 +40,13 @@ class InvestigationRecord(BaseModel):
     search_id: Optional[str] = None
     entity_ids: List[str] = Field(default_factory=list)
     evidence_ids: List[str] = Field(default_factory=list)
+    relationships: List[Dict[str, Any]] = Field(default_factory=list)
     timeline: List[TimelineEvent] = Field(default_factory=list)
     notes: List[InvestigationNote] = Field(default_factory=list)
+    investigative_summary: Optional[Dict[str, Any]] = None
+    open_questions: List[Dict[str, Any]] = Field(default_factory=list)
+    recommended_actions: List[Dict[str, Any]] = Field(default_factory=list)
+    investigation_health: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -54,6 +59,7 @@ class InvestigationCreateRequest(BaseModel):
     target_type: str
     selected_modules: List[str] = Field(default_factory=lambda: ["osint", "threat_intelligence"])
     search_id: Optional[str] = None
+    relationships: List[Dict[str, Any]] = Field(default_factory=list)
 
 class InvestigationUpdateRequest(BaseModel):
     title: Optional[str] = None

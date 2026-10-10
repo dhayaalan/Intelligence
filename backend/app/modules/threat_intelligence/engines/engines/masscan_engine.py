@@ -66,8 +66,23 @@ class MasscanEngine(ScannerEngine):
 
     async def execute(self, target: str, target_type: str, context: Dict[str, Any]) -> RawEngineOutput:
         start_time = time.time()
-        # Enforce hard safety limits: rate cap 1000 pps, max targets 256
-        open_ports = [80, 443]
+        target_clean = target.split("/")[0].replace("https://", "").replace("http://", "").strip()
+
+        # Guard: Only scan valid network hosts / IPs. Never scan general multi-word queries.
+        is_valid_host = bool(target_clean and " " not in target_clean and ("." in target_clean or ":" in target_clean))
+        open_ports = []
+
+        if is_valid_host:
+            # Quick check for standard HTTP/HTTPS availability
+            for p in [80, 443]:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.15)
+                    if s.connect_ex((target_clean, p)) == 0:
+                        open_ports.append(p)
+                    s.close()
+                except Exception:
+                    pass
 
         duration = (time.time() - start_time) * 1000
         return RawEngineOutput(
@@ -75,7 +90,7 @@ class MasscanEngine(ScannerEngine):
             success=True,
             duration_ms=duration,
             raw_data={
-                "target": target,
+                "target": target_clean,
                 "open_ports": open_ports,
                 "rate_limit_pps": 1000,
                 "safety_mode": "ENFORCED"

@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Pagination } from '../../components/ui/Pagination';
 import { formatDate } from '../../lib/utils';
+import { extractEntityAvatar } from '../graph/GraphStudioComponent';
 
 interface Entity {
   id: string;
@@ -172,27 +173,45 @@ export const EntitiesPage: React.FC = () => {
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {paginatedEntities.map((ent) => (
-              <Card key={ent.id} className="hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group cursor-default">
-                <CardContent className="p-4 sm:p-5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="mono" size="sm">
-                      <span className="text-zinc-500 dark:text-zinc-400">{getEntityIcon(ent.type)}</span>
-                      {ent.type}
-                    </Badge>
-                    <Badge variant={getConfidenceBadge(ent.confidence)} size="sm">
-                      {(ent.confidence * 100).toFixed(0)}% Confidence
-                    </Badge>
-                  </div>
+            {paginatedEntities.map((ent) => {
+              const avatarUrl = extractEntityAvatar(ent);
 
-                  <div>
-                    <h4 className="text-xs font-mono font-semibold text-zinc-950 dark:text-white break-all group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {ent.value}
-                    </h4>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
-                      {ent.sources.length} source{ent.sources.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
+              return (
+                <Card key={ent.id} className="hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group cursor-default">
+                  <CardContent className="p-4 sm:p-5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="mono" size="sm">
+                        <span className="text-zinc-500 dark:text-zinc-400">{getEntityIcon(ent.type)}</span>
+                        {ent.type}
+                      </Badge>
+                      <Badge variant={getConfidenceBadge(ent.confidence)} size="sm">
+                        {(ent.confidence * 100).toFixed(0)}% Confidence
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      {avatarUrl && (
+                        <div className="relative shrink-0">
+                          <img
+                            src={avatarUrl}
+                            alt={ent.value}
+                            className="w-10 h-10 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 shadow-2xs"
+                            onError={(e) => {
+                              (e.target as any).src = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(ent.value)}`;
+                            }}
+                          />
+                          <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-950" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-mono font-semibold text-zinc-950 dark:text-white break-all group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {ent.value}
+                        </h4>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
+                          {ent.sources.length} source{ent.sources.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
 
                   {/* Sources */}
                   {ent.sources.length > 0 && (
@@ -222,8 +241,9 @@ export const EntitiesPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
           {/* Pagination Controls */}
           <Card className="p-0 overflow-hidden">

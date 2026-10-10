@@ -54,7 +54,7 @@ async def bootstrap_super_admin():
         "name": "System Super Admin",
         "role": UserRole.SUPER_ADMIN.value,
         "tenant_id": "platform",  # Platform-wide root, not a tenant
-        "assigned_modules": ["osint", "threat_intelligence"],
+        "assigned_modules": ["osint", "threat_intelligence", "news_intelligence"],
         "status": UserStatus.ACTIVE.value,
         "created_at": datetime.utcnow().isoformat(),
         "last_login": None

@@ -88,10 +88,87 @@ export interface Investigation {
   created_by: string;
   entity_ids: string[];
   evidence_ids: string[];
+  relationships?: any[];
   timeline: TimelineEvent[];
   notes: InvestigationNote[];
+  investigative_summary?: {
+    what_we_know: string[];
+    what_we_dont_know: string[];
+    key_findings: Array<{
+      title: string;
+      description: string;
+      confidence: string;
+      severity: string;
+    }>;
+    investigative_leads: Array<{
+      lead: string;
+      why_it_matters: string;
+      confidence: string;
+      recommended_action: string;
+    }>;
+  };
+  open_questions?: Array<{
+    id: string;
+    question: string;
+    search_query: string;
+  }>;
+  recommended_actions?: Array<{
+    id: string;
+    title: string;
+    description: string;
+  }>;
+  investigation_health?: {
+    evidence_coverage: 'HIGH' | 'MEDIUM' | 'LOW';
+    source_diversity: 'HIGH' | 'MEDIUM' | 'LOW';
+    entity_resolution: 'HIGH' | 'MEDIUM' | 'LOW';
+    temporal_coverage: 'HIGH' | 'MEDIUM' | 'LOW';
+    unresolved_questions_count: number;
+    conflicting_claims_count: number;
+    primary_source_coverage: 'HIGH' | 'MEDIUM' | 'LOW';
+  };
   created_at: string;
   updated_at: string;
+}
+
+export interface KeyFindingItem {
+  id: string;
+  title: string;
+  description: string;
+  why_it_matters: string;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  evidence_count: number;
+  sources: string[];
+  action_type?: string;
+  action_target?: string;
+}
+
+export interface InvestigativeLeadItem {
+  id: string;
+  lead: string;
+  why_it_matters: string;
+  evidence_refs: string[];
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  recommended_action: string;
+}
+
+export interface PipelineTraceStage {
+  stage: string;
+  status: string;
+  duration_ms: number;
+  details: string;
+}
+
+export interface InvestigationSnapshot {
+  relevant_findings_count: number;
+  entities_count: number;
+  relationships_count: number;
+  evidence_count: number;
+  sources_count: number;
+  news_stories_count: number;
+  high_priority_leads_count: number;
+  potential_contradictions_count: number;
+  unverified_claims_count: number;
 }
 
 export interface PaginatedInvestigationsResponse {
@@ -148,6 +225,9 @@ export interface SearchResponse {
   search_id: string;
   query: string;
   target_type: string;
+  intent?: string;
+  intent_explanation?: string;
+  selected_scopes?: string[];
   status: 'completed' | 'partial' | 'failed';
   investigation_id?: string;
   partial_warning?: string;
@@ -155,6 +235,10 @@ export interface SearchResponse {
   entities: Entity[];
   relationships: Relationship[];
   evidence: Evidence[];
+  investigation_snapshot?: InvestigationSnapshot;
+  key_findings?: KeyFindingItem[];
+  investigative_leads?: InvestigativeLeadItem[];
+  pipeline_trace?: PipelineTraceStage[];
   stats: {
     total_duration_ms: number;
     modules_executed: number;
