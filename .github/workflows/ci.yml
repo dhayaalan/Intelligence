@@ -19,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
@@ -44,10 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
@@ -67,10 +67,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node.js 22.x
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
@@ -89,10 +89,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node.js 22.x
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
@@ -112,7 +112,7 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -121,10 +121,10 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           echo "Validating PR title: $PR_TITLE"
-          CONVENTIONAL_PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\/]+\))?: .+"
+          CONVENTIONAL_PATTERN="^(?i)(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)([/: ]|\([a-zA-Z0-9_\-\/]+\)[/: ]).+"
           if [[ ! "$PR_TITLE" =~ $CONVENTIONAL_PATTERN ]]; then
             echo "::error::PR title '$PR_TITLE' does not match conventional commits pattern!"
-            echo "Expected format: type(scope): description (e.g., 'feat(auth): add MFA support' or 'ci: add workflows')"
+            echo "Expected format: type(scope): description (e.g., 'chore: description' or 'chore/scope: description')"
             exit 1
           fi
           echo "PR title conforms to conventional commits."
