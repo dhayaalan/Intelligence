@@ -43,6 +43,8 @@ class CrawlCheckpoint(BaseModel):
     items_collected: int = 0
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: CollectorStatus = CollectorStatus.SUCCESS
+    retry_after_seconds: Optional[float] = None
+    status_message: Optional[str] = None
 
 
 class CollectorResult(BaseModel):
@@ -118,9 +120,11 @@ class ResilientCrawlerEngine:
         job_id: str,
         platform: SocialPlatformType,
         query: str,
-        cursor: Optional[str],
-        items_count: int,
-        status: CollectorStatus = CollectorStatus.SUCCESS
+        cursor: Optional[str] = None,
+        items_count: int = 0,
+        status: CollectorStatus = CollectorStatus.SUCCESS,
+        retry_after_seconds: Optional[float] = None,
+        status_message: Optional[str] = None
     ) -> CrawlCheckpoint:
         key = f"{job_id}:{platform.value}"
         cp = CrawlCheckpoint(
@@ -129,7 +133,9 @@ class ResilientCrawlerEngine:
             query=query,
             cursor=cursor,
             items_collected=items_count,
-            status=status
+            status=status,
+            retry_after_seconds=retry_after_seconds,
+            status_message=status_message
         )
         self._checkpoints[key] = cp
         return cp

@@ -136,4 +136,6 @@ class SocialSearchResponse(BaseModel):
     results: List[SocialPost]
     cib_clusters: List[CibCluster] = Field(default_factory=list)
     provider_statuses: Dict[str, str] = Field(default_factory=dict)
+    collector_telemetry: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     execution_time_ms: float
+

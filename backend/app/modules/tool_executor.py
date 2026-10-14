@@ -1240,50 +1240,100 @@ class ToolExecutor:
         )
 
     async def _run_cve_intelligence(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
-        """Real CVE / Vulnerability database search via public NIST/CIRCL feeds."""
+        """
+        Real CVE / Vulnerability database search via public NIST/CIRCL feeds,
+        enriched with FIRST EPSS exploit probability scoring and CISA KEV exploit context.
+        """
         cve_id = target.strip().upper()
         results: List[NormalizedResult] = []
 
+        async def _fetch_circl(client: httpx.AsyncClient):
+            try:
+                r = await client.get(f"https://cve.circl.lu/api/cve/{cve_id}")
+                return r.json() if r.status_code == 200 else None
+            except Exception:
+                return None
+
+        async def _fetch_epss(client: httpx.AsyncClient):
+            try:
+                r = await client.get(f"https://api.first.org/data/v1/epss?cve={cve_id}")
+                if r.status_code == 200:
+                    d = r.json()
+                    rows = d.get("data", [])
+                    if rows:
+                        return {
+                            "epss_score": float(rows[0].get("epss", 0.0)),
+                            "epss_percentile": float(rows[0].get("percentile", 0.0))
+                        }
+            except Exception:
+                pass
+            return None
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(f"https://cve.circl.lu/api/cve/{cve_id}")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data and isinstance(data, dict) and data.get("id"):
-                        summary_desc = data.get("summary", "No description provided.")
-                        cvss = data.get("cvss", 0.0)
-                        severity = "CRITICAL" if cvss >= 9.0 else "HIGH" if cvss >= 7.0 else "MEDIUM" if cvss >= 4.0 else "LOW"
+                data, epss_data = await asyncio.gather(_fetch_circl(client), _fetch_epss(client))
 
-                        results.append(
-                            NormalizedResult(
-                                id=f"cve_{uuid.uuid4().hex[:8]}",
-                                tool_id=tool_id,
-                                type="VULNERABILITY",
-                                target=cve_id,
-                                value=f"CVSS {cvss} ({severity}): {summary_desc[:120]}...",
-                                source="CIRCL CVE Database / NIST NVD",
-                                confidence=1.0,
-                                severity=severity,
-                                metadata={
-                                    "cve_id": cve_id,
-                                    "cvss_score": cvss,
-                                    "published": data.get("Published"),
-                                    "modified": data.get("Modified"),
-                                    "references": data.get("references", [])[:5],
-                                },
-                                relationships=[{"source": cve_id, "relationship": "HAS_SEVERITY", "target": severity}],
-                                raw_result=data,
-                            )
-                        )
-                        return ToolExecutionResponse(
-                            execution_id=exec_id,
+                if data and isinstance(data, dict) and data.get("id"):
+                    summary_desc = data.get("summary", "No description provided.")
+                    cvss = float(data.get("cvss") or 0.0)
+                    severity = "CRITICAL" if cvss >= 9.0 else "HIGH" if cvss >= 7.0 else "MEDIUM" if cvss >= 4.0 else "LOW"
+
+                    # Check CISA Known Exploited Vulnerabilities (KEV) presence in references or known tags
+                    refs = data.get("references", [])
+                    cisa_kev_exploited = any(
+                        "cisa.gov" in ref.lower() or "known_exploited" in ref.lower()
+                        for ref in refs
+                    )
+
+                    epss_score = epss_data.get("epss_score") if epss_data else None
+                    epss_percentile = epss_data.get("epss_percentile") if epss_data else None
+
+                    epss_label = f" | EPSS: {round(epss_score * 100, 2)}%" if epss_score is not None else ""
+                    kev_label = " [CISA KEV EXPLOITED]" if cisa_kev_exploited else ""
+
+                    meta = {
+                        "cve_id": cve_id,
+                        "cvss_score": cvss,
+                        "published": data.get("Published"),
+                        "modified": data.get("Modified"),
+                        "references": refs[:5],
+                        "cisa_kev_exploited": cisa_kev_exploited,
+                        "epss_score": epss_score,
+                        "epss_percentile": epss_percentile,
+                    }
+
+                    relationships = [
+                        {"source": cve_id, "relationship": "HAS_SEVERITY", "target": severity}
+                    ]
+                    if cisa_kev_exploited:
+                        relationships.append({"source": cve_id, "relationship": "EXPLOITED_IN_WILD", "target": "CISA_KEV"})
+                    if epss_score is not None and epss_score >= 0.30:
+                        relationships.append({"source": cve_id, "relationship": "HIGH_EXPLOIT_PROBABILITY", "target": f"EPSS_{round(epss_score * 100, 1)}%"})
+
+                    results.append(
+                        NormalizedResult(
+                            id=f"cve_{uuid.uuid4().hex[:8]}",
                             tool_id=tool_id,
+                            type="VULNERABILITY",
                             target=cve_id,
-                            status="SUCCESS",
-                            duration_ms=0.0,
-                            results=results,
-                            summary=f"Authoritative record for {cve_id}: CVSS {cvss} ({severity})",
+                            value=f"CVSS {cvss} ({severity}){epss_label}{kev_label}: {summary_desc[:110]}...",
+                            source="CIRCL / NIST NVD + FIRST EPSS",
+                            confidence=1.0,
+                            severity=severity,
+                            metadata=meta,
+                            relationships=relationships,
+                            raw_result={"nvd": data, "epss": epss_data},
                         )
+                    )
+                    return ToolExecutionResponse(
+                        execution_id=exec_id,
+                        tool_id=tool_id,
+                        target=cve_id,
+                        status="SUCCESS",
+                        duration_ms=0.0,
+                        results=results,
+                        summary=f"Authoritative record for {cve_id}: CVSS {cvss} ({severity}){epss_label}{kev_label}",
+                    )
         except Exception:
             pass
 
@@ -1296,6 +1346,7 @@ class ToolExecutor:
             error=f"No CVE vulnerability record found for '{cve_id}'",
             summary=f"Search completed: No entries for '{cve_id}'",
         )
+
 
     # -------------------------------------------------------------------------
     # API-KEY REQUIRED TOOLS (Real Execution if key present, else CONFIG_REQUIRED)

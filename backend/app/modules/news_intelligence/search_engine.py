@@ -242,12 +242,26 @@ class MultiSourceRetrievalEngine:
         # Concurrently enrich top articles with authentic publisher OpenGraph imagery
         await self._enrich_with_real_og_images(deduped[:12])
 
-        # Classify source types and compute source independence
-        independent_sources_count = sum(1 for it in deduped if it.get("is_independent", True) and "syndicate" not in it.get("publisher", "").lower())
-        syndicated_count = sum(1 for it in deduped if not it.get("is_independent", True) or "syndicate" in it.get("publisher", "").lower() or "wire" in it.get("publisher", "").lower())
-        copied_count = max(0, len(deduped) - independent_sources_count)
-        official_count = sum(1 for it in deduped if any(w in (it.get("publisher", "") + " " + it.get("source", "")).lower() for w in ["gazette", "commission", "government", "registry", "ministry"]))
-        source_independence_score = round((max(1, independent_sources_count) / max(1, len(deduped))) * 100, 1)
+        # Classify wire syndication and compute authentic source independence
+        for it in deduped:
+            syn_type, wire_orig, is_ind = self._detect_wire_syndication(
+                it.get("title", ""),
+                it.get("summary", ""),
+                it.get("publisher", ""),
+                it.get("source", "")
+            )
+            it["syndication_type"] = syn_type
+            it["wire_origin"] = wire_orig
+            it["is_independent"] = is_ind
+
+        independent_sources_count = sum(1 for it in deduped if it.get("syndication_type") in ["INDEPENDENT", "OFFICIAL_DISPATCH", "ORIGIN_WIRE"] and it.get("is_independent", True))
+        syndicated_count = sum(1 for it in deduped if it.get("syndication_type") == "SYNDICATED_COPY")
+        copied_count = syndicated_count
+        official_count = sum(1 for it in deduped if it.get("syndication_type") == "OFFICIAL_DISPATCH" or any(w in (it.get("publisher", "") + " " + it.get("source", "")).lower() for w in ["gazette", "commission", "government", "registry", "ministry"]))
+        
+        # Genuine independence score: avoids treating 10 republished wire copies as 10 independent corroborations
+        total_items = max(1, len(deduped))
+        source_independence_score = round((max(1, independent_sources_count) / total_items) * 100, 1)
 
         # Identify / compute Story Cluster for related items
         cluster_id = f"clstr_{hashlib.md5(req.query.encode()).hexdigest()[:8]}"
@@ -302,6 +316,8 @@ class MultiSourceRetrievalEngine:
                     story_cluster=primary_story_cluster,
                     source_type=source_type,
                     is_independent=is_indep,
+                    syndication_type=item.get("syndication_type", "INDEPENDENT"),
+                    wire_origin=item.get("wire_origin"),
                     detected_entities=item.get("detected_entities") or parsed["detected_entities"],
                     claim_indicators=item.get("claim_indicators") or self._extract_claim_indicators(item.get("title", "") + " " + item.get("summary", "")),
                     media_indicators=item.get("media_indicators") or {},
@@ -825,10 +841,51 @@ class MultiSourceRetrievalEngine:
             app_logger.debug(f"GDELT DOC 2.0 API lookup for '{query}' caught: {e}")
         return items
 
+    def _detect_wire_syndication(self, title: str, summary: str, publisher: str, source: str) -> Tuple[str, Optional[str], bool]:
+        """
+        Detects if an article is an origin wire dispatch, a syndicated reprint, or an independent investigation.
+        Returns (syndication_type, wire_origin, is_independent).
+        """
+        combined = f"{title} {summary} {publisher} {source}".lower()
+        wires = [
+            ("pti", "Press Trust of India (PTI)"),
+            ("reuters", "Reuters News Agency"),
+            ("associated press", "Associated Press (AP)"),
+            ("ap wire", "Associated Press (AP)"),
+            ("afp", "Agence France-Presse (AFP)"),
+            ("ani", "Asian News International (ANI)"),
+            ("bloomberg", "Bloomberg Terminal / Wire"),
+            ("xinhua", "Xinhua News Agency"),
+            ("tass", "TASS Russian News Agency"),
+            ("dpa", "Deutsche Presse-Agentur (DPA)")
+        ]
+
+        # 1. Check explicit wire credit attribution: e.g. "(PTI)", "(Reuters)", "via AP", "source: PTI"
+        for wire_token, wire_name in wires:
+            if (f"({wire_token})" in combined or f"[{wire_token}]" in combined
+                    or f"via {wire_token}" in combined or f"{wire_token} /" in combined
+                    or f"source: {wire_token}" in combined):
+                if wire_token in publisher.lower():
+                    return "ORIGIN_WIRE", wire_name, True
+                else:
+                    return "SYNDICATED_COPY", wire_name, False
+
+        # 2. Check if publisher itself is an origin wire agency
+        for wire_token, wire_name in wires:
+            if wire_token in publisher.lower():
+                return "ORIGIN_WIRE", wire_name, True
+
+        # 3. Check official public records / gazettes
+        if any(w in combined for w in ["gazette", "commission", "government", "registry", "ministry", ".gov", "official"]):
+            return "OFFICIAL_DISPATCH", None, True
+
+        return "INDEPENDENT", None, True
+
     def _classify_source_type(self, publisher: str, url: str) -> str:
         """Classifies sources into PRIMARY, OFFICIAL, NEWS, ACADEMIC, ARCHIVE, SOCIAL, SYNDICATED."""
         pub_lower = publisher.lower()
         url_lower = url.lower()
+
 
         if any(w in pub_lower or w in url_lower for w in ["gazette", "commission", "government", "registry", "ministry", "dept", ".gov", "official"]):
             return "OFFICIAL"
