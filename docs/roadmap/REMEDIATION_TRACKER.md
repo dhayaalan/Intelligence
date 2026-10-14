@@ -107,9 +107,24 @@
 ### REM-06: Complete Backend Test Validation and Tenant Isolation
 - **Status:** `VERIFIED_FIXED`
 - **Source Files Verified:**
-  - Complete backend test suite in `backend/tests/` (18 test files, 61 test cases).
+  - Complete backend test suite in `backend/tests/` (19 test files, 68 test cases).
 - **Verification Evidence:**
-  - Full suite execution: `61 passed in 146.87s` (100% pass rate).
+  - Full suite execution: `68 passed in 193.18s` (100% pass rate).
   - Multi-tenant boundary tests: `test_tenant_isolation.py` (2/2 passed), `test_tenant_admin_user_creation.py` (4/4 passed).
   - Role-based access control tests: `test_role_security.py` (2/2 passed).
   - Zero synthetic intelligence regressions.
+
+---
+
+## 3. Approved Advanced Intelligence Features Implementation (P0 & P1)
+
+| Feature ID | Category | Priority | Component / Service | Implementation Artifacts | Automated Tests |
+|---|---|---|---|---|---|
+| **OSINT-03** | OSINT | **P0** | Collection Completeness Index (CCI) & Coverage Telemetry | `backend/app/search/schemas.py`, `backend/app/search/orchestrator.py` | `test_osint_03_collection_completeness_index_and_telemetry` |
+| **OSINT-01** | OSINT | **P1** | Multi-Stage Query Pivoting Engine | `backend/app/modules/osint/pivot_engine.py`, `backend/app/api/v1/search.py` | `test_osint_01_query_pivot_generation` |
+| **OSINT-02** | OSINT | **P1** | Historical Passive DNS & Certificate Timeline | `backend/app/modules/osint/passive_dns.py`, `backend/app/modules/tool_executor.py` | `test_osint_02_passive_dns_timeline` |
+| **CTI-01** | Threat Intel | **P0** | Composite Vulnerability Prioritization Engine (CVSS + EPSS + KEV + SLA) | `backend/app/modules/threat_intelligence/composite_scorer.py`, `backend/app/modules/tool_executor.py` | `test_cti_01_composite_vulnerability_scorer` |
+| **SOC-01** | Social Intel | **P1** | Multi-Platform CIB Lexical n-gram Clustering & Temporal Windowing | `backend/app/modules/social_media_intelligence/engines/cib_engine.py` | `test_soc_01_cib_lexical_ngrams_and_temporal_windowing` |
+| **NEWS-01** | News Intel | **P0** | 4-Tier Claim Verification Matrix & Corroboration Engine | `backend/app/modules/news_intelligence/models.py`, `search_engine.py`, `dossier_compiler.py` | `test_news_01_claim_verification_matrix` |
+| **CORR-01** | Cross-Module | **P1** | Unified Cross-Module Entity Resolution & Disambiguation Service | `backend/app/entities/resolver.py`, `backend/app/api/v1/entities.py` | `test_corr_01_cross_module_entity_disambiguation` |
+

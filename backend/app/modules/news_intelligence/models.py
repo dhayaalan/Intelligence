@@ -286,6 +286,27 @@ class NarrativeCluster(BaseModel):
     counter_evidence_summary: Optional[str] = None
 
 
+class ClaimMatrixStatus(str, Enum):
+    CORROBORATED = "CORROBORATED"
+    SINGLE_SOURCE_REPEATED = "SINGLE_SOURCE_REPEATED"
+    CONTRADICTED = "CONTRADICTED"
+    UNVERIFIED = "UNVERIFIED"
+
+
+class ClaimVerificationMatrixItem(BaseModel):
+    claim_id: str
+    claim_text: str
+    verification_tier: ClaimMatrixStatus  # CORROBORATED, SINGLE_SOURCE_REPEATED, CONTRADICTED, UNVERIFIED
+    independent_publishers_count: int = 1
+    syndicated_publishers_count: int = 0
+    origin_wire: Optional[str] = None
+    supporting_publishers: List[str] = Field(default_factory=list)
+    contradicting_publishers: List[str] = Field(default_factory=list)
+    confidence_score: float = 75.0
+    forensic_rationale: str = ""
+    evidence_references: List[str] = Field(default_factory=list)
+
+
 class EvidenceMatrixRow(BaseModel):
     claim_id: str
     claim_text: str
@@ -294,6 +315,7 @@ class EvidenceMatrixRow(BaseModel):
     contradicting_evidence: List[str] = Field(default_factory=list)
     status: str
     confidence: float
+    verification_tier: Optional[str] = None
 
 
 class ConfidenceBreakdown(BaseModel):
@@ -362,6 +384,7 @@ class NewsInvestigationRecord(BaseModel):
     image_forensics: Optional[ImageForensicsData] = None
     narratives: List[NarrativeCluster] = Field(default_factory=list)
     evidence_matrix: List[EvidenceMatrixRow] = Field(default_factory=list)
+    claim_verification_matrix: List[ClaimVerificationMatrixItem] = Field(default_factory=list)
     assessment: Optional[InvestigationAssessment] = None
     associated_case_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -455,6 +478,8 @@ class NewsArticle(BaseModel):
     narratives: List[NarrativeCluster] = Field(default_factory=list)
     story_cluster: Optional[StoryCluster] = None
     related_news: List[RelatedNewsItem] = Field(default_factory=list)
+    evidence_matrix: List[EvidenceMatrixRow] = Field(default_factory=list)
+    claim_verification_matrix: List[ClaimVerificationMatrixItem] = Field(default_factory=list)
     assessment: Optional[InvestigationAssessment] = None
     why_misleading_reasons: List[WhyMisleadingReason] = Field(default_factory=list)
     read_time_minutes: int = 5
@@ -495,13 +520,17 @@ class ClaimInvestigationResult(BaseModel):
     claim_text: str
     claim_type: str = "factual"
     verdict: str = "UNVERIFIED"
+    verification_tier: Optional[str] = "UNVERIFIED"
     confidence: float = 75.0
     original_source: str = "Primary Wire"
+    independent_publishers_count: int = 1
+    syndicated_publishers_count: int = 0
     supporting_sources: List[Dict[str, Any]] = Field(default_factory=list)
     contradicting_sources: List[Dict[str, Any]] = Field(default_factory=list)
     timeline: List[Dict[str, Any]] = Field(default_factory=list)
     assessment_notes: str = ""
     why_reasons: List[str] = Field(default_factory=list)
+    claim_matrix_item: Optional[ClaimVerificationMatrixItem] = None
 
 
 # --- Investigation Report & Case Attachment Schemas ---

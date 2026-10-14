@@ -350,3 +350,40 @@ async def execute_saved_search(
     )
     return await execute_search(req, current_user)
 
+
+@router.post("/pivots")
+async def extract_query_pivots(
+    req: SearchRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    [OSINT-01] Generates traceable, high-confidence secondary pivot targets
+    for a query or active investigation.
+    """
+    from app.modules.osint.pivot_engine import pivot_engine
+    from app.search.classifier import target_classifier
+    target_type = req.target_type or target_classifier.classify(req.query)
+
+    from app.investigations.service import investigation_service
+    existing = [
+        inv for inv in investigation_service.list_investigations(current_user.tenant_id)
+        if inv.target.lower() == req.query.strip().lower()
+    ]
+    entities = []
+    if existing:
+        entities = existing[0].entities or []
+
+    pivots = pivot_engine.generate_pivots(
+        original_query=req.query,
+        target_type=target_type,
+        entities=entities,
+        max_pivots=10
+    )
+    return {
+        "query": req.query,
+        "target_type": target_type,
+        "total_pivots": len(pivots),
+        "pivots": pivots
+    }
+
+
