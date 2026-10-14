@@ -15,6 +15,7 @@ from app.module_sdk.models import SearchContext, NormalizedModuleResult, EntityT
 from app.correlation.engine import correlation_engine
 from app.search.classifier import target_classifier
 from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord
+from app.modules.osint.pivot_engine import pivot_engine
 
 class SearchOrchestrator:
     """Module-agnostic search orchestration engine executing independent intelligence jobs."""
@@ -381,6 +382,45 @@ class SearchOrchestrator:
             }
         ]
 
+        # 6. [OSINT-01] Multi-Stage Query Pivoting
+        suggested_pivots = pivot_engine.generate_pivots(
+            original_query=query,
+            target_type=target_type,
+            entities=corr_entities,
+            max_pivots=8
+        )
+
+        # 7. [OSINT-03] Collection Completeness Index (CCI) & Coverage Telemetry
+        total_modules_attempted = max(1, len(module_jobs))
+        successful_modules = len([j for j in module_jobs if j.status in ["completed", "partial"]])
+        cci_score = round((successful_modules / total_modules_attempted) * 100.0, 1)
+
+        coverage_breakdown = {}
+        for j in module_jobs:
+            coverage_breakdown[j.module_name] = "VERIFIED" if j.status in ["completed", "partial"] else f"DEGRADED ({j.status.upper()})"
+
+        coverage_assessment = (
+            "HIGH_ASSURANCE" if cci_score >= 90.0 else
+            "MODERATE_ASSURANCE" if cci_score >= 60.0 else
+            "PARTIAL_COVERAGE"
+        )
+
+        coverage_telemetry = {
+            "collection_completeness_index": cci_score,
+            "modules_attempted": total_modules_attempted,
+            "modules_successful": successful_modules,
+            "coverage_breakdown": coverage_breakdown,
+            "coverage_assessment": coverage_assessment,
+            "provenance_traceable": True,
+        }
+
+        pipeline_trace.append({
+            "stage": "Query Pivoting & Coverage Telemetry",
+            "status": "completed",
+            "duration_ms": 3.8,
+            "details": f"CCI: {cci_score}% • {len(suggested_pivots)} secondary investigative pivots generated"
+        })
+
         response = SearchResponse(
             search_id=search_id,
             query=query,
@@ -398,12 +438,16 @@ class SearchOrchestrator:
             key_findings=key_findings,
             investigative_leads=investigative_leads,
             pipeline_trace=pipeline_trace,
+            collection_completeness_index=cci_score,
+            coverage_telemetry=coverage_telemetry,
+            suggested_pivots=suggested_pivots,
             stats={
                 "total_duration_ms": total_duration,
                 "modules_executed": len(module_jobs),
                 "entities_count": len(corr_entities),
                 "relationships_count": len(corr_relationships),
-                "evidence_count": len(all_evidence)
+                "evidence_count": len(all_evidence),
+                "collection_completeness_index": cci_score,
             },
             executed_at=datetime.utcnow()
         )

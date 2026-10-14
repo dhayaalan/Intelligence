@@ -38,5 +38,9 @@ class SearchResponse(BaseModel):
     key_findings: List[Dict[str, Any]] = Field(default_factory=list)
     investigative_leads: List[Dict[str, Any]] = Field(default_factory=list)
     pipeline_trace: List[Dict[str, Any]] = Field(default_factory=list)
+    collection_completeness_index: Optional[float] = None  # 0.0 to 100.0 (CCI)
+    coverage_telemetry: Optional[Dict[str, Any]] = None
+    suggested_pivots: List[Dict[str, Any]] = Field(default_factory=list)
     stats: Dict[str, Any] = Field(default_factory=dict)
     executed_at: datetime = Field(default_factory=datetime.utcnow)
+

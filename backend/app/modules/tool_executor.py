@@ -114,6 +114,8 @@ class ToolExecutor:
             # Route to appropriate real tool implementation
             if tool_id in ["tool_dns_recon", "dns_engine", "dnsx_engine"]:
                 res = await self._run_dns_recon(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_passive_dns", "passive_dns"]:
+                res = await self._run_passive_dns(exec_id, tool_id, cleaned_target)
             elif tool_id in ["tool_whois_rdap", "tool_whois"]:
                 res = await self._run_rdap_whois(exec_id, tool_id, cleaned_target)
             elif tool_id in ["tool_crt_sh", "subfinder_engine", "amass_engine"]:
@@ -278,6 +280,52 @@ class ToolExecutor:
             target=domain,
             status=status,
             duration_ms=0.0,
+            results=results,
+            summary=summary,
+        )
+
+    async def _run_passive_dns(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """[OSINT-02] Real historical passive DNS and Certificate Transparency timeline resolution."""
+        domain = self._extract_domain(target)
+        from app.modules.osint.passive_dns import passive_dns_service
+        timeline = await passive_dns_service.get_timeline(domain)
+
+        results: List[NormalizedResult] = []
+        for r in timeline.records[:25]:
+            results.append(
+                NormalizedResult(
+                    id=r.id,
+                    tool_id=tool_id,
+                    type="INFRASTRUCTURE",
+                    target=domain,
+                    value=f"{r.record_type}: {r.resolved_value} (First seen: {r.first_seen or 'Current'})",
+                    source=r.source,
+                    confidence=r.confidence,
+                    metadata={
+                        "domain": domain,
+                        "record_type": r.record_type,
+                        "resolved_value": r.resolved_value,
+                        "first_seen": r.first_seen,
+                        "last_seen": r.last_seen,
+                        **r.metadata
+                    },
+                    relationships=[{"source": domain, "relationship": "HISTORICALLY_RESOLVED_TO", "target": r.resolved_value}]
+                )
+            )
+
+        status = "SUCCESS" if results else "FAILED"
+        summary = (
+            f"Passive DNS & Certificate Timeline for {domain}: {timeline.total_records} historical records "
+            f"({len(timeline.historical_ips)} unique IPs, {timeline.certificate_history_count} certificates)."
+            if results else f"No historical passive DNS records found for '{domain}'"
+        )
+
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=domain,
+            status=status,
+            duration_ms=timeline.duration_ms,
             results=results,
             summary=summary,
         )
@@ -1291,6 +1339,16 @@ class ToolExecutor:
                     epss_label = f" | EPSS: {round(epss_score * 100, 2)}%" if epss_score is not None else ""
                     kev_label = " [CISA KEV EXPLOITED]" if cisa_kev_exploited else ""
 
+                    # Calculate multi-factor composite vulnerability risk
+                    from app.modules.threat_intelligence.composite_scorer import composite_vulnerability_scorer
+                    risk = composite_vulnerability_scorer.calculate_risk(
+                        cve_id=cve_id,
+                        cvss=cvss,
+                        epss_score=epss_score,
+                        epss_percentile=epss_percentile,
+                        in_cisa_kev=cisa_kev_exploited
+                    )
+
                     meta = {
                         "cve_id": cve_id,
                         "cvss_score": cvss,
@@ -1300,6 +1358,11 @@ class ToolExecutor:
                         "cisa_kev_exploited": cisa_kev_exploited,
                         "epss_score": epss_score,
                         "epss_percentile": epss_percentile,
+                        "composite_risk_score": risk.composite_risk_score,
+                        "remediation_priority": risk.remediation_priority,
+                        "sla_remediation_days": risk.sla_remediation_days,
+                        "threat_narrative": risk.threat_narrative,
+                        "actionable_guidance": risk.actionable_guidance
                     }
 
                     relationships = [
@@ -1316,13 +1379,13 @@ class ToolExecutor:
                             tool_id=tool_id,
                             type="VULNERABILITY",
                             target=cve_id,
-                            value=f"CVSS {cvss} ({severity}){epss_label}{kev_label}: {summary_desc[:110]}...",
-                            source="CIRCL / NIST NVD + FIRST EPSS",
+                            value=f"Risk {risk.composite_risk_score}/100 [{risk.remediation_priority}]: CVSS {cvss} ({severity}){epss_label}{kev_label}",
+                            source="CIRCL / NIST NVD + FIRST EPSS + CISA KEV",
                             confidence=1.0,
                             severity=severity,
                             metadata=meta,
                             relationships=relationships,
-                            raw_result={"nvd": data, "epss": epss_data},
+                            raw_result={"nvd": data, "epss": epss_data, "composite_risk": risk.dict()},
                         )
                     )
                     return ToolExecutionResponse(
@@ -1332,7 +1395,7 @@ class ToolExecutor:
                         status="SUCCESS",
                         duration_ms=0.0,
                         results=results,
-                        summary=f"Authoritative record for {cve_id}: CVSS {cvss} ({severity}){epss_label}{kev_label}",
+                        summary=f"Authoritative record for {cve_id}: Composite Risk {risk.composite_risk_score}/100 [{risk.remediation_priority}], CVSS {cvss}{epss_label}{kev_label}",
                     )
         except Exception:
             pass

@@ -67,6 +67,55 @@ async def create_entity(
 ):
     return entity_service.upsert_entity(current_user.tenant_id, payload, investigation_id)
 
+class CorrelateRequest(BaseModel):
+    investigation_ids: Optional[List[str]] = None
+
+@router.get("/correlate", response_model=Any)
+async def correlate_entities_get(
+    investigation_ids: Optional[List[str]] = Query(None),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    from app.entities.resolver import entity_disambiguation_service
+    return entity_disambiguation_service.correlate_entities(
+        tenant_id=current_user.tenant_id,
+        investigation_ids=investigation_ids
+    )
+
+@router.post("/correlate", response_model=Any)
+async def correlate_entities_post(
+    req: Optional[CorrelateRequest] = None,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    from app.entities.resolver import entity_disambiguation_service
+    inv_ids = req.investigation_ids if req else None
+    return entity_disambiguation_service.correlate_entities(
+        tenant_id=current_user.tenant_id,
+        investigation_ids=inv_ids
+    )
+
+@router.get("/resolve", response_model=Any)
+async def resolve_entity(
+    value: str = Query(..., description="Observable value to resolve"),
+    type: Optional[str] = Query(None, description="Optional entity type filter"),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    from app.entities.resolver import entity_disambiguation_service
+    from app.module_sdk.models import EntityType
+    type_enum = None
+    if type:
+        try:
+            type_enum = EntityType(type.lower())
+        except Exception:
+            pass
+    resolved = entity_disambiguation_service.resolve_observable(
+        tenant_id=current_user.tenant_id,
+        value=value,
+        entity_type=type_enum
+    )
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Observable could not be resolved in tenant")
+    return resolved
+
 @router.get("/{entity_id}", response_model=EntityRecord)
 async def get_entity(
     entity_id: str,
