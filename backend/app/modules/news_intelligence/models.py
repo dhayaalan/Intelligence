@@ -146,6 +146,9 @@ class NewsSearchResultItem(BaseModel):
     video_embed_url: Optional[str] = None
     source_type: str = "NEWS"  # PRIMARY, SECONDARY, TERTIARY, OFFICIAL, NEWS, ACADEMIC, ARCHIVE, SOCIAL
     is_independent: bool = True
+    syndication_type: str = "INDEPENDENT"  # INDEPENDENT, ORIGIN_WIRE, SYNDICATED_COPY, OFFICIAL_DISPATCH
+    wire_origin: Optional[str] = None
+
 
 
 class NewsSearchResponse(BaseModel):

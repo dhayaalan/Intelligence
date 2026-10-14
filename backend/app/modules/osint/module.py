@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 import uuid
 import logging
@@ -55,6 +56,11 @@ class OsintModule(IntelligenceModule):
 
         for pid, provider, category, caps, targets in primary_providers:
             self._providers[pid] = provider
+            auth_req = pid == "shodan"
+            env_vars = ["SHODAN_API_KEY"] if auth_req else []
+            has_credentials = bool(os.getenv("SHODAN_API_KEY")) if auth_req else True
+            prov_status = "HEALTHY" if has_credentials else "NOT_CONFIGURED"
+
             meta = ProviderMetadata(
                 provider_id=pid,
                 name=provider.name,
@@ -65,7 +71,9 @@ class OsintModule(IntelligenceModule):
                 supported_targets=targets,
                 version=getattr(provider, "version", "1.0.0"),
                 is_enabled=True,
-                status="HEALTHY",
+                status=prov_status,
+                auth_required=auth_req,
+                env_vars=env_vars,
                 timeout_seconds=getattr(provider, "timeout_seconds", 15.0),
                 rate_limit="120/min"
             )

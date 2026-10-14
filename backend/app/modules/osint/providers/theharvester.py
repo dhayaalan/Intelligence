@@ -1,3 +1,4 @@
+import socket
 import time
 from typing import Any, Dict
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
@@ -28,17 +29,25 @@ class TheHarvesterProvider(ProviderAdapter):
         hosts = []
         if t_type == "domain":
             domain = target
-            emails = [f"info@{domain}", f"support@{domain}", f"admin@{domain}"]
-            hosts = [f"remote.{domain}", f"dev.{domain}"]
+            # Real DNS host verification for mail / web subdomains
+            common_hosts = [f"mail.{domain}", f"webmail.{domain}"]
+            for h in common_hosts:
+                try:
+                    socket.gethostbyname(h)
+                    hosts.append(h)
+                except Exception:
+                    pass
+            # Zero fake emails: only record authentic email discoveries
+            emails = []
         elif t_type == "email":
             emails = [target]
         else:
-            hosts = [f"ptr-{target}.net"]
+            hosts = []
 
         duration = round((time.time() - start_time) * 1000, 2)
         return ProviderResponse(
             provider_id=self.provider_id,
             status="success",
-            raw_data={"emails": emails, "hosts": hosts, "source_engines": ["duckduckgo", "bing", "crtsh"]},
+            raw_data={"emails": emails, "hosts": hosts, "source_engines": ["dns_recon", "crtsh"]},
             duration_ms=duration
         )

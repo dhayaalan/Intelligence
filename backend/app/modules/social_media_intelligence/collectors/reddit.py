@@ -84,6 +84,7 @@ class RedditCollector:
                 except Exception as e:
                     app_logger.warning(f"Error parsing Reddit JSON response: {e}")
             else:
+                retry_after_val = resilient_crawler_engine.parse_retry_after(resp) if resp is not None else None
                 app_logger.info(
                     f"Reddit collection for '{clean_query}' completed with status: {status.value}. Info: {msg}"
                 )
@@ -94,7 +95,9 @@ class RedditCollector:
                         query=clean_query,
                         cursor=None,
                         items_count=0,
-                        status=status
+                        status=status,
+                        retry_after_seconds=retry_after_val,
+                        status_message=msg
                     )
 
         return resilient_crawler_engine.deduplicate_posts(posts)

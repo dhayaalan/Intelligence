@@ -63,27 +63,71 @@ class SocialMediaIntelligenceService:
         results_lists = await asyncio.gather(*tasks, return_exceptions=True)
         all_posts: List[SocialPost] = []
         provider_statuses: Dict[str, str] = {}
+        collector_telemetry: Dict[str, Dict[str, Any]] = {}
 
         for idx, res in enumerate(results_lists):
             plat = platform_keys[idx]
             plat_name = plat.value
+            cp = resilient_crawler_engine.get_checkpoint(search_id, plat)
             if isinstance(res, list):
                 if res:
                     all_posts.extend(res)
                     provider_statuses[plat_name] = f"SUCCESS ({len(res)} authentic posts)"
+                    collector_telemetry[plat_name] = {
+                        "status": "SUCCESS",
+                        "items_count": len(res),
+                        "rate_limited": False,
+                        "retry_after_seconds": None,
+                        "status_message": f"Retrieved {len(res)} authentic posts."
+                    }
                 else:
-                    cp = resilient_crawler_engine.get_checkpoint(search_id, plat)
                     if cp and cp.status == CollectorStatus.ACCESS_DENIED:
                         provider_statuses[plat_name] = "ACCESS_DENIED (HTTP 403: Platform policy restricts unauthenticated requests)"
+                        collector_telemetry[plat_name] = {
+                            "status": "ACCESS_DENIED",
+                            "items_count": 0,
+                            "rate_limited": False,
+                            "retry_after_seconds": None,
+                            "status_message": cp.status_message or "Access restricted by platform policy."
+                        }
                     elif cp and cp.status == CollectorStatus.RATE_LIMITED:
-                        provider_statuses[plat_name] = "RATE_LIMITED (HTTP 429: Platform quota reached, backoff active)"
+                        retry_str = f", Retry-After: {cp.retry_after_seconds:.1f}s" if cp.retry_after_seconds else ""
+                        provider_statuses[plat_name] = f"RATE_LIMITED (HTTP 429: Platform quota reached{retry_str})"
+                        collector_telemetry[plat_name] = {
+                            "status": "RATE_LIMITED",
+                            "items_count": 0,
+                            "rate_limited": True,
+                            "retry_after_seconds": cp.retry_after_seconds,
+                            "status_message": cp.status_message or "Rate limit exceeded."
+                        }
                     elif cp and cp.status == CollectorStatus.UNAVAILABLE:
                         provider_statuses[plat_name] = "UNAVAILABLE (Platform network or endpoint error)"
+                        collector_telemetry[plat_name] = {
+                            "status": "UNAVAILABLE",
+                            "items_count": 0,
+                            "rate_limited": False,
+                            "retry_after_seconds": None,
+                            "status_message": cp.status_message or "Platform unreachable."
+                        }
                     else:
                         provider_statuses[plat_name] = "EMPTY (Zero authentic matches found)"
+                        collector_telemetry[plat_name] = {
+                            "status": "EMPTY",
+                            "items_count": 0,
+                            "rate_limited": False,
+                            "retry_after_seconds": None,
+                            "status_message": "Zero matching records discovered."
+                        }
             elif isinstance(res, Exception):
                 app_logger.warning(f"Social collector subtask raised error: {res}")
                 provider_statuses[plat_name] = f"ERROR ({type(res).__name__})"
+                collector_telemetry[plat_name] = {
+                    "status": "ERROR",
+                    "items_count": 0,
+                    "rate_limited": False,
+                    "retry_after_seconds": None,
+                    "status_message": str(res)
+                }
 
         # Filter by min_credibility if specified
         if request.min_credibility > 0:
@@ -108,8 +152,10 @@ class SocialMediaIntelligenceService:
             results=all_posts,
             cib_clusters=cib_clusters,
             provider_statuses=provider_statuses,
+            collector_telemetry=collector_telemetry,
             execution_time_ms=elapsed_ms
         )
+
 
     async def analyze_cib(self, posts: List[SocialPost]) -> List[CibCluster]:
         return cib_engine.detect_clusters(posts)
