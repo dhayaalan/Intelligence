@@ -74,6 +74,43 @@ class ToolExecutor:
         )
 
         try:
+            # Operational Security & VAPT Scope Enforcement
+            from app.modules.threat_intelligence.engines.scope_enforcer import (
+                vapt_scope_enforcer,
+                ScanImpactLevel,
+            )
+
+            intrusive_tools = {
+                "tool_zap_active_scan", "zap_active_scan", "tool_owasp_zap", "zap_scanner",
+                "nikto_engine", "openvas_engine", "dalfox_engine", "tool_sqlmap"
+            }
+            active_tools = {
+                "tool_zap_spider", "zap_spider", "tool_zap_crawler",
+                "port_service_engine", "naabu_engine", "masscan_engine"
+            }
+
+            impact = ScanImpactLevel.PASSIVE_RECON
+            if tool_id in intrusive_tools:
+                impact = ScanImpactLevel.INTRUSIVE_VULN_SCAN
+            elif tool_id in active_tools:
+                impact = ScanImpactLevel.ACTIVE_PORT_PROBE
+
+            tenant_id = user.tenant_id if user else "default"
+            val = vapt_scope_enforcer.validate_scope_authorization(cleaned_target, impact, tenant_id=tenant_id)
+            if not val.is_authorized:
+                duration = round((time.time() - start_time) * 1000, 2)
+                fail_res = ToolExecutionResponse(
+                    execution_id=exec_id,
+                    tool_id=tool_id,
+                    target=cleaned_target,
+                    status="FAILED",
+                    duration_ms=duration,
+                    error=f"VAPT Scope Enforcer blocked execution: {val.rejection_reason}",
+                    summary=f"Blocked by operational security policy ({val.applied_policy})"
+                )
+                self._record_history(fail_res, user)
+                return fail_res
+
             # Route to appropriate real tool implementation
             if tool_id in ["tool_dns_recon", "dns_engine", "dnsx_engine"]:
                 res = await self._run_dns_recon(exec_id, tool_id, cleaned_target)

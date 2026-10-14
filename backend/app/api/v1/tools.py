@@ -650,3 +650,79 @@ async def get_tool_run_history(
         }
     return history[:limit]
 
+
+# ============================================================================
+# VA/PT SCOPE ENFORCEMENT & SCAN KILL-SWITCH ENDPOINTS
+# ============================================================================
+
+import uuid
+from datetime import datetime, timezone
+from app.modules.threat_intelligence.engines.scope_enforcer import (
+    vapt_scope_enforcer,
+    ScopePermit,
+    ScopeValidationResult,
+    ScanImpactLevel,
+)
+
+
+class ScopePermitRequest(BaseModel):
+    authorized_target: str
+    target_type: str = "DOMAIN"
+    max_impact_level: ScanImpactLevel = ScanImpactLevel.ACTIVE_PORT_PROBE
+    approved_by: str
+    valid_until: str
+    permit_token: Optional[str] = None
+
+
+class ValidateScopeRequest(BaseModel):
+    target: str
+    impact_level: ScanImpactLevel = ScanImpactLevel.PASSIVE_RECON
+
+
+class AbortScanRequest(BaseModel):
+    reason: str = "Emergency Kill-Switch Triggered"
+
+
+@router.post("/vapt/permits")
+async def register_scope_permit(
+    req: ScopePermitRequest,
+    current_user: UserRecord = Depends(require_roles([UserRole.TENANT_ADMIN, UserRole.SUPER_ADMIN]))
+):
+    """Registers an approved Scope Permit allowing active or intrusive vulnerability assessment."""
+    permit = ScopePermit(
+        permit_id=f"permit_{uuid.uuid4().hex[:8]}",
+        tenant_id=current_user.tenant_id,
+        authorized_target=req.authorized_target,
+        target_type=req.target_type,
+        max_impact_level=req.max_impact_level,
+        approved_by=req.approved_by,
+        valid_until=req.valid_until,
+        permit_token=req.permit_token or f"sig_{uuid.uuid4().hex[:12]}"
+    )
+    vapt_scope_enforcer.register_scope_permit(permit)
+    return {"status": "SUCCESS", "permit": permit.dict()}
+
+
+@router.post("/vapt/validate-scope", response_model=ScopeValidationResult)
+async def validate_vapt_target_scope(
+    req: ValidateScopeRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Verifies whether a target IP/domain is authorized for the requested reconnaissance impact level."""
+    return vapt_scope_enforcer.validate_scope_authorization(
+        target=req.target,
+        requested_impact=req.impact_level,
+        tenant_id=current_user.tenant_id
+    )
+
+
+@router.post("/vapt/abort/{job_id}")
+async def abort_vapt_scan(
+    job_id: str,
+    req: AbortScanRequest = AbortScanRequest(),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Emergency kill-switch to immediately abort an active scan job and contain telemetry."""
+    return vapt_scope_enforcer.abort_scan(job_id, reason=req.reason)
+
+

@@ -158,3 +158,71 @@ export function useYouTubeInvestigation() {
     }),
   });
 }
+
+export type RegionalGeography = 'SOUTH_INDIA' | 'NORTH_INDIA' | 'PAKISTAN' | 'BANGLADESH' | 'INTERNATIONAL';
+
+export interface RegionalClaimItem {
+  claim_text: string;
+  original_language: string;
+  translated_text?: string;
+  speaker_or_attribution?: string;
+  source_url: string;
+  publisher: string;
+  publication_time: string;
+}
+
+export interface RegionalPerspective {
+  region: RegionalGeography;
+  region_label: string;
+  sample_size: number;
+  primary_framing: string;
+  observed_sentiment_summary: string;
+  distinctive_regional_terms: string[];
+  claims: RegionalClaimItem[];
+  top_sources: string[];
+  supporting_evidence_count: number;
+  conflicting_evidence_count: number;
+  collection_coverage_notes: string;
+}
+
+export interface RegionalNarrativeComparisonRequest {
+  topic: string;
+  seed_urls?: string[];
+  selected_regions?: RegionalGeography[];
+  preferred_languages?: string[];
+  collection_limit?: number;
+  egress_route?: 'DIRECT' | 'REGIONAL_GATEWAY_APPROVED' | 'ISOLATED_SCANNER';
+  fail_closed?: boolean;
+}
+
+export interface RegionalNarrativeComparisonResponse {
+  comparison_id: string;
+  topic: string;
+  timestamp: string;
+  egress_status?: {
+    route_type: string;
+    gateway_name: string;
+    is_active: boolean;
+    fail_closed: boolean;
+    egress_ip_masked: string;
+    diagnostics: string;
+  };
+  regions_compared: RegionalPerspective[];
+  key_similarities: string[];
+  key_divergences: string[];
+  media_reuse_detected: boolean;
+  media_reuse_details?: string;
+  controlled_variables: string[];
+  uncontrolled_limitations: string[];
+  investigator_advisory: string;
+}
+
+export function useRegionalNarrativeComparison() {
+  return useMutation<RegionalNarrativeComparisonResponse, Error, RegionalNarrativeComparisonRequest>({
+    mutationFn: (req) => apiRequest<RegionalNarrativeComparisonResponse>('/social/regional/compare', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  });
+}
+

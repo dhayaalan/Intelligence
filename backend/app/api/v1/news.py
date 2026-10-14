@@ -21,6 +21,11 @@ from app.modules.news_intelligence.models import (
 )
 from app.modules.news_intelligence.service import news_intelligence_service
 from app.modules.news_intelligence.search_engine import news_retrieval_engine
+from app.modules.news_intelligence.multimodal_engine import (
+    multimodal_engine,
+    SeedIngestRequest,
+    IngestedSeedResult,
+)
 
 router = APIRouter(prefix="/news", tags=["News Intelligence"])
 
@@ -307,3 +312,17 @@ async def extract_url_content(
     if not is_safe:
         raise HTTPException(status_code=400, detail=f"SSRF Protection: {reason}")
     return await news_retrieval_engine.extract_article(payload.url)
+
+
+@router.post("/multimodal/ingest-seed", response_model=IngestedSeedResult)
+async def ingest_multimodal_seed(
+    req: SeedIngestRequest,
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Ingests an investigation seed (news URL, social post URL, or media item)
+    with SSRF-guarded validation, canonical resolution, cryptographic SHA-256,
+    and 64-bit dHash perceptual media hashing.
+    """
+    return await multimodal_engine.ingest_url_seed(req.target_url, req.media_type)
+

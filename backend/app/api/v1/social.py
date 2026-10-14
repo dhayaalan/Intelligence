@@ -14,6 +14,11 @@ from app.modules.social_media_intelligence.models import (
     YouTubeInvestigationResult
 )
 from app.modules.social_media_intelligence.service import social_media_service
+from app.modules.social_media_intelligence.regional_engine import (
+    regional_social_engine,
+    RegionalNarrativeComparisonRequest,
+    RegionalNarrativeComparisonResponse
+)
 
 router = APIRouter(prefix="/social", tags=["Social Media Intelligence"])
 
@@ -83,3 +88,17 @@ async def investigate_youtube_video(
     if not result:
         raise HTTPException(status_code=404, detail="Could not extract metadata for the specified YouTube video.")
     return result
+
+
+@router.post("/regional/compare", response_model=RegionalNarrativeComparisonResponse)
+async def compare_regional_narratives(
+    req: RegionalNarrativeComparisonRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Executes cross-regional social narrative analysis across South India,
+    North India, Pakistan, Bangladesh, and International regions with multilingual
+    lexicon expansion and explicit sample size & framing limitation disclaimers.
+    """
+    return await regional_social_engine.compare_regional_narratives(req)
+
