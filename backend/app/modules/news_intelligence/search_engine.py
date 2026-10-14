@@ -148,20 +148,35 @@ class MultiSourceRetrievalEngine:
     """
 
     def __init__(self):
-        self.client = httpx.AsyncClient(
-            timeout=12.0,
-            follow_redirects=True,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36 SentinelIntel/2.0"
-                ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            }
-        )
+        self.client = None
         self._article_cache: Dict[str, NewsArticle] = {}
         self._items_cache: Dict[str, NewsSearchResultItem] = {}
+
+    def _get_client(self) -> httpx.AsyncClient:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if (
+            self.client is None
+            or getattr(self.client, "is_closed", False)
+            or getattr(self, "_client_loop", None) != current_loop
+        ):
+            self.client = httpx.AsyncClient(
+                timeout=12.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36 SentinelIntel/2.0"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                }
+            )
+            self._client_loop = current_loop
+        return self.client
 
     async def search(self, req: NewsSearchRequest) -> NewsSearchResponse:
         start_time = time.time()
@@ -178,6 +193,8 @@ class MultiSourceRetrievalEngine:
                 raw_items.append(url_item)
 
         # Concurrently query live wire RSS, GDELT DOC API, and YouTube video sources
+        provider_statuses: Dict[str, str] = {}
+        fetch_names = ["google_news_rss", "bing_news_rss", "gdelt_api", "youtube"]
         fetch_tasks = [
             self._fetch_google_news_rss(req.query),
             self._fetch_bing_news_rss(req.query),
@@ -188,15 +205,36 @@ class MultiSourceRetrievalEngine:
         # Also query secondary expansion if semantic search requested
         if req.search_mode == SearchMode.SEMANTIC and expansions:
             fetch_tasks.append(self._fetch_google_news_rss(expansions[0].generated_query))
+            fetch_names.append("semantic_expansion_rss")
 
         results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
-        for r in results:
+        for name, r in zip(fetch_names, results):
             if isinstance(r, list):
-                raw_items.extend(r)
+                if r:
+                    raw_items.extend(r)
+                    provider_statuses[name] = f"SUCCESS ({len(r)} items)"
+                else:
+                    provider_statuses[name] = "EMPTY (Zero items returned)"
+            elif isinstance(r, Exception):
+                provider_statuses[name] = f"ERROR ({type(r).__name__})"
 
-        # Use query-bound synthesis only as a resilient fallback if external wire endpoints yielded zero results
+        # Zero synthetic fallback generation! If external wires return zero records, return honest empty state.
         if not raw_items:
-            raw_items = self._synthesize_resilient_query_records(req.query, parsed)
+            duration = round((time.time() - start_time) * 1000, 2)
+            return NewsSearchResponse(
+                search_id=search_id,
+                original_query=req.query,
+                normalized_query=parsed["normalized_query"],
+                search_mode=req.search_mode.value,
+                detected_entities=parsed["detected_entities"],
+                query_expansions=expansions,
+                total_results=0,
+                results=[],
+                category_counts={"all": 0},
+                provider_statuses=provider_statuses,
+                investigator_advisory=f"No authentic wire or news records discovered for query '{req.query}'. External providers yielded zero matches or were unreachable. Zero synthetic records injected.",
+                duration_ms=duration,
+            )
 
         # Deduplication by canonical URL and headline similarity
         deduped = self._deduplicate_items(raw_items)
@@ -320,6 +358,7 @@ class MultiSourceRetrievalEngine:
             total_results=len(filtered_items),
             results=filtered_items,
             category_counts=category_counts,
+            provider_statuses=provider_statuses,
             duration_ms=duration,
         )
 
@@ -625,7 +664,7 @@ class MultiSourceRetrievalEngine:
         try:
             encoded = urllib.parse.quote_plus(query)
             url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
-            resp = await self.client.get(url)
+            resp = await self._get_client().get(url)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.text)
                 channel = root.find("channel")
@@ -673,7 +712,7 @@ class MultiSourceRetrievalEngine:
         try:
             encoded = urllib.parse.quote_plus(query)
             url = f"https://www.bing.com/news/search?q={encoded}&format=rss"
-            resp = await self.client.get(url)
+            resp = await self._get_client().get(url)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.text)
                 channel = root.find("channel")
@@ -747,7 +786,7 @@ class MultiSourceRetrievalEngine:
         try:
             encoded = urllib.parse.quote_plus(query)
             url = f"https://api.gdeltproject.org/api/v2/doc/doc?query={encoded}&mode=ArtList&format=json&maxrecords=25"
-            resp = await self.client.get(url, timeout=3.5)
+            resp = await self._get_client().get(url, timeout=3.5)
             if resp.status_code == 200:
                 data = resp.json()
                 articles = data.get("articles", [])
@@ -845,7 +884,7 @@ class MultiSourceRetrievalEngine:
             return None
 
         try:
-            resp = await self.client.get(url)
+            resp = await self._get_client().get(url)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 title = soup.find("title")
@@ -896,7 +935,7 @@ class MultiSourceRetrievalEngine:
         try:
             encoded = urllib.parse.quote_plus(query)
             url = f"https://www.youtube.com/results?search_query={encoded}"
-            resp = await self.client.get(url, timeout=4.5)
+            resp = await self._get_client().get(url, timeout=4.5)
             if resp.status_code == 200:
                 html = resp.text
                 m = re.search(r'var ytInitialData = ({.*?});</script>', html)
@@ -955,33 +994,13 @@ class MultiSourceRetrievalEngine:
                     except Exception as je:
                         app_logger.debug(f"JSON parse error for YouTube data: {je}")
 
-                # Regex fallback if ytInitialData navigation produced fewer items
-                if not items:
-                    vids = list(dict.fromkeys(re.findall(r'/watch\?v=([a-zA-Z0-9_-]{11})', html)))[:4]
-                    for vid in vids:
-                        items.append({
-                            "id": f"yt_vid_{vid}",
-                            "title": f"YouTube Video Broadcast ({query})",
-                            "summary": f"Public video broadcast footage and telemetry for '{query}' on YouTube.",
-                            "canonical_url": f"https://www.youtube.com/watch?v={vid}",
-                            "source": "YouTube Broadcast",
-                            "publisher": "YouTube Video Wire",
-                            "publication_date": datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                            "content_type": "video",
-                            "country": "International",
-                            "language": "en",
-                            "source_type": "SOCIAL",
-                            "is_independent": True,
-                            "hero_image": f"https://img.youtube.com/vi/{vid}/hqdefault.jpg",
-                            "thumbnail_url": f"https://img.youtube.com/vi/{vid}/hqdefault.jpg",
-                            "media_indicators": {
-                                "is_video": True,
-                                "youtube_id": vid,
-                                "embed_url": f"https://www.youtube.com/embed/{vid}",
-                                "watch_url": f"https://www.youtube.com/watch?v={vid}",
-                                "has_image": True,
-                            }
-                        })
+                # Filter genuine YouTube search matches against query keywords to reject unrelated suggestions
+                query_tokens = [tok.lower() for tok in re.findall(r'[a-zA-Z0-9]+', query) if len(tok) >= 3]
+                if query_tokens:
+                    items = [
+                        it for it in items
+                        if any(tok in it.get("title", "").lower() or tok in it.get("summary", "").lower() for tok in query_tokens)
+                    ]
         except Exception as e:
             app_logger.debug(f"YouTube video search retrieval caught: {e}")
         return items
@@ -1000,7 +1019,7 @@ class MultiSourceRetrievalEngine:
             if not is_safe:
                 return
             try:
-                resp = await self.client.get(canon, timeout=5.0)
+                resp = await self._get_client().get(canon, timeout=5.0)
                 if resp.status_code == 200 and resp.text:
                     soup = BeautifulSoup(resp.text[:65000], "html.parser")
                     og = (
@@ -1030,193 +1049,6 @@ class MultiSourceRetrievalEngine:
         tasks = [enrich_single(it) for it in items[:10]]
         await asyncio.gather(*tasks, return_exceptions=True)
 
-
-    def _synthesize_resilient_query_records(self, query: str, parsed: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Deterministic, strictly query-bound fallback synthesis guaranteeing that if external
-        wire endpoints are unreachable, the investigator still receives relevant results built
-        from their query tokens—NEVER unrelated topics.
-        """
-        tokens = query.strip().split()
-        date_str = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
-        domain = self._classify_query_domain(query)
-
-        if domain == "GEOPOLITICAL":
-            return [
-                {
-                    "id": f"res_{hashlib.md5((query + 'primary').encode()).hexdigest()[:10]}",
-                    "title": f"Diplomatic Wire: Bilateral Assessments & Liaison Review regarding '{query}'",
-                    "summary": f"Primary intelligence wire dispatch documenting verified bilateral consultations, border accords, and official communiques concerning {query}.",
-                    "canonical_url": f"https://wire.reuters.com/investigations/{urllib.parse.quote_plus(query)}",
-                    "source": "Reuters Global Dispatch",
-                    "publisher": "Reuters / AP Syndicate",
-                    "country": "United States",
-                    "author": "Marcus Sterling, Global Affairs Analyst",
-                    "category": "Geopolitical & Strategic Security",
-                    "publication_date": date_str,
-                    "content_type": "article",
-                    "media_indicators": {"has_image": True},
-                    "hero_image": self._pick_default_hero_image(query, 0),
-                    "thumbnail_url": self._pick_default_hero_image(query, 0),
-                    "detected_entities": parsed["detected_entities"] or [tokens[0].capitalize() if tokens else "Target"],
-                },
-                {
-                    "id": f"res_{hashlib.md5((query + 'regional').encode()).hexdigest()[:10]}",
-                    "title": f"National Coverage: Frontier Telemetry & Defense Posture on '{query}'",
-                    "summary": f"Detailed regional reporting examining high-altitude buffer zones, Corps Commander dialogues, and verified field telemetry on {query}.",
-                    "canonical_url": f"https://thehindu.com/news/national/{urllib.parse.quote_plus(query)}",
-                    "source": "The Hindu Bureau",
-                    "publisher": "The Hindu / PTI Syndicate",
-                    "country": "India",
-                    "author": "Priya Raman, Senior Defense & Diplomatic Correspondent",
-                    "category": "Frontier Telemetry & Defense",
-                    "publication_date": date_str,
-                    "content_type": "article",
-                    "media_indicators": {"has_image": True},
-                    "hero_image": self._pick_default_hero_image(query, 1),
-                    "thumbnail_url": self._pick_default_hero_image(query, 1),
-                    "detected_entities": parsed["detected_entities"],
-                },
-                {
-                    "id": f"res_{hashlib.md5((query + 'europe').encode()).hexdigest()[:10]}",
-                    "title": f"International Analysis: Multilateral Perspectives on Strategic Balance in '{query}'",
-                    "summary": f"Global broadcast analysis assessing Indo-Pacific balance of power, diplomatic equilibrium, and cross-border narrative amplification regarding {query}.",
-                    "canonical_url": f"https://bbc.com/world/analysis/{urllib.parse.quote_plus(query)}",
-                    "source": "BBC World Service",
-                    "publisher": "BBC News International",
-                    "country": "United Kingdom",
-                    "author": "Claire Beaumont, European Editor",
-                    "category": "Geopolitical Analysis",
-                    "publication_date": date_str,
-                    "content_type": "article",
-                    "media_indicators": {"has_image": True},
-                    "hero_image": self._pick_default_hero_image(query, 2),
-                    "thumbnail_url": self._pick_default_hero_image(query, 2),
-                    "detected_entities": parsed["detected_entities"],
-                },
-                {
-                    "id": f"res_{hashlib.md5((query + 'video').encode()).hexdigest()[:10]}",
-                    "title": f"Digital Forensics: Satellite & Audio-Visual Media Verification for '{query}'",
-                    "summary": f"Circulating video clips examined against archival confrontation footage and Sentinel-2 satellite passes for contextual misattribution related to {query}.",
-                    "canonical_url": f"https://disinfolab.org/forensics/video_{urllib.parse.quote_plus(query)}",
-                    "source": "Verification Bureau",
-                    "publisher": "DisinfoLab Open Source",
-                    "country": "International",
-                    "author": "Forensic Video Working Group",
-                    "category": "Media Provenance & Geospatial Verification",
-                    "publication_date": date_str,
-                    "content_type": "video",
-                    "media_indicators": {"is_video": True, "duration": "01:42"},
-                    "hero_image": self._pick_default_hero_image(query, 3),
-                    "thumbnail_url": self._pick_default_hero_image(query, 3),
-                    "detected_entities": parsed["detected_entities"],
-                },
-                {
-                    "id": f"res_{hashlib.md5((query + 'archive').encode()).hexdigest()[:10]}",
-                    "title": f"Archived Record: Historical Precedent & Treaty Framework for '{query}'",
-                    "summary": f"Historical border agreement and diplomatic records cross-referenced to evaluate current claims regarding {query}.",
-                    "canonical_url": f"https://archive.local/ref/{urllib.parse.quote_plus(query)}",
-                    "source": "Historical Archive Registry",
-                    "publisher": "Public Registry",
-                    "country": "International",
-                    "author": "Open Archive Index",
-                    "category": "Historical Cross-Reference",
-                    "publication_date": "Wed, 14 Mar 2022 10:15:00 GMT",
-                    "content_type": "article",
-                    "media_indicators": {},
-                    "hero_image": self._pick_default_hero_image(query, 0),
-                    "thumbnail_url": self._pick_default_hero_image(query, 0),
-                    "detected_entities": parsed["detected_entities"],
-                },
-            ]
-
-        return [
-            {
-                "id": f"res_{hashlib.md5((query + 'primary').encode()).hexdigest()[:10]}",
-                "title": f"Investigative Wire: Assessment regarding '{query}'",
-                "summary": f"Primary intelligence wire report documenting verified public data and claims concerning {query}.",
-                "canonical_url": f"https://wire.reuters.com/investigations/{urllib.parse.quote_plus(query)}",
-                "source": "Reuters Global Dispatch",
-                "publisher": "Reuters / AP Syndicate",
-                "country": "United States",
-                "author": "Marcus Sterling, Global Affairs Analyst",
-                "category": "Investigative Research",
-                "publication_date": date_str,
-                "content_type": "article",
-                "media_indicators": {"has_image": True},
-                "hero_image": self._pick_default_hero_image(query, 0),
-                "thumbnail_url": self._pick_default_hero_image(query, 0),
-                "detected_entities": parsed["detected_entities"] or [tokens[0].capitalize() if tokens else "Target"],
-            },
-            {
-                "id": f"res_{hashlib.md5((query + 'regional').encode()).hexdigest()[:10]}",
-                "title": f"National Coverage: Regulatory & Verification Status of '{query}'",
-                "summary": f"Detailed regional reporting examining technical audits, legal filings, and administrative clarifications on {query}.",
-                "canonical_url": f"https://thehindu.com/news/national/{urllib.parse.quote_plus(query)}",
-                "source": "The Hindu Bureau",
-                "publisher": "The Hindu / PTI Syndicate",
-                "country": "India",
-                "author": "Priya Raman, Senior Legal & Tech Correspondent",
-                "category": "Institutional Telemetry & Governance",
-                "publication_date": date_str,
-                "content_type": "article",
-                "media_indicators": {"has_image": True},
-                "hero_image": self._pick_default_hero_image(query, 1),
-                "thumbnail_url": self._pick_default_hero_image(query, 1),
-                "detected_entities": parsed["detected_entities"],
-            },
-            {
-                "id": f"res_{hashlib.md5((query + 'europe').encode()).hexdigest()[:10]}",
-                "title": f"International Analysis: How Global Institutions Interpret '{query}'",
-                "summary": f"European broadcast analysis assessing institutional resilience and cross-border narrative amplification regarding {query}.",
-                "canonical_url": f"https://bbc.com/world/analysis/{urllib.parse.quote_plus(query)}",
-                "source": "BBC World Service",
-                "publisher": "BBC News International",
-                "country": "United Kingdom",
-                "author": "Claire Beaumont, European Editor",
-                "category": "International Analysis",
-                "publication_date": date_str,
-                "content_type": "article",
-                "media_indicators": {"has_image": True},
-                "hero_image": self._pick_default_hero_image(query, 2),
-                "thumbnail_url": self._pick_default_hero_image(query, 2),
-                "detected_entities": parsed["detected_entities"],
-            },
-            {
-                "id": f"res_{hashlib.md5((query + 'video').encode()).hexdigest()[:10]}",
-                "title": f"Digital Forensics: Audio-Visual Media Analysis on '{query}'",
-                "summary": f"Circulating video footage examined against historical archives for contextual attribution mismatches related to {query}.",
-                "canonical_url": f"https://disinfolab.org/forensics/video_{urllib.parse.quote_plus(query)}",
-                "source": "Verification Bureau",
-                "publisher": "DisinfoLab Open Source",
-                "country": "International",
-                "author": "Forensic Video Working Group",
-                "category": "Media Provenance & Forensics",
-                "publication_date": date_str,
-                "content_type": "video",
-                "media_indicators": {"is_video": True, "duration": "01:42"},
-                "hero_image": self._pick_default_hero_image(query, 3),
-                "thumbnail_url": self._pick_default_hero_image(query, 3),
-                "detected_entities": parsed["detected_entities"],
-            },
-            {
-                "id": f"res_{hashlib.md5((query + 'archive').encode()).hexdigest()[:10]}",
-                "title": f"Archived Record: Historical Publication Cross-Reference for '{query}'",
-                "summary": f"Earlier known occurrence cross-referenced to evaluate potential false contextual reuse of statements regarding {query}.",
-                "canonical_url": f"https://archive.local/ref/{urllib.parse.quote_plus(query)}",
-                "source": "Historical Archive Registry",
-                "publisher": "Public Registry",
-                "country": "International",
-                "author": "Open Archive Index",
-                "category": "Historical Cross-Reference",
-                "publication_date": "Wed, 14 Mar 2022 10:15:00 GMT",
-                "content_type": "article",
-                "media_indicators": {},
-                "hero_image": self._pick_default_hero_image(query, 0),
-                "thumbnail_url": self._pick_default_hero_image(query, 0),
-                "detected_entities": parsed["detected_entities"],
-            },
-        ]
 
     def _deduplicate_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Deduplicates items with identical or normalized headlines and URLs."""

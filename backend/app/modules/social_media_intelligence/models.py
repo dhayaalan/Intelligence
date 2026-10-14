@@ -135,4 +135,5 @@ class SocialSearchResponse(BaseModel):
     total_results: int
     results: List[SocialPost]
     cib_clusters: List[CibCluster] = Field(default_factory=list)
+    provider_statuses: Dict[str, str] = Field(default_factory=dict)
     execution_time_ms: float

@@ -119,6 +119,7 @@ export interface SocialSearchResponse {
   total_results: number;
   results: SocialPost[];
   cib_clusters: CibCluster[];
+  provider_statuses?: Record<string, string>;
   execution_time_ms: number;
 }
 

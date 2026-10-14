@@ -46,6 +46,16 @@ def reset_modules_state():
     module_registry.enable_module("social_media_intelligence")
     module_registry.enable_module("test_intelligence")
     module_registry.enable_module("example_intelligence")
+    with db._lock:
+        db.news_articles.clear()
+    try:
+        from app.modules.news_intelligence.search_engine import news_retrieval_engine
+        news_retrieval_engine.client = None
+        news_retrieval_engine._client_loop = None
+        news_retrieval_engine._article_cache.clear()
+        news_retrieval_engine._items_cache.clear()
+    except Exception:
+        pass
 
 
 

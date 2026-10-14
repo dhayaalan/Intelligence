@@ -21,6 +21,7 @@ from app.modules.social_media_intelligence.collectors.mastodon import mastodon_c
 from app.modules.social_media_intelligence.collectors.youtube import youtube_collector
 from app.modules.social_media_intelligence.engines.cib_engine import cib_engine
 from app.modules.social_media_intelligence.engines.credibility_engine import credibility_engine
+from app.modules.social_media_intelligence.crawler_engine import resilient_crawler_engine, CollectorStatus
 
 
 class SocialMediaIntelligenceService:
@@ -42,24 +43,47 @@ class SocialMediaIntelligenceService:
         ]
 
         tasks = []
+        platform_keys = []
         if SocialPlatformType.BLUESKY in requested_platforms:
-            tasks.append(bluesky_collector.search_posts(query, limit=request.limit))
+            tasks.append(bluesky_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.BLUESKY)
         if SocialPlatformType.TELEGRAM in requested_platforms:
-            tasks.append(telegram_collector.search_posts(query, limit=request.limit))
+            tasks.append(telegram_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.TELEGRAM)
         if SocialPlatformType.REDDIT in requested_platforms:
-            tasks.append(reddit_collector.search_posts(query, limit=request.limit))
+            tasks.append(reddit_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.REDDIT)
         if SocialPlatformType.MASTODON in requested_platforms:
-            tasks.append(mastodon_collector.search_posts(query, limit=request.limit))
+            tasks.append(mastodon_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.MASTODON)
         if SocialPlatformType.YOUTUBE in requested_platforms:
             tasks.append(youtube_collector.search_posts(query, limit=min(request.limit, 10)))
+            platform_keys.append(SocialPlatformType.YOUTUBE)
 
         results_lists = await asyncio.gather(*tasks, return_exceptions=True)
         all_posts: List[SocialPost] = []
-        for res in results_lists:
+        provider_statuses: Dict[str, str] = {}
+
+        for idx, res in enumerate(results_lists):
+            plat = platform_keys[idx]
+            plat_name = plat.value
             if isinstance(res, list):
-                all_posts.extend(res)
+                if res:
+                    all_posts.extend(res)
+                    provider_statuses[plat_name] = f"SUCCESS ({len(res)} authentic posts)"
+                else:
+                    cp = resilient_crawler_engine.get_checkpoint(search_id, plat)
+                    if cp and cp.status == CollectorStatus.ACCESS_DENIED:
+                        provider_statuses[plat_name] = "ACCESS_DENIED (HTTP 403: Platform policy restricts unauthenticated requests)"
+                    elif cp and cp.status == CollectorStatus.RATE_LIMITED:
+                        provider_statuses[plat_name] = "RATE_LIMITED (HTTP 429: Platform quota reached, backoff active)"
+                    elif cp and cp.status == CollectorStatus.UNAVAILABLE:
+                        provider_statuses[plat_name] = "UNAVAILABLE (Platform network or endpoint error)"
+                    else:
+                        provider_statuses[plat_name] = "EMPTY (Zero authentic matches found)"
             elif isinstance(res, Exception):
                 app_logger.warning(f"Social collector subtask raised error: {res}")
+                provider_statuses[plat_name] = f"ERROR ({type(res).__name__})"
 
         # Filter by min_credibility if specified
         if request.min_credibility > 0:
@@ -83,6 +107,7 @@ class SocialMediaIntelligenceService:
             total_results=len(all_posts),
             results=all_posts,
             cib_clusters=cib_clusters,
+            provider_statuses=provider_statuses,
             execution_time_ms=elapsed_ms
         )
 

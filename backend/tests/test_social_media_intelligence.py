@@ -90,8 +90,25 @@ def test_youtube_collector_extraction():
     assert vid_short == "wb_DPZnYx04"
 
 
-def test_social_module_contract_search():
+def test_social_module_contract_search(monkeypatch):
     import asyncio
+    async def mock_posts(query, limit=25, job_id=None):
+        return [
+            SocialPost(
+                id="test_post_01",
+                platform=SocialPlatformType.MASTODON,
+                author="@test_analyst@infosec.exchange",
+                author_id="masto_usr_1",
+                text="Observed cyber threat campaign telemetry across federated relays",
+                created_at="2026-10-14T10:00:00Z",
+                url="https://infosec.exchange/@test_analyst/1001",
+                links=["https://threat-intel.org/ioc"],
+                entities=["threat", "campaign"],
+                credibility_score=85.0
+            )
+        ]
+    monkeypatch.setattr(bluesky_collector, "search_posts", mock_posts)
+
     async def _test():
         mod = module_registry.get_module("social_media_intelligence")
         assert mod is not None
@@ -124,7 +141,9 @@ def test_api_social_search(client: TestClient, super_admin_headers):
     data = res.json()
     assert data["search_id"].startswith("soc_")
     assert data["query"] == "malware infrastructure"
-    assert len(data["results"]) > 0
+    assert "results" in data
+    assert "provider_statuses" in data
+    assert len(data["provider_statuses"]) > 0
 
 
 def test_api_cib_analysis(client: TestClient, super_admin_headers):

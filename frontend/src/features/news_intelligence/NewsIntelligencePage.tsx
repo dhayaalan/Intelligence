@@ -752,13 +752,37 @@ export const NewsIntelligencePage: React.FC = () => {
             ))}
           </div>
         ) : searchMutation.data ? (
-          <div className="py-16 text-center space-y-2">
+          <div className="py-16 text-center space-y-4 max-w-lg mx-auto">
             <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              No results found above {minRelevance}% relevance
+              {searchMutation.data.total_results === 0
+                ? "Zero Authentic Records Discovered"
+                : `No results found above ${minRelevance}% relevance`}
             </h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Try adjusting the minimum relevance threshold or broadening search operators while maintaining your core inquiry scope.
+            {searchMutation.data.investigator_advisory && (
+              <p className="text-xs text-slate-600 dark:text-slate-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl font-mono text-left">
+                ℹ️ {searchMutation.data.investigator_advisory}
+              </p>
+            )}
+            {searchMutation.data.provider_statuses && Object.keys(searchMutation.data.provider_statuses).length > 0 && (
+              <div className="pt-2 text-left space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  Provider Diagnostic Telemetry:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(searchMutation.data.provider_statuses).map(([prov, status_str]) => (
+                    <span
+                      key={prov}
+                      className="px-2 py-1 rounded text-[11px] font-mono border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    >
+                      <strong className="text-slate-900 dark:text-white capitalize">{prov.replace(/_/g, ' ')}:</strong> {status_str}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-slate-400">
+              Zero synthetic records injected. Try broadening search operators or adjusting date scope.
             </p>
           </div>
         ) : (

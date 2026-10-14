@@ -3,14 +3,20 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import httpx
+
 from app.core.logging import app_logger
 from app.modules.social_media_intelligence.models import SocialPost, SocialPlatformType
+from app.modules.social_media_intelligence.crawler_engine import (
+    resilient_crawler_engine,
+    CollectorStatus,
+)
+
 
 class RedditCollector:
     """
     Reddit content and author search collector.
-    Attempts OAuth2 client credentials if REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET are configured,
-    otherwise uses public search endpoints with descriptive User-Agent headers.
+    Executes resilient collection with adaptive rate-limit detection (HTTP 429),
+    cursor tracking ('after'), and strict zero-fake-data honesty.
     """
 
     def __init__(self):
@@ -18,42 +24,80 @@ class RedditCollector:
         self.client_secret = os.getenv("REDDIT_CLIENT_SECRET", "")
         self._access_token: Optional[str] = None
 
-    async def search_posts(self, query: str, subreddit: Optional[str] = None, limit: int = 25) -> List[SocialPost]:
+    async def search_posts(
+        self,
+        query: str,
+        subreddit: Optional[str] = None,
+        limit: int = 25,
+        cursor: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> List[SocialPost]:
         posts: List[SocialPost] = []
         clean_query = query.strip()
         if not clean_query:
             return posts
 
         base_url = f"https://www.reddit.com/r/{subreddit}/search.json" if subreddit else "https://www.reddit.com/search.json"
-        params = {
+        params: Dict[str, Any] = {
             "q": clean_query,
             "sort": "relevance",
             "limit": min(limit, 50),
             "restrict_sr": bool(subreddit)
         }
-        headers = {"User-Agent": "SentialIntelligenceOSINT/2.0 (Security & Forensic Analysis)"}
+        if cursor:
+            params["after"] = cursor
 
-        try:
-            async with httpx.AsyncClient(timeout=8.0, headers=headers) as client:
-                resp = await client.get(base_url, params=params)
-                if resp.status_code == 200:
+        headers = {
+            "User-Agent": "Sentinel-Intelligence-Recon/2.0 (Security & Forensic Analysis; contact: sec-audit@sential.io)"
+        }
+
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp, status, msg = await resilient_crawler_engine.execute_request_with_resilience(
+                platform=SocialPlatformType.REDDIT,
+                client=client,
+                url=base_url,
+                method="GET",
+                headers=headers,
+                params=params,
+            )
+
+            if status == CollectorStatus.SUCCESS and resp is not None:
+                try:
                     data = resp.json()
+                    after_token = data.get("data", {}).get("after")
                     children = data.get("data", {}).get("children", [])
                     for child in children:
                         post_data = child.get("data", {})
                         post = self._parse_reddit_post(post_data)
                         if post:
                             posts.append(post)
-                elif resp.status_code == 403:
-                    app_logger.info("Reddit 403 encountered, utilizing resilient fallback telemetry.")
-                    posts.extend(self._generate_fallback_posts(clean_query, subreddit))
-                else:
-                    app_logger.warning(f"Reddit search returned HTTP {resp.status_code}")
-        except Exception as e:
-            app_logger.warning(f"Error fetching Reddit posts for '{query}': {e}")
-            posts.extend(self._generate_fallback_posts(clean_query, subreddit))
 
-        return posts
+                    if job_id:
+                        resilient_crawler_engine.save_checkpoint(
+                            job_id=job_id,
+                            platform=SocialPlatformType.REDDIT,
+                            query=clean_query,
+                            cursor=after_token,
+                            items_count=len(posts),
+                            status=CollectorStatus.SUCCESS if posts else CollectorStatus.SUCCESS_EMPTY
+                        )
+                except Exception as e:
+                    app_logger.warning(f"Error parsing Reddit JSON response: {e}")
+            else:
+                app_logger.info(
+                    f"Reddit collection for '{clean_query}' completed with status: {status.value}. Info: {msg}"
+                )
+                if job_id:
+                    resilient_crawler_engine.save_checkpoint(
+                        job_id=job_id,
+                        platform=SocialPlatformType.REDDIT,
+                        query=clean_query,
+                        cursor=None,
+                        items_count=0,
+                        status=status
+                    )
+
+        return resilient_crawler_engine.deduplicate_posts(posts)
 
     def _parse_reddit_post(self, data: Dict[str, Any]) -> Optional[SocialPost]:
         try:
@@ -67,11 +111,14 @@ class RedditCollector:
             num_comments = data.get("num_comments", 0)
             sub = data.get("subreddit", "all")
 
-            created_at = datetime.fromtimestamp(created_utc, timezone.utc).isoformat() if created_utc else datetime.now(timezone.utc).isoformat()
+            created_at = (
+                datetime.fromtimestamp(created_utc, timezone.utc).isoformat()
+                if created_utc
+                else datetime.now(timezone.utc).isoformat()
+            )
             full_text = f"{title}\n\n{selftext}".strip()
             url = f"https://reddit.com{permalink}" if permalink else f"https://reddit.com/r/{sub}/comments/{pid}"
 
-            # Links inside selftext
             links = re.findall(r'https?://[^\s()<>]+', full_text)
             entities = re.findall(r'r\/([a-zA-Z0-9_]+)', full_text) + re.findall(r'u\/([a-zA-Z0-9_]+)', full_text)
 
@@ -89,31 +136,11 @@ class RedditCollector:
                 reposts_count=num_comments,
                 channel_name=f"r/{sub}",
                 entities=list(set(entities)),
-                credibility_score=75.0
+                credibility_score=None
             )
         except Exception as e:
             app_logger.warning(f"Failed to parse Reddit post: {e}")
             return None
 
-    def _generate_fallback_posts(self, query: str, subreddit: Optional[str]) -> List[SocialPost]:
-        now = datetime.now(timezone.utc).isoformat()
-        sub = subreddit or "netsec"
-        return [
-            SocialPost(
-                id="reddit_fb_01",
-                platform=SocialPlatformType.REDDIT,
-                author="u/threat_intel_bot",
-                author_id="reddit_user_threat_intel_bot",
-                text=f"Technical Discussion: Analysis of {query} indicators and adversary infrastructure observed across telemetry endpoints.",
-                created_at=now,
-                url=f"https://reddit.com/r/{sub}/comments/abc1234/{query.replace(' ', '_')}",
-                langs=["en"],
-                likes_count=138,
-                reposts_count=24,
-                channel_name=f"r/{sub}",
-                entities=[query, sub],
-                credibility_score=80.0
-            )
-        ]
 
 reddit_collector = RedditCollector()

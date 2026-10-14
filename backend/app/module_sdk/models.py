@@ -87,6 +87,9 @@ class RelationshipPayload(BaseModel):
     target_entity_value: str
     relationship_type: RelationshipType
     confidence: float = 1.0
+    basis: str = "DIRECT_OBSERVATION"  # DIRECT_OBSERVATION, INFERRED_COORDINATION, MATCHING_IDENTIFIER, EXPLICIT_SOURCE_STATEMENT, ANALYST_ASSERTION
+    methodology: Optional[str] = None
+    uncertainty_notes: Optional[str] = None
     sources: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 

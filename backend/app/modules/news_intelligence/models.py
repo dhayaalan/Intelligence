@@ -78,7 +78,7 @@ class QueryExpansionItem(BaseModel):
 class NewsSearchRequest(BaseModel):
     query: str
     search_mode: SearchMode = SearchMode.SEMANTIC
-    min_relevance: float = 70.0  # 0 to 100 percentage
+    min_relevance: float = 50.0  # 0 to 100 percentage
     category_filter: ContentCategory = ContentCategory.ALL
     date_filter: Optional[str] = None  # "today", "yesterday", "week", "month", or "YYYY-MM-DD..YYYY-MM-DD"
     location_filter: Optional[str] = None
@@ -159,6 +159,8 @@ class NewsSearchResponse(BaseModel):
     total_results: int
     results: List[NewsSearchResultItem] = Field(default_factory=list)
     category_counts: Dict[str, int] = Field(default_factory=dict)
+    provider_statuses: Dict[str, str] = Field(default_factory=dict)
+    investigator_advisory: Optional[str] = None
     duration_ms: float = 0.0
 
 

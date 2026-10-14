@@ -3,55 +3,93 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import httpx
 from bs4 import BeautifulSoup
+
 from app.core.logging import app_logger
 from app.modules.social_media_intelligence.models import SocialPost, SocialPlatformType
+from app.modules.social_media_intelligence.crawler_engine import (
+    resilient_crawler_engine,
+    CollectorStatus,
+)
+
 
 class TelegramCollector:
     """
-    Telegram public channel monitor that ingests posts from `https://t.me/s/{channel}`.
+    Telegram public channel monitor that ingests authentic posts from `https://t.me/s/{channel}`.
     Extracts post text, timestamps, views, forwards, and media indicators keylessly.
+    Zero fake data generation.
     """
 
-    async def get_channel_posts(self, channel_name: str, limit: int = 25) -> List[SocialPost]:
+    async def get_channel_posts(
+        self,
+        channel_name: str,
+        limit: int = 25,
+        job_id: Optional[str] = None
+    ) -> List[SocialPost]:
         clean_channel = channel_name.strip().lstrip("@")
         posts: List[SocialPost] = []
         if not clean_channel:
             return posts
 
         url = f"https://t.me/s/{clean_channel}"
-        try:
-            async with httpx.AsyncClient(timeout=8.0, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}) as client:
-                resp = await client.get(url, follow_redirects=True)
-                if resp.status_code == 200:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp, status, msg = await resilient_crawler_engine.execute_request_with_resilience(
+                platform=SocialPlatformType.TELEGRAM,
+                client=client,
+                url=url,
+                method="GET",
+                headers=headers,
+            )
+
+            if status == CollectorStatus.SUCCESS and resp is not None:
+                try:
                     soup = BeautifulSoup(resp.text, "html.parser")
                     message_divs = soup.find_all("div", class_=re.compile(r"tgme_widget_message_wrap"))
                     for div in message_divs[-limit:]:
                         post = self._parse_telegram_message(div, clean_channel)
                         if post:
                             posts.append(post)
-                else:
-                    app_logger.warning(f"Telegram channel {clean_channel} returned HTTP {resp.status_code}")
-        except Exception as e:
-            app_logger.warning(f"Error fetching Telegram channel '{clean_channel}': {e}")
-            posts.extend(self._generate_fallback_posts(clean_channel))
 
-        return posts
+                    if job_id:
+                        resilient_crawler_engine.save_checkpoint(
+                            job_id=job_id,
+                            platform=SocialPlatformType.TELEGRAM,
+                            query=clean_channel,
+                            cursor=None,
+                            items_count=len(posts),
+                            status=CollectorStatus.SUCCESS if posts else CollectorStatus.SUCCESS_EMPTY
+                        )
+                except Exception as e:
+                    app_logger.warning(f"Error parsing Telegram HTML for '{clean_channel}': {e}")
+            else:
+                app_logger.info(
+                    f"Telegram collection for '{clean_channel}' completed with status: {status.value}. Info: {msg}"
+                )
+                if job_id:
+                    resilient_crawler_engine.save_checkpoint(
+                        job_id=job_id,
+                        platform=SocialPlatformType.TELEGRAM,
+                        query=clean_channel,
+                        cursor=None,
+                        items_count=0,
+                        status=status
+                    )
 
-    async def search_posts(self, query: str, limit: int = 25) -> List[SocialPost]:
+        return resilient_crawler_engine.deduplicate_posts(posts)
+
+    async def search_posts(self, query: str, limit: int = 25, job_id: Optional[str] = None) -> List[SocialPost]:
         """
-        If query looks like a channel handle (@channel or t.me/channel), inspect channel.
-        Otherwise inspect known OSINT/threat wire channels for matching query keywords.
+        If query specifies a channel (@channel or t.me/channel), inspect channel.
+        Otherwise inspect target channel and filter by query terms.
         """
         match = re.search(r'(?:t\.me\/|@)([a-zA-Z0-9_]{4,})', query)
         target_channel = match.group(1) if match else "durov"
-        
-        posts = await self.get_channel_posts(target_channel, limit=limit)
+
+        posts = await self.get_channel_posts(target_channel, limit=limit, job_id=job_id)
         if query and not match:
-            # Filter by keyword if general query
             q_lower = query.lower()
-            filtered = [p for p in posts if q_lower in p.text.lower()]
-            if filtered:
-                return filtered
+            posts = [p for p in posts if q_lower in p.text.lower()]
         return posts
 
     def _parse_telegram_message(self, div: Any, channel: str) -> Optional[SocialPost]:
@@ -82,7 +120,7 @@ class TelegramCollector:
 
             # Date
             time_el = div.find("time")
-            created_at = time_el.get("datetime") if time_el else datetime.now(timezone.utc).isoformat()
+            created_at = (time_el.get("datetime") if time_el and time_el.get("datetime") else None) or datetime.now(timezone.utc).isoformat()
 
             # Forwards
             fwd_el = div.find("a", class_="tgme_widget_message_forwarded_from_name")
@@ -121,29 +159,11 @@ class TelegramCollector:
                 is_forwarded=is_forwarded,
                 forwarded_from=fwd_name,
                 entities=list(set(entities)),
-                credibility_score=80.0
+                credibility_score=None
             )
         except Exception as e:
             app_logger.warning(f"Error parsing Telegram widget message: {e}")
             return None
 
-    def _generate_fallback_posts(self, channel: str) -> List[SocialPost]:
-        now = datetime.now(timezone.utc).isoformat()
-        return [
-            SocialPost(
-                id=f"tg_{channel}_mock_01",
-                platform=SocialPlatformType.TELEGRAM,
-                author=f"@{channel}",
-                author_id=f"channel_{channel}",
-                text=f"Official bulletin from @{channel}: Operational readiness and telemetry dispatch confirmed.",
-                created_at=now,
-                url=f"https://t.me/{channel}/101",
-                langs=["en"],
-                views_count=14500,
-                channel_name=channel,
-                entities=[channel, "bulletin"],
-                credibility_score=85.0
-            )
-        ]
 
 telegram_collector = TelegramCollector()

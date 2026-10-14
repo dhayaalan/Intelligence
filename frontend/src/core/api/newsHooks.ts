@@ -79,6 +79,8 @@ export interface NewsSearchResponse {
   total_results: number;
   results: NewsSearchResultItem[];
   category_counts: Record<string, number>;
+  provider_statuses?: Record<string, string>;
+  investigator_advisory?: string;
   duration_ms: number;
 }
 

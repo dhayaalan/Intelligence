@@ -256,10 +256,34 @@ export const SocialIntelligencePage: React.FC = () => {
       {activeTab === 'feed' && (
         <div className="space-y-4">
           {posts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-800">
-              <Share2 className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-              <p className="text-sm font-semibold">No social media dispatches collected yet.</p>
-              <p className="text-xs text-slate-400 mt-1">Enter a query above and dispatch collectors.</p>
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-800 space-y-3">
+              <Share2 className="w-8 h-8 mx-auto text-slate-400" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {searchMutation.data ? "No authentic social posts returned for this query" : "No social media dispatches collected yet"}
+              </p>
+              {searchMutation.data?.provider_statuses && Object.keys(searchMutation.data.provider_statuses).length > 0 && (
+                <div className="max-w-md mx-auto pt-2 text-left space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block text-center">
+                    Collector Diagnostics & Platform Quota Status:
+                  </span>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    {Object.entries(searchMutation.data.provider_statuses).map(([plat, status_str]) => (
+                      <div
+                        key={plat}
+                        className="p-2 rounded-lg border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between"
+                      >
+                        <strong className="capitalize text-slate-900 dark:text-white">{plat}:</strong>
+                        <span className="text-right truncate ml-2 text-xs">{status_str}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-slate-400">
+                {searchMutation.data
+                  ? "Zero synthetic data injected. External platforms restricting automated access require authenticated API credentials."
+                  : "Enter a query above and dispatch collectors."}
+              </p>
             </div>
           ) : (
             posts.map((post) => (
