@@ -169,7 +169,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
 
   // Default to OVERVIEW as per Investigator Workspace standard
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'entities' | 'findings' | 'leads' | 'news' | 'profiles' | 'graph' | 'map' | 'evidence' | 'sources' | 'logs' | 'raw'
+    'overview' | 'entities' | 'findings' | 'leads' | 'news' | 'profiles' | 'graph' | 'map' | 'evidence'
   >('overview');
 
   const [entityDisplayMode, setEntityDisplayMode] = useState<'cards' | 'table'>('cards');
@@ -1132,9 +1132,6 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'graph', label: 'Relationship Graph', count: searchResult.entities.length, icon: Share2 },
                   { id: 'map', label: 'Geospatial Radar', count: geoLocations.length, icon: Globe },
                   { id: 'evidence', label: 'Evidence Vault', count: searchResult.evidence.length, icon: ShieldCheck },
-                  { id: 'sources', label: 'Sources & Lineage', count: sourceStats.length, icon: BookOpen },
-                  { id: 'logs', label: 'Pipeline Trace', count: pipelineStages.length, icon: Cpu },
-                  { id: 'raw', label: 'Raw Output', count: searchResult.entities.length, icon: Terminal },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -2374,114 +2371,6 @@ export const SearchPage: React.FC<SearchPageProps> = ({
               </div>
             )}
 
-            {/* TAB 10: SOURCES & LINEAGE (Section 24, 50) */}
-            {activeTab === 'sources' && (
-              <div className="p-5 sm:p-6 space-y-5 font-mono text-xs">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-500 uppercase tracking-wider font-bold">
-                    SOURCE INDEPENDENCE & LINEAGE MATRIX
-                  </span>
-                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
-                    {sourceStats.length} Unique Sources Analyzed
-                  </span>
-                </div>
-
-                {/* Source Independence Callout */}
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
-                    <Split className="w-4 h-4 text-indigo-500" />
-                    <span>Source Independence Breakdown</span>
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-300 font-sans text-xs leading-relaxed">
-                    The platform evaluates publisher independence, syndicated wires, and derivative reposts.
-                    Syndicated reports sharing canonical phrasing are grouped to prevent artificial corroboration.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {sourceStats.map((src, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c101d] space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-white truncate">{src.name}</span>
-                        <Badge variant="outline" size="sm">
-                          {src.type}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <span>Reliability: <strong className="text-emerald-600 dark:text-emerald-400">{src.reliability}</strong></span>
-                        <span>Correlated: <strong>{src.entities} entities</strong></span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 11: PIPELINE TRACE (Section 32) */}
-            {activeTab === 'logs' && (
-              <div className="p-5 sm:p-6 space-y-4 font-mono text-xs">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-500 uppercase tracking-wider font-bold">
-                    SEARCH EXECUTION PIPELINE TRACE
-                  </span>
-                  <span>TOTAL DURATION: {searchResult.stats?.total_duration_ms || 350}ms</span>
-                </div>
-
-                <div className="space-y-3">
-                  {pipelineStages.map((stage, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-start justify-between gap-4"
-                    >
-                      <div className="space-y-1">
-                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <span>{stage.stage}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-600 dark:text-slate-400 font-sans">
-                          {stage.details}
-                        </div>
-                      </div>
-
-                      <div className="text-right space-y-1 shrink-0">
-                        <Badge variant="success" size="sm">
-                          {stage.status}
-                        </Badge>
-                        <div className="text-[10px] text-slate-400">{stage.duration_ms}ms</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 12: RAW TECHNICAL PAYLOADS (Section 31) */}
-            {activeTab === 'raw' && (
-              <div className="p-5 sm:p-6 space-y-3 font-mono text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">RAW ENGINE TELEMETRY & PAYLOADS</span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => copyToClipboard(JSON.stringify(searchResult, null, 2), 'raw')}
-                    className="text-xs font-mono cursor-pointer"
-                  >
-                    {rawCopied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500 mr-1" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5 mr-1" />
-                    )}
-                    {rawCopied ? 'Copied' : 'Copy JSON'}
-                  </Button>
-                </div>
-                <pre className="p-4 rounded-xl bg-slate-950 text-slate-100 overflow-x-auto max-h-[500px] text-[11px] leading-relaxed border border-slate-800">
-                  {JSON.stringify(searchResult, null, 2)}
-                </pre>
-              </div>
-            )}
           </div>
         </div>
       )}
