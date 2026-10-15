@@ -21,8 +21,10 @@ from app.modules.news_intelligence.models import (
     ClaimVerificationMatrixItem,
     ConfidenceBreakdown,
     ContentCategory,
+    CountryComparisonMatrixRow,
     ExtractedClaim,
     GlobalCoverageItem,
+    GlobalCoverageMatrixItem,
     InvestigationAssessment,
     NewsArticle,
     NewsEvidenceItem,
@@ -47,6 +49,7 @@ from app.modules.news_intelligence.models import (
 )
 from app.modules.news_intelligence.repository import news_article_repo
 from app.modules.news_intelligence.dossier_compiler import news_dossier_compiler
+from app.modules.news_intelligence.country_registry import country_registry, CountryEntry
 
 
 class QueryParser:
@@ -194,17 +197,75 @@ class MultiSourceRetrievalEngine:
             if url_item:
                 raw_items.append(url_item)
 
-        # Concurrently query live wire RSS, GDELT DOC API, and YouTube video sources
+        # 1. Resolve geographic scope and target countries
+        requested_countries: List[CountryEntry] = []
+        if req.countries:
+            for c_id in req.countries:
+                if c_id.upper() == "ALL" or c_id.upper() == "WORLDWIDE":
+                    req.is_worldwide = True
+                    continue
+                c_match = country_registry.get_country(c_id)
+                if c_match and c_match not in requested_countries:
+                    requested_countries.append(c_match)
+        elif req.location_filter:
+            c_loc = country_registry.get_country(req.location_filter)
+            if c_loc:
+                requested_countries.append(c_loc)
+
+        countries_searched_names: List[str] = []
+        if requested_countries:
+            countries_searched_names = [c.name for c in requested_countries]
+        else:
+            countries_searched_names = ["Worldwide (All Configured Global Sources)"]
+
+        languages_searched: List[str] = req.languages if req.languages else ([req.language_filter] if req.language_filter else ["en"])
+
+        # 2. Build fetch tasks with bounded concurrency
         provider_statuses: Dict[str, str] = {}
-        fetch_names = ["google_news_rss", "bing_news_rss", "gdelt_api", "youtube"]
+        fetch_names = ["bing_news_rss", "gdelt_api", "youtube"]
         fetch_tasks = [
-            self._fetch_google_news_rss(req.query),
             self._fetch_bing_news_rss(req.query),
             self._fetch_gdelt_doc_api(req.query),
             self._fetch_youtube_videos(req.query),
         ]
-        
-        # Also query secondary expansion if semantic search requested
+
+        if requested_countries:
+            for c_entry in requested_countries[:10]:
+                gl_code = c_entry.google_news_gl or c_entry.alpha2
+                hl_code = c_entry.google_news_hl or "en"
+                fetch_tasks.append(
+                    self._fetch_google_news_rss(
+                        req.query,
+                        gl=gl_code,
+                        hl=hl_code,
+                        country_name=c_entry.name,
+                        edition=c_entry.alpha2
+                    )
+                )
+                fetch_names.append(f"google_news_{c_entry.alpha2.lower()}")
+        else:
+            # Worldwide search: query global wires + representative regional editions
+            worldwide_editions = [
+                ("US", "en-US", "United States"),
+                ("GB", "en-GB", "United Kingdom"),
+                ("FR", "fr", "France"),
+                ("DE", "de", "Germany"),
+                ("JP", "ja", "Japan"),
+                ("IN", "en-IN", "India"),
+            ]
+            for gl_code, hl_code, c_name in worldwide_editions:
+                fetch_tasks.append(
+                    self._fetch_google_news_rss(
+                        req.query,
+                        gl=gl_code,
+                        hl=hl_code,
+                        country_name=c_name,
+                        edition=gl_code
+                    )
+                )
+                fetch_names.append(f"google_news_{gl_code.lower()}")
+
+        # Secondary semantic expansion if requested
         if req.search_mode == SearchMode.SEMANTIC and expansions:
             fetch_tasks.append(self._fetch_google_news_rss(expansions[0].generated_query))
             fetch_names.append("semantic_expansion_rss")
@@ -219,6 +280,14 @@ class MultiSourceRetrievalEngine:
                     provider_statuses[name] = "EMPTY (Zero items returned)"
             elif isinstance(r, Exception):
                 provider_statuses[name] = f"ERROR ({type(r).__name__})"
+
+        # Provide canonical 'google_news_rss' entry for backwards compatibility
+        if "google_news_rss" not in provider_statuses:
+            gn_matches = [v for k, v in provider_statuses.items() if k.startswith("google_news_")]
+            if gn_matches:
+                provider_statuses["google_news_rss"] = gn_matches[0]
+            else:
+                provider_statuses["google_news_rss"] = "EMPTY (Zero items returned)"
 
         # Zero synthetic fallback generation! If external wires return zero records, return honest empty state.
         if not raw_items:
@@ -236,6 +305,10 @@ class MultiSourceRetrievalEngine:
                 provider_statuses=provider_statuses,
                 investigator_advisory=f"No authentic wire or news records discovered for query '{req.query}'. External providers yielded zero matches or were unreachable. Zero synthetic records injected.",
                 duration_ms=duration,
+                countries_searched=countries_searched_names,
+                languages_searched=languages_searched,
+                country_comparison_matrix=[],
+                coverage_summary=country_registry.get_coverage_summary(),
             )
 
         # Deduplication by canonical URL and headline similarity
@@ -265,19 +338,23 @@ class MultiSourceRetrievalEngine:
         total_items = max(1, len(deduped))
         source_independence_score = round((max(1, independent_sources_count) / total_items) * 100, 1)
 
-        # Identify / compute Story Cluster for related items
+        # Dynamic country list from observed items without hardcoded fallback lists
+        observed_countries = list(set(it.get("country", "International") for it in deduped if it.get("country") and it.get("country") != "International"))
+        if not observed_countries:
+            observed_countries = ["International Wire"]
+
         cluster_id = f"clstr_{hashlib.md5(req.query.encode()).hexdigest()[:8]}"
         primary_story_cluster = StoryCluster(
             cluster_id=cluster_id,
             primary_headline=f"Global Wire Coverage: {req.query}",
             article_count=len(deduped),
             publishers_count=len(set(it.get("publisher", "Wire") for it in deduped)),
-            countries_count=len(set(it.get("country", "International") for it in deduped)),
-            countries=list(set(it.get("country", "International") for it in deduped))[:5] or ["International", "US", "UK", "India"],
-            languages=["en"],
+            countries_count=len(observed_countries),
+            countries=observed_countries[:8],
+            languages=list(set(it.get("original_language", "en") for it in deduped)),
             primary_source_name=deduped[0].get("publisher", "Reuters Wire") if deduped else "Reuters",
-            primary_source_country=deduped[0].get("country", "US") if deduped else "US",
-            timeline_summary=f"Event emergence tracked across wire syndicates and international broadcasting",
+            primary_source_country=deduped[0].get("publisher_country", "International") if deduped else "International",
+            timeline_summary="Event emergence tracked across worldwide wire syndicates and national broadcasting editions",
             independent_sources_count=max(1, independent_sources_count),
             syndicated_count=syndicated_count,
             copied_count=copied_count,
@@ -293,8 +370,22 @@ class MultiSourceRetrievalEngine:
                 item_id = item.get("id") or f"art_{hashlib.md5((item.get('title', '') + str(idx)).encode()).hexdigest()[:10]}"
                 
                 # Determine realistic global country
-                country = item.get("country") or self._detect_country(item.get("publisher", ""), item.get("canonical_url", ""))
-                
+                c_det_name, c_det_code, _ = self._detect_country_details(item.get("publisher", ""), item.get("canonical_url", ""))
+                final_country = item.get("publisher_country") or item.get("country") or c_det_name
+                final_code = item.get("publisher_country_code") or c_det_code
+                orig_lang = item.get("original_language") or item.get("language") or "en"
+                source_edition = item.get("source_edition") or "GLOBAL"
+                coll_route = item.get("collection_route") or "DIRECT"
+
+                # Extract event location from detected entities or filter
+                event_loc = req.event_location_filter or None
+                if not event_loc:
+                    for entity in (item.get("detected_entities") or []):
+                        ent_c = country_registry.get_country(entity)
+                        if ent_c:
+                            event_loc = ent_c.name
+                            break
+
                 hero_img = item.get("hero_image") or item.get("thumbnail_url") or self._pick_default_hero_image(req.query, idx)
                 source_type = item.get("source_type") or self._classify_source_type(item.get("publisher", ""), item.get("canonical_url", ""))
                 is_indep = item.get("is_independent", source_type not in ["SYNDICATED", "SOCIAL"])
@@ -309,10 +400,17 @@ class MultiSourceRetrievalEngine:
                     content_type=item.get("content_type", "article"),
                     publication_date=item.get("publication_date"),
                     relevance_score=round(relevance, 1),
-                    country=country,
+                    country=final_country,
+                    publisher_country=final_country,
+                    publisher_country_code=final_code,
+                    original_language=orig_lang,
+                    event_location=event_loc,
+                    article_subject_country=final_country if event_loc == final_country else event_loc,
+                    source_edition=source_edition,
+                    collection_route=coll_route,
                     author=item.get("author") or "Special Investigation Desk",
                     category=item.get("category") or "Investigative Wire",
-                    language=item.get("language") or "en",
+                    language=orig_lang,
                     read_time_minutes=item.get("read_time_minutes") or 5,
                     cluster_id=cluster_id,
                     story_cluster=primary_story_cluster,
@@ -365,6 +463,98 @@ class MultiSourceRetrievalEngine:
             "evidence": len(scored_items) * 2,
         }
 
+        # 3. Build dynamic evidence-based Country Comparison Matrix
+        comparison_rows: List[CountryComparisonMatrixRow] = []
+        by_country: Dict[str, List[NewsSearchResultItem]] = {}
+        for item in scored_items:
+            c_key = item.publisher_country or "International"
+            by_country.setdefault(c_key, []).append(item)
+
+        comparison_targets = set(by_country.keys())
+        if req.countries:
+            for c_req in req.countries:
+                c_ent = country_registry.get_country(c_req)
+                if c_ent:
+                    comparison_targets.add(c_ent.name)
+
+        for c_name in sorted(comparison_targets):
+            c_items = by_country.get(c_name, [])
+            c_ent = country_registry.get_country(c_name)
+            c_code = c_ent.alpha2 if c_ent else "GLOBAL"
+            c_region = c_ent.region if c_ent else "International"
+
+            if c_items:
+                pub_count = len(set(it.publisher for it in c_items if it.publisher))
+                langs = list(set(it.original_language or it.language for it in c_items if it.original_language or it.language))
+                indep_count = sum(1 for it in c_items if it.is_independent and it.syndication_type != "SYNDICATED_COPY")
+                indep_score = round((max(1, indep_count) / max(1, len(c_items))) * 100, 1)
+
+                valid_dates = [it.publication_date for it in c_items if it.publication_date]
+                earliest_pub = valid_dates[0] if valid_dates else None
+                latest_up = valid_dates[-1] if valid_dates else None
+
+                top_headline = c_items[0].title if c_items else "Coverage tracked"
+
+                dom_framing = "NEUTRAL"
+                text_corpus = " ".join((it.title + " " + it.summary).lower() for it in c_items)
+                if any(w in text_corpus for w in ["crisis", "threat", "alarm", "violation", "attack", "danger"]):
+                    dom_framing = "CRITICAL / ADVERSE"
+                elif any(w in text_corpus for w in ["deal", "treaty", "growth", "cooperation", "success"]):
+                    dom_framing = "SUPPORTIVE / PROGRESSIVE"
+                elif any(w in text_corpus for w in ["diplomacy", "talks", "meeting", "negotiation"]):
+                    dom_framing = "DIPLOMATIC"
+
+                gaps = []
+                if pub_count == 1:
+                    gaps.append(f"Single domestic outlet ({c_items[0].publisher}); lacking independent cross-publisher verification")
+                if all(it.syndication_type == "SYNDICATED_COPY" for it in c_items):
+                    gaps.append("All observed records are republished wire copies; no local investigative reporting")
+                if not any(it.media_indicators.get("has_image") for it in c_items):
+                    gaps.append("No primary photographic or visual evidence attached to domestic reporting")
+
+                comparison_rows.append(CountryComparisonMatrixRow(
+                    country_name=c_name,
+                    country_code=c_code,
+                    region=c_region,
+                    article_count=len(c_items),
+                    source_count=pub_count,
+                    languages_detected=langs,
+                    source_independence_score=indep_score,
+                    earliest_publication=earliest_pub,
+                    latest_update=latest_up,
+                    primary_headline=top_headline,
+                    dominant_framing=dom_framing,
+                    claim_support_count=sum(len(it.claim_indicators) for it in c_items),
+                    claim_contradiction_count=0,
+                    coverage_gaps=gaps,
+                    operational_status="WORKING_TESTED_REAL"
+                ))
+            elif c_ent:
+                comparison_rows.append(CountryComparisonMatrixRow(
+                    country_name=c_ent.name,
+                    country_code=c_ent.alpha2,
+                    region=c_ent.region,
+                    article_count=0,
+                    source_count=0,
+                    languages_detected=c_ent.languages[:2],
+                    source_independence_score=0.0,
+                    earliest_publication=None,
+                    latest_update=None,
+                    primary_headline="No articles indexed for query",
+                    dominant_framing="UNREPORTED / ABSENT",
+                    claim_support_count=0,
+                    claim_contradiction_count=0,
+                    coverage_gaps=["Zero matching articles observed in configured national feeds for this event"],
+                    operational_status=c_ent.operational_status
+                ))
+
+        # 4. Global coverage summary
+        cov_summary = country_registry.get_coverage_summary()
+        cov_summary["mode"] = "WORLDWIDE" if req.is_worldwide else ("COUNTRY_FILTERED" if req.countries else "GLOBAL_DISCOVERY")
+        cov_summary["countries_queried"] = len(countries_searched_names)
+        cov_summary["countries_with_results"] = len(by_country)
+        cov_summary["total_results_evaluated"] = len(filtered_items)
+
         duration = round((time.time() - start_time) * 1000, 2)
         return NewsSearchResponse(
             search_id=search_id,
@@ -378,6 +568,10 @@ class MultiSourceRetrievalEngine:
             category_counts=category_counts,
             provider_statuses=provider_statuses,
             duration_ms=duration,
+            countries_searched=countries_searched_names,
+            languages_searched=languages_searched,
+            country_comparison_matrix=comparison_rows,
+            coverage_summary=cov_summary,
         )
 
     def get_article(self, article_id: str, query_hint: Optional[str] = None, include_deleted: bool = False) -> Optional[NewsArticle]:
@@ -663,27 +857,35 @@ class MultiSourceRetrievalEngine:
         }
 
     def _detect_country(self, publisher: str, url: str) -> str:
-        """Determines country of publication based on publisher name or domain extension."""
-        pub_lower = publisher.lower()
-        url_lower = url.lower()
+        """Determines country of publication dynamically from central country registry."""
+        c_name, _, _ = country_registry.detect_country_from_url_or_publisher(publisher, url)
+        return c_name
 
-        if any(w in pub_lower for w in ["hindu", "ndtv", "pti", "times of india", "express", "ani"]) or ".in" in url_lower:
-            return "India"
-        if any(w in pub_lower for w in ["bbc", "guardian", "reuters uk", "telegraph", "ft", "financial times"]) or ".uk" in url_lower or ".co.uk" in url_lower:
-            return "United Kingdom"
-        if any(w in pub_lower for w in ["reuters", "ap", "cnn", "nytimes", "washington post", "bloomberg", "wsj"]):
-            return "United States"
-        if any(w in pub_lower for w in ["al jazeera", "thenational", "gulf news"]):
-            return "Middle East / Qatar"
-        if any(w in pub_lower for w in ["le monde", "afp", "france24"]) or ".fr" in url_lower:
-            return "France"
-        if any(w in pub_lower for w in ["deutsche welle", "dw", "spiegel"]) or ".de" in url_lower:
-            return "Germany"
-        if any(w in pub_lower for w in ["haaretz", "times of israel", "jerusalem post"]):
-            return "Israel"
-        if any(w in pub_lower for w in ["asahi", "nhk", "kyodo"]) or ".jp" in url_lower:
-            return "Japan"
-        return "International"
+    def _detect_country_details(self, publisher: str, url: str) -> Tuple[str, str, float]:
+        """Returns (country_name, alpha2_code, confidence) from central registry."""
+        return country_registry.detect_country_from_url_or_publisher(publisher, url)
+
+    def _extract_event_location(self, text: str) -> Optional[str]:
+        """Extracts event location from text entities, city names, or country mentions."""
+        if not text:
+            return None
+        text_lower = text.lower()
+        city_to_country = {
+            "paris": "France", "berlin": "Germany", "london": "United Kingdom",
+            "tokyo": "Japan", "beijing": "China", "new delhi": "India", "delhi": "India",
+            "washington": "United States", "new york": "United States", "moscow": "Russia",
+            "kyiv": "Ukraine", "geneva": "Switzerland", "brussels": "Belgium", "canberra": "Australia",
+            "ottawa": "Canada", "brasilia": "Brazil", "abu dhabi": "United Arab Emirates"
+        }
+        for city, cname in city_to_country.items():
+            if re.search(r'\b' + re.escape(city) + r'\b', text_lower):
+                return cname
+        for c in country_registry.get_countries():
+            if re.search(r'\b' + re.escape(c.name.lower()) + r'\b', text_lower):
+                return c.name
+            if any(re.search(r'\b' + re.escape(a.lower()) + r'\b', text_lower) for a in c.aliases if len(a) > 2):
+                return c.name
+        return None
 
     def _classify_query_domain(self, query: str) -> str:
         """Categorizes query into intelligence domains for contextual dossier synthesis."""
@@ -745,12 +947,19 @@ class MultiSourceRetrievalEngine:
             ]
         return images[index % len(images)]
 
-    async def _fetch_google_news_rss(self, query: str) -> List[Dict[str, Any]]:
-        """Queries Google News RSS endpoint scoped strictly to investigator query."""
+    async def _fetch_google_news_rss(
+        self,
+        query: str,
+        gl: str = "US",
+        hl: str = "en-US",
+        country_name: str = "United States",
+        edition: str = "US"
+    ) -> List[Dict[str, Any]]:
+        """Queries Google News RSS endpoint scoped strictly to investigator query and geographic edition."""
         items: List[Dict[str, Any]] = []
         try:
             encoded = urllib.parse.quote_plus(query)
-            url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+            url = f"https://news.google.com/rss/search?q={encoded}&hl={hl}&gl={gl}&ceid={gl}:{hl}"
             resp = await self._get_client().get(url)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.text)
@@ -777,6 +986,12 @@ class MultiSourceRetrievalEngine:
                         # Detect content type
                         c_type = "video" if any(w in title.lower() for w in ["video", "watch", "footage", "clip"]) else "article"
 
+                        # Detect specific publisher country using central registry
+                        c_detected_name, c_detected_code, _ = country_registry.detect_country_from_url_or_publisher(source, link)
+                        final_country = c_detected_name if c_detected_name != "International" else country_name
+                        final_code = c_detected_code if c_detected_code != "GLOBAL" else gl
+                        raw_lang = hl.split("-")[0].lower() if "-" in hl else hl.lower()
+
                         items.append({
                             "title": title,
                             "summary": clean_desc or title,
@@ -785,12 +1000,18 @@ class MultiSourceRetrievalEngine:
                             "publisher": source,
                             "publication_date": pub_date,
                             "content_type": c_type,
+                            "country": final_country,
+                            "publisher_country": final_country,
+                            "publisher_country_code": final_code,
+                            "original_language": raw_lang,
+                            "source_edition": edition,
+                            "collection_route": "DIRECT",
                             "media_indicators": {"is_video": c_type == "video", "has_image": bool(img_url)},
                             "hero_image": img_url,
                             "thumbnail_url": img_url,
                         })
         except Exception as e:
-            app_logger.debug(f"Google News RSS retrieval for '{query}' caught: {e}")
+            app_logger.debug(f"Google News RSS retrieval for '{query}' (gl={gl}) caught: {e}")
         return items
 
     async def _fetch_bing_news_rss(self, query: str) -> List[Dict[str, Any]]:

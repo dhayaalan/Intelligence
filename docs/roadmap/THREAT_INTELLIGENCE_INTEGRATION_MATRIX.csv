@@ -1,0 +1,37 @@
+Engine / Feed ID,Engine Name,Category,Mode,Operational Status,Data Sources / Upstream,Capabilities,Zero Synthetic Enforced
+threat_intelligence_correlation,Threat Intelligence Correlation,THREAT_INTEL,PASSIVE,WORKING_TESTED_REAL,CISA KEV / NVD Threat Actors,CVE correlation & actor attribution,Yes
+vulnerability_intel,CVE EPSS & CISA KEV Intelligence,THREAT_INTEL,PASSIVE,WORKING_TESTED_REAL,FIRST.org EPSS API & CISA KEV JSON,Live exploit probability & weaponization check,Yes
+ioc_feed,Global IOC & Threat Intelligence Feed,THREAT_INTEL,PASSIVE,WORKING_TESTED_REAL,AlienVault OTX Community Pulses,Reputation scoring & pulse correlation,Yes
+urlhaus_intel,URLhaus Malicious URL Feed,THREAT_INTEL,PASSIVE,CONFIG_REQUIRED,URLhaus API v1 (abuse.ch),Malicious payload & C2 URLs,Yes (Requires URLHAUS_API_KEY)
+abuseipdb_intel,AbuseIPDB IP Reputation,THREAT_INTEL,PASSIVE,CONFIG_REQUIRED,AbuseIPDB API v2,IP abuse confidence scoring,Yes (Requires ABUSEIPDB_API_KEY)
+amass_engine,OWASP Amass Engine,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,DNS / WHOIS / Certificate Transparency,Subdomain & perimeter asset discovery,Yes
+asnmap_engine,ProjectDiscovery Asnmap,NETWORK,PASSIVE,WORKING_TESTED_REAL,ProjectDiscovery ASN mappings,CIDR & ASN network mapping,Yes
+cdncheck_engine,CDN Check Engine,NETWORK,PASSIVE,WORKING_TESTED_REAL,WAF & Cloud Provider IP ranges,Edge proxy & CDN identification,Yes
+crtsh_engine,crt.sh Certificate Transparency,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,crt.sh Sectigo PostgreSQL feed,TLS certificate history & SAN discovery,Yes
+dalfox_engine,Dalfox XSS Scanner,WEB_VULN,ACTIVE,WORKING_TESTED_REAL,DOM / Reflected XSS prober,Authorized parameter injection testing,Yes
+dns_engine,DNS Intelligence Prober,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,Authoritative DNS NS / MX / TXT,Record enumeration & DNSSEC validation,Yes
+dnsx_engine,ProjectDiscovery dnsx,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,Multi-resolver DNS querying,High-throughput record resolution,Yes
+gitleaks_engine,Gitleaks Secret Scanner,SECRETS,PASSIVE,WORKING_TESTED_REAL,Regex secret ruleset,API keys & credential discovery in source,Yes
+host_discovery_engine,ICMP / ARP Host Discovery,DISCOVERY,ACTIVE,WORKING_TESTED_REAL,ICMP echo & TCP ACK probes,Host availability verification,Yes
+http_engine,HTTP Security Header Inspector,WEB_VULN,PASSIVE,WORKING_TESTED_REAL,HTTP response headers,CSP / HSTS / CORS misconfiguration,Yes
+httpx_engine,ProjectDiscovery httpx,WEB_VULN,PASSIVE,WORKING_TESTED_REAL,HTTP probe & TLS inspection,Status / title / technology fingerprinting,Yes
+katana_engine,ProjectDiscovery Katana,CRAWLER,ACTIVE,WORKING_TESTED_REAL,Headless crawler & endpoint discovery,URL & form parameter spidering,Yes
+naabu_engine,ProjectDiscovery Naabu,PORT_SCAN,ACTIVE,WORKING_TESTED_REAL,SYN / CONNECT port probes,Open port & service discovery,Yes
+nuclei_engine,ProjectDiscovery Nuclei,VULNERABILITY,ACTIVE,WORKING_TESTED_REAL,Nuclei community vulnerability templates,CVE & misconfiguration probing,Yes
+nvd_cve_engine,NVD Vulnerability Feed,THREAT_INTEL,PASSIVE,WORKING_TESTED_REAL,NIST NVD API v2.0,CVSS v3.1 scoring & CWE categorization,Yes
+openvas_engine,OpenVAS Vulnerability Engine,VULNERABILITY,ACTIVE,CONFIG_REQUIRED,Greenbone Community Edition,Authenticated vulnerability scans,Yes (Requires OPENVAS_HOST)
+port_service_engine,Port & Service Identification,PORT_SCAN,ACTIVE,WORKING_TESTED_REAL,Banner grabbing & nmap probes,Service version fingerprinting,Yes
+prowler_engine,Prowler Cloud Security,CLOUD_AUDIT,PASSIVE,CONFIG_REQUIRED,AWS / Azure / GCP API,CIS benchmark cloud posture audit,Yes (Requires Cloud Credentials)
+scoutsuite_engine,ScoutSuite Multi-Cloud,CLOUD_AUDIT,PASSIVE,CONFIG_REQUIRED,Cloud provider IAM & storage APIs,Multi-cloud risk assessment,Yes (Requires Cloud Credentials)
+semgrep_engine,Semgrep Static Analysis,SAST,PASSIVE,WORKING_TESTED_REAL,Semgrep community rules,Static code security auditing,Yes
+shodan_engine,Shodan Host Intelligence,THREAT_INTEL,PASSIVE,WORKING_TESTED_REAL,Shodan REST API,Exposed banners / CVEs / ports,Yes (Configured with SHODAN_API_KEY)
+subfinder_engine,ProjectDiscovery Subfinder,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,Passive DNS sources,Subdomain enumeration,Yes
+tech_engine,Technology Fingerprinting,DISCOVERY,PASSIVE,WORKING_TESTED_REAL,Wappalyzer / header signatures,CMS / framework / web server identification,Yes
+testssl_engine,testssl.sh TLS Auditor,TLS,ACTIVE,WORKING_TESTED_REAL,TLS cipher & protocol checks,Weak cipher suites & expired certificates,Yes
+trivy_engine,Aqua Security Trivy,CONTAINER,PASSIVE,WORKING_TESTED_REAL,Trivy vulnerability database,Container image & SBOM auditing,Yes
+uncover_engine,ProjectDiscovery Uncover,DISCOVERY,PASSIVE,CONFIG_REQUIRED,Search engine APIs,Exposed host search aggregation,Yes (Requires Engine Keys)
+wapiti_engine,Wapiti Web Auditor,WEB_VULN,ACTIVE,WORKING_TESTED_REAL,Black-box web vulnerability scanner,SQLi / XSS / SSRF testing,Yes
+wazuh_engine,Wazuh SIEM / EDR,EDR,PASSIVE,CONFIG_REQUIRED,Wazuh REST API,Host intrusion & log telemetry,Yes (Requires WAZUH_API_URL)
+web_crawler_engine,Asynchronous Web Spider,CRAWLER,ACTIVE,WORKING_TESTED_REAL,HTML link extractor & robots.txt parser,Deep site crawling,Yes
+zap_active_scan_engine,OWASP ZAP Active Scanner,WEB_VULN,ACTIVE,CONFIG_REQUIRED,OWASP ZAP Daemon,Authenticated deep DAST scans,Yes (Requires ZAP_PORT)
+zap_spider_engine,OWASP ZAP Spider,CRAWLER,ACTIVE,CONFIG_REQUIRED,OWASP ZAP Daemon,AJAX & traditional spidering,Yes (Requires ZAP_PORT)

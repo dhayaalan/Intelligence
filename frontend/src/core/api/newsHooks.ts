@@ -40,6 +40,44 @@ export interface StoryCluster {
   source_independence_score?: number;
 }
 
+export interface CountryComparisonMatrixRow {
+  country_name: string;
+  country_code: string;
+  region: string;
+  article_count: number;
+  source_count: number;
+  languages_detected: string[];
+  source_independence_score: number;
+  earliest_publication?: string;
+  latest_update?: string;
+  primary_headline: string;
+  dominant_framing: string;
+  claim_support_count: number;
+  claim_contradiction_count: number;
+  coverage_gaps: string[];
+  operational_status: string;
+}
+
+export interface CountryEntry {
+  name: string;
+  alpha2: string;
+  alpha3: string;
+  code?: string;
+  region: string;
+  subregion: string;
+  languages: string[];
+  tlds: string[];
+  aliases: string[];
+  google_news_gl?: string;
+  google_news_hl?: string;
+  major_publishers: string[];
+  official_sources: string[];
+  source_count: number;
+  verified_coverage: boolean;
+  operational_status: string;
+  last_collection_at?: string;
+}
+
 export interface NewsSearchResultItem {
   id: string;
   title: string;
@@ -51,6 +89,13 @@ export interface NewsSearchResultItem {
   publication_date?: string;
   relevance_score: number;
   country?: string;
+  publisher_country?: string;
+  publisher_country_code?: string;
+  original_language?: string;
+  event_location?: string;
+  article_subject_country?: string;
+  source_edition?: string;
+  collection_route?: string;
   author?: string;
   category?: string;
   language?: string;
@@ -82,6 +127,10 @@ export interface NewsSearchResponse {
   provider_statuses?: Record<string, string>;
   investigator_advisory?: string;
   duration_ms: number;
+  countries_searched?: string[];
+  languages_searched?: string[];
+  country_comparison_matrix?: CountryComparisonMatrixRow[];
+  coverage_summary?: Record<string, any>;
 }
 
 export interface NewsSearchRequest {
@@ -94,6 +143,11 @@ export interface NewsSearchRequest {
   source_filter?: string;
   language_filter?: string;
   content_type_filter?: string;
+  countries?: string[];
+  languages?: string[];
+  is_worldwide?: boolean;
+  compare_countries?: boolean;
+  event_location_filter?: string;
 }
 
 export interface ExtractedClaim {
@@ -656,4 +710,28 @@ export function useDeleteNewsArticle() {
     },
   });
 }
+
+export function useNewsCountries(region?: string, verifiedOnly?: boolean, query?: string) {
+  return useQuery({
+    queryKey: ['news-countries', region, verifiedOnly, query],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (region && region !== 'ALL') params.append('region', region);
+      if (verifiedOnly !== undefined) params.append('verified_only', String(verifiedOnly));
+      if (query) params.append('query', query);
+      const qs = params.toString();
+      return apiRequest<CountryEntry[]>(`/news/countries${qs ? `?${qs}` : ''}`);
+    },
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+}
+
+export function useNewsCoverageSummary() {
+  return useQuery({
+    queryKey: ['news-coverage-summary'],
+    queryFn: () => apiRequest<Record<string, any>>('/news/coverage-summary'),
+    staleTime: 1000 * 60 * 15,
+  });
+}
+
 

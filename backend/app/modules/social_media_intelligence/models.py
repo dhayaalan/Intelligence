@@ -10,6 +10,8 @@ class SocialPlatformType(str, Enum):
     REDDIT = "reddit"
     MASTODON = "mastodon"
     YOUTUBE = "youtube"
+    INSTAGRAM = "instagram"
+    FACEBOOK = "facebook"
 
 
 class CredibilityBand(str, Enum):

@@ -5,33 +5,42 @@ import re
 import urllib.parse
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
 from app.module_sdk.models import (
     HealthCheckResult, ModuleHealthStatus, EntityPayload, EvidencePayload, EntityType
 )
+from app.modules.osint.models import (
+    ProfileExtractionResult, ExtractionStatus, ExtractedFieldProvenance,
+    PublicAccountStatistics, ProfileArtifactItem
+)
+
 
 class OSINTPlatformAdapter(ProviderAdapter):
     """
-    Genuine OSINT Platform Prober Adapter.
-    Performs deterministic HTTP profile existence detection across hundreds of public platforms
-    without synthetic or fabricated mock records.
+    Genuine OSINT Platform Prober & Metadata Extractor Adapter.
+    Performs verified profile resolution and rich metadata extraction across hundreds
+    of public platforms without synthetic or fabricated mock records.
+    Distinguishes profile validation from rich metadata extraction.
     """
 
     def __init__(self, raw: Dict[str, Any]):
         self._raw = raw
         self._platform_id = f"osint_{raw['platform_id']}"
+        self._raw_platform_id = raw['platform_id']
         self._name = raw["name"]
         self._category = raw.get("category", "Other")
         self._profile_url_template = raw.get("profile_url_template", "")
         self._check_url_template = raw.get("check_url_template", self._profile_url_template)
+        self._detection_method = raw.get("detection_method", "STATUS_CODE")
         self._method = raw.get("method", "GET")
         self._headers = raw.get("headers", {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Sential-OSINT/1.0"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Sential-OSINT/2.0"
         })
         self._expected_status = raw.get("expected_status", [200])
         self._not_found_status = raw.get("not_found_status", [404])
         self._not_found_keywords = raw.get("not_found_keywords", [])
-        self._timeout = float(raw.get("timeout_seconds", 4.0))
+        self._timeout = float(raw.get("timeout_seconds", 5.0))
         self._supported_targets = ["username", "person", "identity", "handle"]
         
         # If platform category relates to developer, package or publishing, also support domain
@@ -56,17 +65,16 @@ class OSINTPlatformAdapter(ProviderAdapter):
 
     @property
     def capabilities(self) -> List[str]:
-        return ["profile_lookup", "handle_detection", "social_graph", "account_enumeration"]
+        return ["profile_lookup", "handle_detection", "metadata_extraction", "provenance_tracking"]
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "2.0.0"
 
     async def health_check(self) -> HealthCheckResult:
-        # Platform endpoint definitions are verified against catalog
         return HealthCheckResult(
             status=ModuleHealthStatus.HEALTHY,
-            message=f"Platform prober '{self._name}' active and verified"
+            message=f"Platform prober & extractor '{self._name}' active and verified"
         )
 
     async def execute(self, request: ProviderRequest) -> ProviderResponse:
@@ -74,14 +82,14 @@ class OSINTPlatformAdapter(ProviderAdapter):
         target = request.query.strip()
         target_type = request.target_type.lower()
 
-        # If domain search, extract username/brand from domain (e.g. acme from acme.com)
+        # Extract handle from domain or email if applicable
         clean_handle = target
         if target_type == "domain" and "." in target:
             clean_handle = target.split(".")[0]
         elif target_type == "email" and "@" in target:
             clean_handle = target.split("@")[0]
 
-        # Ensure valid handle characters
+        # Clean handle characters
         clean_handle = clean_handle.replace(" ", "").strip()
         if not clean_handle:
             return ProviderResponse(
@@ -103,135 +111,307 @@ class OSINTPlatformAdapter(ProviderAdapter):
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="skipped",
-                        error="Platform rate limit triggered",
+                        error="Platform rate limit triggered (HTTP 429)",
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.RATE_LIMITED.value,
+                            "profile_url": prof_url
+                        },
                         duration_ms=duration_ms
                     )
 
-                # 2. Check status code
+                # 2. Access restriction / Auth required
+                if resp.status_code in (401, 403):
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="success",
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.ACCESS_RESTRICTED.value,
+                            "profile_url": prof_url,
+                            "note": f"Source returned HTTP {resp.status_code}; requires elevated credentials or login."
+                        },
+                        duration_ms=duration_ms
+                    )
+
+                # 3. Check not found status
                 if resp.status_code in self._not_found_status:
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="success",
-                        raw_data={"found": False, "status": "NOT_FOUND"},
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.NOT_FOUND.value,
+                            "profile_url": prof_url
+                        },
                         duration_ms=duration_ms
                     )
 
-                # 3. Check for keywords
+                # 4. Check for not found keywords in response body
                 body_text = resp.text or ""
                 body_lower = body_text.lower()
                 if any(kw.lower() in body_lower for kw in self._not_found_keywords):
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="success",
-                        raw_data={"found": False, "status": "NOT_FOUND_KEYWORD"},
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.NOT_FOUND.value,
+                            "profile_url": prof_url
+                        },
                         duration_ms=duration_ms
                     )
 
-                # If status matches expected status
+                # 5. Profile existence confirmed
                 if resp.status_code in self._expected_status:
-                    # Verified profile found
-                    entities = []
-                    evidence = []
+                    extracted_fields = []
+                    field_provenance: Dict[str, ExtractedFieldProvenance] = {}
+                    stats = PublicAccountStatistics()
+                    artifacts: List[ProfileArtifactItem] = []
+                    
+                    display_name: Optional[str] = None
+                    bio: Optional[str] = None
+                    avatar_url: Optional[str] = None
+                    location: Optional[str] = None
+                    account_created_at: Optional[str] = None
+                    native_id: Optional[str] = None
+                    website_urls: List[str] = []
 
-                    # Extract avatar/image from HTML response if available
-                    avatar_url = None
-                    try:
-                        og_match = re.search(
-                            r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image|twitter:image:src)["\'][^>]+content=["\']([^"\']+)["\']',
-                            body_text,
-                            re.IGNORECASE
-                        )
-                        if not og_match:
-                            og_match = re.search(
-                                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image|twitter:image:src)["\']',
-                                body_text,
-                                re.IGNORECASE
-                            )
-                        if og_match:
-                            extracted_img = og_match.group(1).strip()
-                            if extracted_img.startswith("//"):
-                                avatar_url = f"https:{extracted_img}"
-                            elif extracted_img.startswith("http"):
-                                avatar_url = extracted_img
-                            elif extracted_img.startswith("/"):
-                                parsed_orig = urllib.parse.urlparse(prof_url)
-                                avatar_url = f"{parsed_orig.scheme}://{parsed_orig.netloc}{extracted_img}"
-                    except Exception:
-                        pass
+                    # Attempt structured JSON parsing if API endpoint or detection method is JSON_API
+                    is_json_resp = False
+                    json_data = None
+                    if "application/json" in resp.headers.get("content-type", "").lower() or self._detection_method == "JSON_API":
+                        try:
+                            json_data = resp.json()
+                            is_json_resp = True
+                        except Exception:
+                            is_json_resp = False
 
-                    # Platform-specific high-fidelity avatar resolvers
-                    pid = self._raw.get("platform_id", "").lower()
-                    if not avatar_url or any(x in avatar_url.lower() for x in ["default_profile", "placeholder", "logo-large", "favicon", "site-logo"]):
-                        if "twitter" in pid or pid in ["x", "x_com", "twitter_x"]:
-                            avatar_url = f"https://unavatar.io/x/{clean_handle}"
-                        elif "youtube" in pid:
-                            avatar_url = f"https://unavatar.io/youtube/{clean_handle}"
-                        elif "telegram" in pid:
-                            avatar_url = f"https://t.me/i/userpic/320/{clean_handle}.jpg"
-                        elif "instagram" in pid:
-                            avatar_url = f"https://unavatar.io/instagram/{clean_handle}"
-                        elif "tiktok" in pid:
-                            avatar_url = f"https://unavatar.io/tiktok/{clean_handle}"
-                        elif "github" in pid:
-                            avatar_url = f"https://github.com/{clean_handle}.png"
-                        elif "reddit" in pid:
-                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=ff4500"
-                        elif "linkedin" in pid:
-                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=0284c7"
-                        elif "pinterest" in pid:
-                            avatar_url = f"https://unavatar.io/pinterest/{clean_handle}"
-                        elif "twitch" in pid:
-                            avatar_url = f"https://unavatar.io/twitch/{clean_handle}"
-                        elif "soundcloud" in pid:
-                            avatar_url = f"https://unavatar.io/soundcloud/{clean_handle}"
-                        elif "vimeo" in pid:
-                            avatar_url = f"https://unavatar.io/vimeo/{clean_handle}"
-                        elif "substack" in pid:
-                            avatar_url = f"https://unavatar.io/substack/{clean_handle}"
-                        elif "bluesky" in pid:
-                            avatar_url = f"https://unavatar.io/bluesky/{clean_handle}"
-                        elif "mastodon" in pid:
-                            avatar_url = f"https://unavatar.io/mastodon/{clean_handle}"
-                        elif "discord" in pid:
-                            avatar_url = f"https://api.dicebear.com/7.x/identicon/svg?seed={clean_handle}&backgroundColor=5865f2"
-                        elif "keybase" in pid:
-                            avatar_url = f"https://keybase.io/{clean_handle}/picture"
-                        elif "gitlab" in pid:
-                            avatar_url = f"https://gitlab.com/uploads/-/system/user/avatar/{clean_handle}/avatar.png"
-                        elif "gravatar" in pid:
-                            h = hashlib.md5(clean_handle.lower().encode()).hexdigest()
-                            avatar_url = f"https://www.gravatar.com/avatar/{h}?d=identicon&s=200"
+                    if is_json_resp and isinstance(json_data, dict):
+                        # GitHub API
+                        if self._raw_platform_id == "github":
+                            native_id = str(json_data.get("id", "")) if json_data.get("id") else None
+                            display_name = json_data.get("name")
+                            bio = json_data.get("bio")
+                            avatar_url = json_data.get("avatar_url")
+                            location = json_data.get("location")
+                            account_created_at = json_data.get("created_at")
+                            if json_data.get("blog"):
+                                website_urls.append(json_data["blog"])
+                            stats.followers = json_data.get("followers")
+                            stats.following = json_data.get("following")
+                            stats.repositories_count = json_data.get("public_repos")
+                            stats.custom_metrics["public_gists"] = json_data.get("public_gists")
+
+                        # GitLab API
+                        elif self._raw_platform_id == "gitlab" and isinstance(json_data, list) and len(json_data) > 0:
+                            first_user = json_data[0]
+                            native_id = str(first_user.get("id", ""))
+                            display_name = first_user.get("name")
+                            bio = first_user.get("bio")
+                            avatar_url = first_user.get("avatar_url")
+                            prof_url = first_user.get("web_url", prof_url)
+
+                        # Dev.to API
+                        elif self._raw_platform_id == "devto":
+                            native_id = str(json_data.get("id", "")) if json_data.get("id") else None
+                            display_name = json_data.get("name")
+                            bio = json_data.get("summary")
+                            avatar_url = json_data.get("profile_image")
+                            location = json_data.get("location")
+                            account_created_at = json_data.get("joined_at")
+
+                        # Hacker News API
+                        elif self._raw_platform_id == "hackernews":
+                            native_id = json_data.get("id")
+                            bio = json_data.get("about")
+                            if json_data.get("created"):
+                                account_created_at = datetime.fromtimestamp(json_data["created"], tz=timezone.utc).isoformat()
+                            stats.custom_metrics["karma"] = json_data.get("karma")
+                            stats.post_count = len(json_data.get("submitted", []))
+
+                        # Chess.com API
+                        elif self._raw_platform_id == "chess_com":
+                            native_id = str(json_data.get("player_id", ""))
+                            display_name = json_data.get("name")
+                            avatar_url = json_data.get("avatar")
+                            location = json_data.get("location")
+                            stats.followers = json_data.get("followers")
+                            if json_data.get("joined"):
+                                account_created_at = datetime.fromtimestamp(json_data["joined"], tz=timezone.utc).isoformat()
+
+                        # Generic JSON parser fallback
                         else:
-                            # Universal unavatar / contextual identicon fallback
-                            avatar_url = avatar_url or f"https://unavatar.io/{pid}/{clean_handle}"
+                            display_name = json_data.get("name") or json_data.get("display_name") or json_data.get("username")
+                            bio = json_data.get("bio") or json_data.get("description") or json_data.get("about") or json_data.get("summary")
+                            avatar_url = json_data.get("avatar_url") or json_data.get("profile_image") or json_data.get("avatar")
+                            location = json_data.get("location")
+                            if json_data.get("followers") is not None and isinstance(json_data.get("followers"), int):
+                                stats.followers = json_data["followers"]
 
+                    elif not is_json_resp and body_text:
+                        # Extract OpenGraph / Meta attributes from HTML
+                        try:
+                            # og:title
+                            title_m = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:title|twitter:title)["\'][^>]+content=["\']([^"\']+)["\']', body_text, re.I)
+                            if not title_m:
+                                title_m = re.search(r'<title>([^<]+)</title>', body_text, re.I)
+                            if title_m:
+                                raw_title = title_m.group(1).strip()
+                                # Clean up generic suffixes like " - Twitter" or " - Steam Community"
+                                cleaned_title = re.sub(r'\s*[\-|•|—].*$', '', raw_title).strip()
+                                if cleaned_title and len(cleaned_title) < 80:
+                                    display_name = cleaned_title
+
+                            # og:description
+                            desc_m = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:description|twitter:description|description)["\'][^>]+content=["\']([^"\']+)["\']', body_text, re.I)
+                            if desc_m:
+                                desc_val = desc_m.group(1).strip()
+                                if desc_val and len(desc_val) > 3 and not any(x in desc_val.lower() for x in ["sign in", "login", "enable javascript", "cookie policy"]):
+                                    bio = desc_val[:400]
+
+                            # og:image (genuine profile image only, ignore generic assets)
+                            img_m = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image|twitter:image:src)["\'][^>]+content=["\']([^"\']+)["\']', body_text, re.I)
+                            if img_m:
+                                cand_img = img_m.group(1).strip()
+                                if not any(x in cand_img.lower() for x in ["logo", "default", "favicon", "placeholder", "sprite", "og-default"]):
+                                    if cand_img.startswith("//"):
+                                        avatar_url = f"https:{cand_img}"
+                                    elif cand_img.startswith("http"):
+                                        avatar_url = cand_img
+                                    elif cand_img.startswith("/"):
+                                        parsed_orig = urllib.parse.urlparse(prof_url)
+                                        avatar_url = f"{parsed_orig.scheme}://{parsed_orig.netloc}{cand_img}"
+                        except Exception:
+                            pass
+
+                    # Record extracted provenance
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    if display_name:
+                        extracted_fields.append("display_name")
+                        field_provenance["display_name"] = ExtractedFieldProvenance(
+                            field_name="display_name",
+                            value=display_name,
+                            source_provider=self.provider_id,
+                            source_path="json.name" if is_json_resp else "html.og:title",
+                            is_inferred=not is_json_resp,
+                            observed_at=now_iso,
+                            confidence=0.95 if is_json_resp else 0.82
+                        )
+                    if bio:
+                        extracted_fields.append("bio")
+                        field_provenance["bio"] = ExtractedFieldProvenance(
+                            field_name="bio",
+                            value=bio,
+                            source_provider=self.provider_id,
+                            source_path="json.bio" if is_json_resp else "html.og:description",
+                            is_inferred=not is_json_resp,
+                            observed_at=now_iso,
+                            confidence=0.95 if is_json_resp else 0.80
+                        )
+                    if avatar_url:
+                        extracted_fields.append("avatar_url")
+                        field_provenance["avatar_url"] = ExtractedFieldProvenance(
+                            field_name="avatar_url",
+                            value=avatar_url,
+                            source_provider=self.provider_id,
+                            source_path="json.avatar_url" if is_json_resp else "html.og:image",
+                            is_inferred=not is_json_resp,
+                            observed_at=now_iso,
+                            confidence=0.98 if is_json_resp else 0.85
+                        )
+                    if location:
+                        extracted_fields.append("location")
+                        field_provenance["location"] = ExtractedFieldProvenance(
+                            field_name="location",
+                            value=location,
+                            source_provider=self.provider_id,
+                            source_path="json.location",
+                            is_inferred=False,
+                            observed_at=now_iso,
+                            confidence=0.90
+                        )
+                    if stats.followers is not None:
+                        extracted_fields.append("statistics.followers")
+                    if stats.repositories_count is not None:
+                        extracted_fields.append("statistics.repositories_count")
+
+                    # Determine honest extraction status
+                    if len(extracted_fields) >= 3 or (is_json_resp and len(extracted_fields) >= 2):
+                        status = ExtractionStatus.METADATA_EXTRACTED
+                    elif len(extracted_fields) > 0:
+                        status = ExtractionStatus.PARTIAL_EXTRACTION
+                    else:
+                        # Genuine validation of account existence, without rich metadata
+                        status = ExtractionStatus.PROFILE_VALIDATED
+
+                    extraction_res = ProfileExtractionResult(
+                        platform_id=self._raw_platform_id,
+                        platform_name=self._name,
+                        native_id=native_id,
+                        username=clean_handle,
+                        display_name=display_name,
+                        canonical_url=prof_url,
+                        submitted_url=prof_url,
+                        bio=bio,
+                        avatar_url=avatar_url,
+                        website_urls=website_urls,
+                        location=location,
+                        category=self._category,
+                        account_created_at=account_created_at,
+                        statistics=stats,
+                        artifacts=artifacts,
+                        status=status,
+                        first_seen_at=now_iso,
+                        last_seen_at=now_iso,
+                        fetched_at=now_iso,
+                        is_cached=False,
+                        source_endpoint=check_url,
+                        extraction_method="JSON_API" if is_json_resp else "HTTP_PROBE",
+                        fields_extracted=extracted_fields,
+                        fields_unsupported=[],
+                        field_provenance=field_provenance,
+                        raw_preview={"status_code": resp.status_code, "content_type": resp.headers.get("content-type")}
+                    )
+
+                    # Build evidence payload
+                    sha256 = hashlib.sha256(f"{prof_url}:{resp.status_code}:{now_iso}".encode()).hexdigest()
+                    evidence = [{
+                        "source": self.provider_id,
+                        "provider": self.provider_id,
+                        "module": "osint",
+                        "reference": prof_url,
+                        "confidence": 0.95 if status == ExtractionStatus.METADATA_EXTRACTED else 0.88,
+                        "raw_data": {
+                            "url": prof_url,
+                            "platform": self._name,
+                            "category": self._category,
+                            "status_code": resp.status_code,
+                            "status": status.value,
+                            "fields_extracted": extracted_fields
+                        },
+                        "hash": sha256
+                    }]
+
+                    # Build entity payload
                     entity = EntityPayload(
                         type=EntityType.USERNAME,
                         value=f"{clean_handle}@{self._name.lower().replace(' ', '')}",
-                        confidence=0.88,
+                        confidence=0.92 if status == ExtractionStatus.METADATA_EXTRACTED else 0.85,
                         sources=[self.provider_id],
                         metadata={
                             "platform": self._name,
                             "category": self._category,
                             "profile_url": prof_url,
+                            "status": status.value,
                             "status_code": resp.status_code,
                             "avatar_url": avatar_url,
-                            "image_url": avatar_url,
-                            "profile_image": avatar_url,
+                            "bio": bio,
+                            "display_name": display_name,
+                            "fields_extracted": extracted_fields,
+                            "is_metadata_extracted": status in (ExtractionStatus.METADATA_EXTRACTED, ExtractionStatus.PARTIAL_EXTRACTION),
                         }
                     )
-                    entities.append(entity.dict())
-
-                    sha256 = hashlib.sha256(f"{prof_url}:{resp.status_code}:{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()
-                    evidence.append({
-                        "source": self.provider_id,
-                        "provider": self.provider_id,
-                        "module": "osint",
-                        "reference": prof_url,
-                        "confidence": 0.90,
-                        "raw_data": {"url": prof_url, "platform": self._name, "category": self._category, "status_code": resp.status_code},
-                        "hash": sha256
-                    })
 
                     return ProviderResponse(
                         provider_id=self.provider_id,
@@ -240,7 +420,9 @@ class OSINTPlatformAdapter(ProviderAdapter):
                             "found": True,
                             "platform": self._name,
                             "profile_url": prof_url,
-                            "entities": entities,
+                            "status": status.value,
+                            "extraction_result": extraction_res.dict(),
+                            "entities": [entity.dict()],
                             "evidence": evidence
                         },
                         duration_ms=duration_ms
@@ -249,9 +431,14 @@ class OSINTPlatformAdapter(ProviderAdapter):
                 return ProviderResponse(
                     provider_id=self.provider_id,
                     status="success",
-                    raw_data={"found": False, "status": f"HTTP_{resp.status_code}"},
+                    raw_data={
+                        "found": False,
+                        "status": f"HTTP_{resp.status_code}",
+                        "profile_url": prof_url
+                    },
                     duration_ms=duration_ms
                 )
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
             return ProviderResponse(

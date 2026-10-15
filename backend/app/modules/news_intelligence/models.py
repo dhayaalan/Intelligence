@@ -85,6 +85,45 @@ class NewsSearchRequest(BaseModel):
     source_filter: Optional[str] = None
     language_filter: Optional[str] = "en"
     content_type_filter: Optional[str] = None
+    # Worldwide & Multi-Country Comparative Fields
+    countries: List[str] = Field(default_factory=list)  # ISO alpha-2, alpha-3, or canonical country names
+    languages: List[str] = Field(default_factory=list)  # Target ISO 639-1 language codes
+    is_worldwide: bool = False  # If True, searches global providers across all countries
+    compare_countries: bool = False  # If True, generates side-by-side country comparison matrix
+    event_location_filter: Optional[str] = None  # Specific event location (distinct from publisher country)
+
+
+class CountryComparisonMatrixRow(BaseModel):
+    """Side-by-side comparative analysis row for an event/claim across countries."""
+    country_name: str
+    country_code: str
+    region: str
+    article_count: int = 0
+    source_count: int = 0
+    languages_detected: List[str] = Field(default_factory=list)
+    source_independence_score: float = 75.0
+    earliest_publication: Optional[str] = None
+    latest_update: Optional[str] = None
+    primary_headline: str = ""
+    dominant_framing: str = "NEUTRAL"
+    claim_support_count: int = 0
+    claim_contradiction_count: int = 0
+    coverage_gaps: List[str] = Field(default_factory=list)
+    operational_status: str = "WORKING_TESTED_REAL"
+
+
+class GlobalCoverageMatrixItem(BaseModel):
+    """Coverage matrix metrics for a single country or territory."""
+    country_code: str
+    country_name: str
+    region: str
+    subregion: str = ""
+    configured_sources_count: int = 0
+    articles_found: int = 0
+    supported_languages: List[str] = Field(default_factory=list)
+    operational_status: str = "UNVERIFIED"
+    last_collection: Optional[str] = None
+    coverage_completeness: str = "UNKNOWN"  # FULL, PARTIAL, MINIMAL, NONE
 
 
 class GlobalCoverageItem(BaseModel):
@@ -128,6 +167,14 @@ class NewsSearchResultItem(BaseModel):
     publication_date: Optional[str] = None
     relevance_score: float  # 0 to 100
     country: str = "International"
+    # Explicit 6-Dimension Geographic Metadata
+    publisher_country: str = "International"
+    publisher_country_code: str = "GLOBAL"
+    original_language: str = "en"
+    event_location: Optional[str] = None
+    article_subject_country: Optional[str] = None
+    source_edition: str = "GLOBAL"
+    collection_route: str = "DIRECT"
     author: Optional[str] = None
     category: str = "Global News"
     language: str = "en"
@@ -150,7 +197,6 @@ class NewsSearchResultItem(BaseModel):
     wire_origin: Optional[str] = None
 
 
-
 class NewsSearchResponse(BaseModel):
     search_id: str
     original_query: str
@@ -165,6 +211,11 @@ class NewsSearchResponse(BaseModel):
     provider_statuses: Dict[str, str] = Field(default_factory=dict)
     investigator_advisory: Optional[str] = None
     duration_ms: float = 0.0
+    # Global Multilingual & Multi-Country Metadata
+    countries_searched: List[str] = Field(default_factory=list)
+    languages_searched: List[str] = Field(default_factory=list)
+    country_comparison_matrix: List[CountryComparisonMatrixRow] = Field(default_factory=list)
+    coverage_summary: Dict[str, Any] = Field(default_factory=dict)
 
 
 # --- Investigation Pipeline Schemas ---
@@ -290,7 +341,9 @@ class ClaimMatrixStatus(str, Enum):
     CORROBORATED = "CORROBORATED"
     SINGLE_SOURCE_REPEATED = "SINGLE_SOURCE_REPEATED"
     CONTRADICTED = "CONTRADICTED"
+    DISPUTED = "DISPUTED"
     UNVERIFIED = "UNVERIFIED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 
 
 class ClaimVerificationMatrixItem(BaseModel):

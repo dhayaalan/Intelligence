@@ -1,6 +1,13 @@
 from typing import List, Optional
 import os
-from pydantic import BaseSettings, Field
+try:
+    from pydantic import BaseSettings, Field
+except ImportError:
+    try:
+        from pydantic_settings import BaseSettings
+        from pydantic import Field
+    except ImportError:
+        from pydantic.v1 import BaseSettings, Field
 
 class Settings(BaseSettings):
     APP_NAME: str = "Sential Intelligence Platform"
@@ -25,6 +32,19 @@ class Settings(BaseSettings):
     PROVIDER_TIMEOUT_SECONDS: int = int(os.getenv("PROVIDER_TIMEOUT_SECONDS", "10"))
     MAX_CONCURRENT_MODULES: int = 10
     
+    # OSINT & Social Extraction Limits (Phase 4 Specification)
+    MAX_PROFILES_PER_INVESTIGATION: int = int(os.getenv("MAX_PROFILES_PER_INVESTIGATION", "100"))
+    MAX_POSTS_PER_PROFILE: int = int(os.getenv("MAX_POSTS_PER_PROFILE", "50"))
+    MAX_PAGINATION_DEPTH: int = int(os.getenv("MAX_PAGINATION_DEPTH", "5"))
+    MAX_COMMENTS_PER_CONTENT: int = int(os.getenv("MAX_COMMENTS_PER_CONTENT", "20"))
+    MAX_CONCURRENT_EXTRACTION_REQUESTS: int = int(os.getenv("MAX_CONCURRENT_EXTRACTION_REQUESTS", "10"))
+    COLLECTION_TIMEOUT_SECONDS: int = int(os.getenv("COLLECTION_TIMEOUT_SECONDS", "45"))
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5"))
+    CIRCUIT_BREAKER_RESET_TIMEOUT_SECONDS: int = int(os.getenv("CIRCUIT_BREAKER_RESET_TIMEOUT_SECONDS", "60"))
+    ENABLE_HISTORICAL_SNAPSHOTS: bool = os.getenv("ENABLE_HISTORICAL_SNAPSHOTS", "true").lower() == "true"
+    SNAPSHOT_RETENTION_DAYS: int = int(os.getenv("SNAPSHOT_RETENTION_DAYS", "90"))
+    FAIL_CLOSED_REGIONAL_ROUTING: bool = os.getenv("FAIL_CLOSED_REGIONAL_ROUTING", "true").lower() == "true"
+
     # External ML Microservice (Operated independently by ML Team)
     ML_SERVICE_URL: Optional[str] = os.getenv("ML_SERVICE_URL", None)
     ML_SERVICE_API_KEY: Optional[str] = os.getenv("ML_SERVICE_API_KEY", None)

@@ -19,6 +19,8 @@ from app.modules.social_media_intelligence.collectors.telegram import telegram_c
 from app.modules.social_media_intelligence.collectors.reddit import reddit_collector
 from app.modules.social_media_intelligence.collectors.mastodon import mastodon_collector
 from app.modules.social_media_intelligence.collectors.youtube import youtube_collector
+from app.modules.social_media_intelligence.collectors.instagram import instagram_collector
+from app.modules.social_media_intelligence.collectors.facebook import facebook_collector
 from app.modules.social_media_intelligence.engines.cib_engine import cib_engine
 from app.modules.social_media_intelligence.engines.credibility_engine import credibility_engine
 from app.modules.social_media_intelligence.crawler_engine import resilient_crawler_engine, CollectorStatus
@@ -59,6 +61,12 @@ class SocialMediaIntelligenceService:
         if SocialPlatformType.YOUTUBE in requested_platforms:
             tasks.append(youtube_collector.search_posts(query, limit=min(request.limit, 10)))
             platform_keys.append(SocialPlatformType.YOUTUBE)
+        if SocialPlatformType.INSTAGRAM in requested_platforms:
+            tasks.append(instagram_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.INSTAGRAM)
+        if SocialPlatformType.FACEBOOK in requested_platforms:
+            tasks.append(facebook_collector.search_posts(query, limit=request.limit, job_id=search_id))
+            platform_keys.append(SocialPlatformType.FACEBOOK)
 
         results_lists = await asyncio.gather(*tasks, return_exceptions=True)
         all_posts: List[SocialPost] = []
@@ -81,7 +89,16 @@ class SocialMediaIntelligenceService:
                         "status_message": f"Retrieved {len(res)} authentic posts."
                     }
                 else:
-                    if cp and cp.status == CollectorStatus.ACCESS_DENIED:
+                    if cp and cp.status == CollectorStatus.CONFIG_REQUIRED:
+                        provider_statuses[plat_name] = "CONFIG_REQUIRED (Access credentials required to query this platform)"
+                        collector_telemetry[plat_name] = {
+                            "status": "CONFIG_REQUIRED",
+                            "items_count": 0,
+                            "rate_limited": False,
+                            "retry_after_seconds": None,
+                            "status_message": "Platform API requires credentials (access token) not configured in environment."
+                        }
+                    elif cp and cp.status == CollectorStatus.ACCESS_DENIED:
                         provider_statuses[plat_name] = "ACCESS_DENIED (HTTP 403: Platform policy restricts unauthenticated requests)"
                         collector_telemetry[plat_name] = {
                             "status": "ACCESS_DENIED",

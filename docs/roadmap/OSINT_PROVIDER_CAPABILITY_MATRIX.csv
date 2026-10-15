@@ -1,0 +1,353 @@
+Platform ID,Platform Name,Category,Subcategory,Detection Method,Capability Class,Supports Metadata,API License Type,Config Required,Reliability Score
+twitter_x,Twitter / X,Social Media,Microblogging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.99
+youtube,YouTube,Social Media,Video Sharing,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Channel,No,0.99
+instagram,Instagram,Social Media,Photo & Video,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.98
+tiktok,TikTok,Social Media,Short Video,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.97
+facebook,Facebook,Social Media,Social Network,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.95
+linkedin,LinkedIn,Social Media,Professional Network,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.96
+reddit,Reddit,Social Media,Community Discussions,STATUS_CODE,Metadata Extraction,Yes,Public Profile,No,0.97
+telegram,Telegram,Social Media,Messaging & Channels,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.98
+discord,Discord,Social Media,Community Chat,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.95
+pinterest,Pinterest,Social Media,Visual Bookmarking,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.96
+snapchat,Snapchat,Social Media,Ephemeral Social,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.94
+threads,Threads,Social Media,Microblogging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.96
+bluesky,Bluesky,Social Media,Decentralized Social,JSON_API,Metadata Extraction,Yes,Official Public AT-Protocol API,No,0.99
+mastodon,Mastodon,Social Media,Fediverse,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public ActivityPub Profile,No,0.97
+whatsapp,WhatsApp,Social Media,Direct Messaging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Direct Link,No,0.92
+vimeo,Vimeo,Social Media,Video Showcase,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.95
+soundcloud,SoundCloud,Social Media,Audio & Music,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.95
+spotify,Spotify,Social Media,Streaming Audio,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.94
+patreon,Patreon,Social Media,Creator Support,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Creator Page,No,0.95
+linktree,Linktree,Social Media,Bio Links Aggregator,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Landing Page,No,0.96
+quora,Quora,Social Media,Knowledge Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.94
+tumblr,Tumblr,Social Media,Microblogging & Art,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Blog,No,0.94
+flickr,Flickr,Social Media,Photography Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile,No,0.95
+chess_com,Chess.com,Chess,Online Chess,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.99
+lichess,Lichess,Chess,Open Source Chess,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.99
+chessable,Chessable,Chess,Chess Education,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+chesstempo,Chess Tempo,Chess,Tactics & Training,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Forum,No,0.9
+365chess,365Chess,Chess,Chess Games Database,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Games Directory,No,0.88
+gameknot,GameKnot Chess,Chess,Correspondence Chess,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Member Directory,No,0.89
+redhotpawn,RedHotPawn Chess,Chess,Correspondence Chess,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.88
+fide_profile,FIDE International Chess Federation,Chess,Official Federation,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Official Ratings Directory,No,0.9
+steam,Steam Community,Gaming,PC Gaming,HTML_KEYWORD,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.94
+roblox,Roblox Player,Gaming,Metaverse Gaming,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+twitch,Twitch Interactive,Live Streaming,Gaming & Streaming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Streamer Page,No,0.94
+itch_io,Itch.io Indie Games,Gaming,Indie Games,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+speedrun_com,Speedrun.com,Gaming,Leaderboards & Records,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+nexusmods,Nexus Mods,Gaming,Game Modding,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Modder Showcase,No,0.9
+retroachievements,RetroAchievements,Gaming,Retro Emulation,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Community Web,No,0.91
+tracker_gg,Tracker Network (Tracker.gg),Gaming,Competitive Stats,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Esports Stats,No,0.88
+boardgamegeek,BoardGameGeek,Gaming,Tabletop & Boardgames,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Tabletop Community,No,0.92
+newgrounds,Newgrounds Creator,Gaming,Flash & Indie Games,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Portal,No,0.91
+kongregate,Kongregate,Gaming,Web Games,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+gamejolt,Game Jolt,Gaming,Indie Games Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Creator Showcase,No,0.89
+moddb,ModDB,Gaming,Modding & PC Gaming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Community Web,No,0.91
+osu_game,osu! Rhythm Game,Gaming,Rhythm Gaming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Player Profile,No,0.93
+namemc_minecraft,NameMC Minecraft,Gaming,Minecraft Profiles,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Skin & Handle Directory,No,0.94
+planetminecraft,Planet Minecraft,Gaming,Minecraft Creations,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Community Web,No,0.9
+gog,GOG Galaxy,Gaming,DRM-free Gaming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Gamer Profile,No,0.89
+armorgames,Armor Games,Gaming,Web Games,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.88
+faceit,FACEIT Esports,Gaming,Competitive League,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Esports Profile,No,0.89
+dotabuff,Dotabuff,Gaming,MOBA Esports,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Match Telemetry,No,0.87
+op_gg,OP.GG League of Legends,Gaming,MOBA Esports,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public MOBA Telemetry,No,0.88
+geoguessr,GeoGuessr Explorer,Gaming,Geography Game,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Gamer Profile,No,0.89
+pokemon_showdown,Pokemon Showdown,Gaming,Turn-based Battle,JSON_API,Metadata Extraction,Yes,Official Public Endpoint,No,0.93
+runescape_hiscores,Old School RuneScape Hiscores,Gaming,MMORPG,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Official Leaderboards,No,0.92
+hypixel_player,Hypixel Minecraft Network,Gaming,Minecraft Server,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Server Telemetry,No,0.91
+github,GitHub,Developer & Tech,Code Hosting & Collaboration,JSON_API,Metadata Extraction,Yes,Official REST API,No,0.99
+gitlab,GitLab,Developer & Tech,DevOps & Git,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+bitbucket,Bitbucket Cloud,Developer & Tech,Code Hosting,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.95
+dockerhub,DockerHub,Developer & Tech,Container Registry,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+hackernews,HackerNews,Developer & Tech,Tech News & Discussions,JSON_API,Metadata Extraction,Yes,Official Firebase REST API,No,0.98
+devto,Dev.to Community,Developer & Tech,Developer Blogging,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.95
+hashnode,Hashnode Tech Blog,Developer & Tech,Blogging Platform,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+kaggle,Kaggle AI & Data,Developer & Tech,Machine Learning & Data Science,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+codepen,CodePen,Developer & Tech,Frontend Playground,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Showcase,No,0.9
+replit,Replit,Developer & Tech,Cloud IDE & Coding,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+huggingface,Hugging Face AI,Developer & Tech,AI Models & Datasets,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+leetcode,LeetCode,Developer & Tech,Algorithms & Coding,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Problem Solving Profile,No,0.91
+hackerrank,HackerRank,Developer & Tech,Competitive Programming,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.94
+codeforces,Codeforces,Developer & Tech,Competitive Programming,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.97
+topcoder,Topcoder,Developer & Tech,Design & Algorithms,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.93
+atcoder,AtCoder,Developer & Tech,Competitive Programming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+sourceforge,SourceForge,Developer & Tech,Open Source Directory,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Open Source Showcase,No,0.91
+codeberg,Codeberg Git,Developer & Tech,Ethical Open Source Git,JSON_API,Metadata Extraction,Yes,Official Gitea REST API,No,0.97
+launchpad,Ubuntu Launchpad,Developer & Tech,Package & Bug Tracker,JSON_API,Metadata Extraction,Yes,Official Canonical REST API,No,0.96
+pastebin,Pastebin,Developer & Tech,Code Snippets,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Snippets Showcase,No,0.88
+glitch,Glitch Coding,Developer & Tech,Collaborative Apps,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.93
+jsfiddle,JSFiddle,Developer & Tech,Frontend Sandbox,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Code Showcase,No,0.89
+observable,Observable HQ,Developer & Tech,Data Visualization,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.94
+codewars,Codewars,Developer & Tech,Coding Katas,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.97
+exercism,Exercism,Developer & Tech,Mentored Programming,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Learning Showcase,No,0.91
+coderwall,Coderwall,Developer & Tech,Developer Badges,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.92
+scrimba,Scrimba Coding,Developer & Tech,Interactive Courses,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Student Showcase,No,0.89
+freecodecamp,freeCodeCamp,Developer & Tech,Learn to Code,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Certifications Web,No,0.91
+stackexchange,Stack Exchange Network,Developer & Tech,Q&A Network,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Q&A Profile,No,0.89
+openhub,Open Hub (Black Duck),Developer & Tech,Open Source Analytics,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Open Source Telemetry,No,0.91
+npm,npm Packages,Package Registries,Node.js JavaScript Packages,JSON_API,Metadata Extraction,Yes,Official npm Registry API,No,0.95
+pypi,PyPI Python Packages,Package Registries,Python Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Official PyPI Web,No,0.93
+crates_io,Crates.io Rust Packages,Package Registries,Rust Language Ecosystem,JSON_API,Metadata Extraction,Yes,Official Rust Registry API,No,0.97
+rubygems,RubyGems,Package Registries,Ruby Ecosystem,JSON_API,Metadata Extraction,Yes,Official RubyGems REST API,No,0.95
+packagist,Packagist Composer,Package Registries,PHP Ecosystem,JSON_API,Metadata Extraction,Yes,Official Packagist API,No,0.94
+clojars,Clojars Clojure,Package Registries,Clojure JVM Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Registry Web,No,0.9
+nuget,NuGet .NET Packages,Package Registries,.NET / C# Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Microsoft Registry,No,0.91
+cpan,CPAN MetaCPAN,Package Registries,Perl Ecosystem,JSON_API,Metadata Extraction,Yes,Official MetaCPAN REST API,No,0.96
+hex_pm,Hex.pm Erlang & Elixir,Package Registries,BEAM Ecosystem,JSON_API,Metadata Extraction,Yes,Official Hex.pm REST API,No,0.97
+pub_dev,Pub.dev Dart & Flutter,Package Registries,Dart & Flutter Ecosystem,JSON_API,Metadata Extraction,Yes,Official Dart Registry API,No,0.94
+cocoapods,CocoaPods Apple,Package Registries,iOS / macOS Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Apple Ecosystem,No,0.89
+ansible_galaxy,Ansible Galaxy,Package Registries,Infrastructure as Code,JSON_API,Metadata Extraction,Yes,Official Red Hat Ansible API,No,0.93
+youtube,YouTube Channel,Creator & Media,Video & Creator Hub,HTML_KEYWORD,Profile Existence Validation,No (URL Validation Only),Public Creator Channel,No,0.93
+vimeo,Vimeo Video Showcase,Creator & Media,High-Definition Video,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Portfolio Web,No,0.91
+dailymotion,Dailymotion,Creator & Media,Video Sharing,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.95
+rumble,Rumble Video,Creator & Media,Independent Video Hub,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Video Channel,No,0.89
+kick_streaming,Kick Live Streaming,Live Streaming,Live Broadcasts,JSON_API,Metadata Extraction,Yes,Public REST Endpoint,No,0.92
+soundcloud,SoundCloud Music,Music,Audio & Music Creator,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Audio Profile,No,0.91
+bandcamp,Bandcamp Artist,Music,Independent Music Sales,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Musician Showcase,No,0.9
+last_fm,Last.fm Music Scrobbler,Music,Music Listening History,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Scrobble Profile,No,0.92
+mixcloud,Mixcloud DJ & Radio,Music,DJ Mixes & Radio,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+audiomack,Audiomack Hip-Hop & Music,Music,Streaming & Downloads,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Music Profile,No,0.89
+patreon,Patreon Creator,Creator & Media,Crowdfunding & Memberships,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Creator Showcase,No,0.9
+kofi,Ko-fi Support Creators,Creator & Media,Micro-donations & Shop,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Supporter Page,No,0.91
+buymeacoffee,Buy Me a Coffee,Creator & Media,Creator Crowdfunding,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Supporter Page,No,0.9
+substack,Substack Newsletter,Newsletters,Independent Journalism & Essays,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Newsletter Domain,No,0.93
+medium,Medium Publication,Publishing,Articles & Thought Leadership,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Article Directory,No,0.9
+vocal_media,Vocal Media Storytellers,Publishing,Creative Writing,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Writer Showcase,No,0.89
+smule,Smule Social Karaoke,Music,Vocal Recordings,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Singer Profile,No,0.88
+podbean,Podbean Podcasts,Podcasting,Podcast Hosting,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Podcast Feed,No,0.9
+buzzsprout,Buzzsprout Podcasts,Podcasting,Podcast Directory,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Podcast Show,No,0.89
+reverbnation,ReverbNation Indie Artists,Music,Independent Musicians,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Music Network,No,0.88
+bluesky,Bluesky Social,Social Networks,Decentralized Social Network,JSON_API,Metadata Extraction,Yes,Official AT Protocol Public API,No,0.98
+mastodon_social,Mastodon (mastodon.social),Social Networks,Fediverse Microblogging,JSON_API,Metadata Extraction,Yes,Official Mastodon REST API,No,0.97
+reddit,Reddit Community,Social Networks,Social News & Forums,JSON_API,Metadata Extraction,Yes,Official Reddit JSON Endpoint,No,0.94
+threads,Meta Threads,Social Networks,Microblogging,HTML_KEYWORD,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.88
+pinterest,Pinterest Visual Discovery,Social Networks,Visual Bookmarking & Moodboards,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Pinboard Web,No,0.9
+tumblr,Tumblr Microblogging,Social Networks,Creative Blogging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Tumblr Domain,No,0.91
+snapchat,Snapchat Public Profile,Social Networks,Stories & Lenses,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.88
+telegram,Telegram Messenger,Messaging,Instant Messaging & Channels,HTML_KEYWORD,Profile Existence Validation,No (URL Validation Only),Public Telegram Preview,No,0.93
+keybase,Keybase Cryptographic Identity,Social Networks,Identity & PGP Verification,JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.98
+disqus,Disqus Comment Network,Social Networks,Comment Platform,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Discussion Network,No,0.9
+flickr,Flickr Photography,Photography,High-Res Photo Sharing,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Gallery Web,No,0.91
+deviantart,DeviantArt Studio,Design & Art,Digital Art & Illustration,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Artist Gallery,No,0.9
+500px,500px Photography,Photography,Professional Photography,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.94
+unsplash,Unsplash High-Res Photos,Photography,Free Stock Photography,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Contributor Profile,No,0.92
+vsco,VSCO Creative Journal,Photography,Artistic Photography & Film Filters,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Visual Journal,No,0.91
+artstation,ArtStation Portfolio,Design & Art,"Game, Film & Concept Art",JSON_API,Metadata Extraction,Yes,Official Public REST API,No,0.96
+behance,Behance Portfolio (Adobe),Design & Art,Graphic Design & Creative Fields,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Adobe Creative Showcase,No,0.92
+dribbble,Dribbble Designers,Design & Art,UI/UX & Product Design,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Designer Portfolio Network,No,0.91
+vkontakte,VKontakte (VK),Social Networks,Eurasian Social Network,HTML_KEYWORD,Profile Existence Validation,No (URL Validation Only),Public Russian Social Network,No,0.89
+plurk,Plurk Microblogging,Social Networks,Timeline Microblogging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Plurk Timeline,No,0.89
+duolingo,Duolingo Language Learner,Language Learning,Gamified Language Education,JSON_API,Metadata Extraction,Yes,Official Public API,No,0.98
+codecademy,Codecademy Learner,Education,Interactive Technical Skills,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Learner Showcase,No,0.91
+khan_academy,Khan Academy,Education,K-12 & University Learning,JSON_API,Metadata Extraction,Yes,Official Internal REST API,No,0.95
+quizlet,Quizlet Flashcards,Education,Study Sets & Flashcards,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Flashcards Web,No,0.89
+memrise,Memrise Vocabulary,Language Learning,Spaced Repetition Flashcards,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Student Profile,No,0.89
+typeracer,TypeRacer Typist,Education,Typing Speed Competition,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Racing Telemetry,No,0.92
+instructables,Instructables DIY,Hobbies & Lifestyle,Maker & Hardware DIY,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Autodesk Maker Showcase,No,0.91
+scratch_mit,Scratch (MIT Media Lab),Education,Visual Block Programming,JSON_API,Metadata Extraction,Yes,Official MIT Scratch API,No,0.97
+edx_org,edX Online Courses,Education,University Courses & MicroMasters,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Education Web,No,0.88
+sololearn,SoloLearn Mobile Coding,Education,Mobile Learning Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Coding Showcase,No,0.89
+letterboxd,Letterboxd Film Diary,Film & TV,Cinema Reviews & Lists,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Cinephile Diary,No,0.93
+goodreads,Goodreads Book Catalog,Books & Literature,Reading Lists & Book Reviews,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Amazon Goodreads Community,No,0.91
+myanimelist,MyAnimeList,Anime & Manga,Anime & Manga Catalog,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Anime Database,No,0.94
+anilist,AniList Anime & Manga,Anime & Manga,Modern Anime Tracker,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Tracker Web,No,0.93
+mangaupdates,MangaUpdates (Baka-Updates),Anime & Manga,Manga Scans & Release Directory,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Community Web,No,0.89
+trakt_tv,Trakt.tv TV & Movie Tracker,Film & TV,Media Scrobbling & Watchlists,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Scrobbler Showcase,No,0.92
+openlibrary,Open Library (Internet Archive),Books & Literature,Universal Book Catalog,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Internet Archive Public Web,No,0.91
+librarything,LibraryThing,Books & Literature,Personal Book Cataloging,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Book Catalog,No,0.9
+kitsu,Kitsu Anime Tracker,Anime & Manga,Social Anime Discovery,JSON_API,Metadata Extraction,Yes,Official JSON API,No,0.95
+discogs_community,Discogs Vinyl & CD Database,Music,Physical Music Discography,JSON_API,Metadata Extraction,Yes,Official Discogs REST API,No,0.95
+lobsters,Lobste.rs Computing,Forums & Communities,Curated Tech Community,JSON_API,Metadata Extraction,Yes,Official Lobste.rs JSON API,No,0.98
+producthunt,Product Hunt,Forums & Communities,New Tech Product Launches,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Maker Directory,No,0.91
+slashdot,Slashdot,Forums & Communities,News for Nerds,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Tech Discussion,No,0.9
+quora,Quora Q&A,Forums & Communities,General Knowledge Q&A,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Knowledge Network,No,0.88
+discourse_meta,Discourse Meta Community,Forums & Communities,Community Platform,JSON_API,Metadata Extraction,Yes,Official Discourse REST API,No,0.97
+wikipedia_users,Wikipedia User Page,Open Knowledge,Free Encyclopedia,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Wikimedia Foundation,No,0.92
+geocaching,Geocaching Global GPS Hunt,Hobbies & Lifestyle,Outdoor Real-world Treasure Hunt,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Groundspeak Geocaching,No,0.91
+alltrails,AllTrails Outdoor Maps,Sports & Fitness,Hiking & Trail Running,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Outdoor Showcase,No,0.9
+strava,Strava Athletics,Sports & Fitness,"Cycling, Running & GPS Tracking",STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Fitness Telemetry,No,0.91
+xda_developers,XDA Developers Forum,Forums & Communities,Android & Mobile Modding,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Mobile Community,No,0.91
+linktree,Linktree Link-in-Bio,Link in Bio,Unified Social Landing Page,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Link Aggregator,No,0.93
+carrd_co,Carrd Responsive Sites,Portfolios,Single-page Personal Websites,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Personal Domain,No,0.92
+about_me,About.me Personal Splash,Portfolios,Personal Profile Page,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Personal Showcase,No,0.9
+bio_link,Bio.link Creator Page,Link in Bio,Creator Hub,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Link Hub,No,0.91
+wellfound,Wellfound (AngelList),Professional & Career,Startup Jobs & Companies,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Startup Directory,No,0.89
+gravatar,Gravatar Globally Recognized Avatar,Public Directories,Universal Profile & Avatar,JSON_API,Metadata Extraction,Yes,Official Automattic REST API,No,0.97
+fiverr,Fiverr Freelance Services,Marketplaces & Commerce,Freelance Gig Marketplace,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Gig Marketplace,No,0.89
+gumroad,Gumroad Digital Store,Marketplaces & Commerce,Creator Commerce,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Creator Store,No,0.91
+etsy_shop,Etsy Handmade Marketplace,Marketplaces & Commerce,Crafts & Vintage Goods,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Crafts Store,No,0.9
+envato_market,Envato Market (ThemeForest),Marketplaces & Commerce,Web Themes & Code Assets,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Digital Asset Store,No,0.9
+polywork,Polywork Multidisciplinary Profile,Professional & Career,Collaboration & Skills,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Professional Showcase,No,0.89
+readcv,ReadCV Minimalist Resume,Portfolios,Interactive Resume,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Designer & Engineer CV,No,0.91
+peerlist,Peerlist Professional Network,Professional & Career,Tech Work Showcase,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Tech Network,No,0.92
+opensea,OpenSea NFT Marketplace,Crypto & Web3,Digital Collectibles & Art,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web3 Marketplace,No,0.89
+rarible,Rarible Community NFT,Crypto & Web3,Multichain NFTs,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web3 Showcase,No,0.88
+etherscan_name,Etherscan ENS Name / Account,Crypto & Web3,Blockchain Explorer,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Ethereum Ledger,No,0.89
+mirror_xyz,Mirror.xyz Web3 Publishing,Crypto & Web3,Decentralized Crowdfunding & Essays,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Arweave / Optimism Blog,No,0.9
+hackaday,Hackaday Hardware & Engineering,Hobbies & Lifestyle,Hardware Hacking & Electronics,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Maker Network,No,0.92
+hackster_io,Hackster.io Hardware Projects,Hobbies & Lifestyle,IoT & Embedded Systems,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Avnet Developer Community,No,0.91
+thingiverse,Thingiverse 3D Models,Hobbies & Lifestyle,3D Printing & CAD Designs,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),MakerBot 3D Directory,No,0.9
+printables,Printables (Prusa Research),Hobbies & Lifestyle,3D Printing Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Prusa 3D Printing Showcase,No,0.92
+untappd,Untappd Craft Beer Social,Hobbies & Lifestyle,Craft Beer Reviews & Venues,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Social Beverage Telemetry,No,0.89
+vivino,Vivino Wine Community,Hobbies & Lifestyle,Wine Reviews & Ratings,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Wine Showcase,No,0.88
+flightradar24,Flightradar24 Aviation Feeders,Hobbies & Lifestyle,Flight Tracking & ADS-B,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Flight Log,No,0.9
+komoot,Komoot Cycling & Hiking Route,Sports & Fitness,Outdoor Route Planning,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public GPS Route Showcase,No,0.91
+amino_apps,Amino Communities,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+cohost,Cohost Social,Social Networks,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+weibo,Sina Weibo,Regional & Niche,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+taringa,Taringa Latin America,Regional & Niche,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+mewe,MeWe Social,Social Networks,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+gab_ai,Gab Social,Social Networks,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+audius_music,Audius Decentralized Music,Music,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+castbox_fm,Castbox Podcasts,Podcasting,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+spreaker,Spreaker Radio,Podcasting,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+mix_com,Mix Content Curation,Social Networks,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+ello_co,Ello Art Community,Design & Art,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+couchsurfing,Couchsurfing Travel,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+flightaware,FlightAware Aviation,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+parkrun_results,Parkrun Athlete,Sports & Fitness,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+smash_gg_start,Start.gg Esports Tournaments,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+hltv_esports,HLTV Counter-Strike Hub,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+vimm_lair,Vimm's Lair Gaming,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+retro_achieve_forum,Retro Gamer Zone,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+tibia_char,Tibia MMORPG,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+habbo_hotel,Habbo Hotel Community,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+ravelry_knitting,Ravelry Fiber Arts,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+instructables_makers,Instructables Makers Contest,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+thingiverse_collections,Thingiverse Maker Collections,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+hackerearth,HackerEarth Developer,Developer & Tech,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+datacamp_learn,DataCamp Data Scientist,Developer & Tech,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+brilliant_org,Brilliant.org STEM,Education,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+treehouse_team,Team Treehouse Coding,Education,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+criticker_films,Criticker Movie Ratings,Film & TV,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+serializd_tv,Serializd TV Series Diary,Film & TV,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+tmdb_movies,TheMovieDB (TMDB),Film & TV,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+bookcrossing_books,BookCrossing Book Tracker,Books & Literature,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+anime_planet_tracker,Anime-Planet Otaku Tracker,Anime & Manga,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+tv_time_watch,TV Time Series Tracker,Film & TV,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+fandom_wikia_contributor,Fandom (Wikia) Contributor,Open Knowledge,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+openstreetmap_mappers,OpenStreetMap Mapper,Open Knowledge,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+flyertalk_travel,FlyerTalk Frequent Flyer,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+tripadvisor_reviews,TripAdvisor Traveler,Hobbies & Lifestyle,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+overclock_hardware,Overclock.net Hardware PC,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+linustech_community,Linus Tech Tips Forum,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+tomshardware_pc,Tom's Hardware PC Builder,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+bogleheads_invest,Bogleheads Financial Forum,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+avsforum_hometheater,AVS Forum Home Theater,Forums & Communities,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+gamefaqs_guides,GameFAQs Walkthroughs & Boards,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+ign_boards_gamer,IGN Boards Gamers,Gaming,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+freelancer_pro,Freelancer.com Talent,Marketplaces & Commerce,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+redbubble_shop,Redbubble Independent Artists,Marketplaces & Commerce,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+teepublic_design,TeePublic Artist Store,Marketplaces & Commerce,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+society6_home,Society6 Art & Decor,Marketplaces & Commerce,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+creative_market,Creative Market Assets,Marketplaces & Commerce,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+farcaster_warpcast,Farcaster Warpcast Web3,Crypto & Web3,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+superrare_nft,SuperRare Curated Digital Art,Crypto & Web3,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+foundation_app_art,Foundation Web3 Creator,Crypto & Web3,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+zora_creator,Zora Web3 Network,Crypto & Web3,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+magic_eden_solana,Magic Eden Solana NFT,Crypto & Web3,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+showwcase_developer,Showwcase Developer Community,Professional & Career,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+contra_independent,Contra Freelance Network,Professional & Career,Specialized Long-tail Community,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Web Profile,No,0.9
+hackthebox,Hack The Box,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+tryhackme,TryHackMe Cyber Labs,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+hackerone,HackerOne Bug Bounty,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+bugcrowd,Bugcrowd Security Researcher,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+intigriti,Intigriti Ethical Hackers,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+ctftime,CTFtime Competitive Security,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+root_me,Root-Me Hacking Challenges,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+wechall,WeChall Challenge Sites,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+picoctf,picoCTF Learning Platform,Developer & Tech,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+curseforge,CurseForge Mods & Addons,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+modrinth,Modrinth Open Source Mods,Gaming,Specialized Ecosystem,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.92
+spigotmc,SpigotMC Minecraft Dev,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+royalroad,Royal Road Web Fiction,Books & Literature,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+wattpad,Wattpad Stories & Books,Books & Literature,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+archiveofourown,Archive of Our Own (AO3),Books & Literature,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+fanfiction_net,FanFiction.Net Stories,Books & Literature,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+webtoons,Webtoon Comics & Creators,Books & Literature,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+anidb_net,AniDB Anime Database,Anime & Manga,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+vndb_org,VNDB Visual Novel Database,Anime & Manga,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+pixelfed_social,Pixelfed Decentralized Photos,Photography,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+peertube_tv,PeerTube Federated Video,Video,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+lemmy_world,Lemmy.world Fediverse Forum,Forums & Communities,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+qiita_tech,Qiita Japanese Tech Hub,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+zenn_dev_tech,Zenn.dev Japanese Devs,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+bilibili_tv,Bilibili Video & Creator,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+douban_movie,Douban Film & Books,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+zhihu_column,Zhihu Knowledge Column,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+hatena_id,Hatena Bookmark & Blog,Regional & Niche,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+r6tracker_stats,Rainbow Six Siege Tracker,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+apex_tracker_stats,Apex Legends Tracker,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+destiny_tracker,Destiny Tracker Guardian,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+rocketleague_stats,Rocket League Tracker,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+fortnite_tracker_stats,Fortnite Tracker Player,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+valorant_tracker_stats,Valorant Tracker Agent,Gaming,Specialized Ecosystem,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.92
+storygraph,The StoryGraph Books,Books & Literature,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+hardcover_books,Hardcover Book Tracker,Books & Literature,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bookwyrm_fediverse,BookWyrm (Fediverse Books),Books & Literature,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+cara_artists,Cara Art & Portfolio,Design & Art,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bento_me,Bento.me Personal Bio,Link in Bio,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+beacons_ai,Beacons.ai Creator Bio,Link in Bio,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+snipfeed,Snipfeed Monetization,Link in Bio,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+taplink_cc,Taplink Bio Links,Link in Bio,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+stan_store,Stan Store Creator Shop,Marketplaces & Commerce,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bear_blog,Bear Blog Minimalist,Blogging,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+mataroa_blog,Mataroa Minimalist Blog,Blogging,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+writeas_blog,Write.as Thoughtful Writing,Publishing,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+trailforks_bike,Trailforks Mountain Biking,Sports & Fitness,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+wikiloc_gps,Wikiloc GPS Outdoor Trails,Sports & Fitness,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+ridewithgps,Ride with GPS Cycling,Sports & Fitness,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+intervals_icu,Intervals.icu Endurance Analytics,Sports & Fitness,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+sourcehut,SourceHut Software Forge,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+libraries_io,Libraries.io Package Monitor,Package Registries,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93
+arch_aur_users,Arch Linux AUR Maintainer,Package Registries,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+debian_contributors,Debian Project Contributor,Open Knowledge,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+fedora_packagers,Fedora Linux Packager,Package Registries,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+uschess_ratings,US Chess Federation (USCF),Chess,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+ecf_chess_ratings,English Chess Federation (ECF),Chess,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+warframe_market_trader,Warframe Market Trader,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+roblox_trade,Rolimons Roblox Trader,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+speedrun_guides_author,Speedrun Game Guides,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+osu_beatmap_creators,osu! Beatmap Mapper,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+boardgamegeek_collection_user,BoardGameGeek Collection,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+letterboxd_lists,Letterboxd Film Lists,Film & TV,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+trakt_history_user,Trakt.tv History Stream,Film & TV,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+myanimelist_favorites,MyAnimeList Favorites,Anime & Manga,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+anilist_activity,AniList Community Activity,Anime & Manga,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+archiveofourown_works,AO3 Published Works,Books & Literature,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+webtoons_series,Webtoons Comic Series,Books & Literature,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+pixelfed_art_showcase,Pixelfed Art Showcase,Photography,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+cara_app_gallery,Cara Creator Gallery,Design & Art,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+lemmy_ml_community,Lemmy.ml Open Discussion,Forums & Communities,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+discourse_org_community,Discourse Foundation,Forums & Communities,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+mastodon_art_gallery,Mastodon Art Community,Design & Art,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bluesky_directory_actor,Bluesky Directory Search,Social Networks,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+hackerone_hackers,HackerOne Public Directory,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bugcrowd_hall_of_fame,Bugcrowd Hall of Fame,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+intigriti_leaderboard,Intigriti Leaderboard Rank,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+ctftime_teams,CTFtime Team Association,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+root_me_stats,Root-Me Challenges Solved,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+wechall_profiles,WeChall Challenge Profiles,Developer & Tech,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+curseforge_creators,CurseForge Creator Studio,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+modrinth_author_mods,Modrinth Released Mods,Gaming,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93
+spigotmc_plugins,SpigotMC Plugin Author,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+planetminecraft_maps,Planet Minecraft World Maps,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+namemc_server_staff,NameMC Server Profile,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+steam_inventory_showcase,Steam Inventory Showcase,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+steam_badges_showcase,Steam Badges & Level,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+itch_io_devlog,Itch.io Developer Logs,Gaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+bandcamp_discography,Bandcamp Discography & Vinyl,Music,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+last_fm_top_artists,Last.fm Top Artists Telemetry,Music,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+soundcloud_tracks,SoundCloud Track Catalog,Music,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+kick_vods,Kick VOD Recordings,Live Streaming,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+vimeo_portfolio_showcase,Vimeo Cinema Portfolio,Creator & Media,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+youtube_community_tab,YouTube Creator Posts,Creator & Media,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+patreon_tiers,Patreon Membership Tiers,Creator & Media,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+substack_archive,Substack Newsletter Archive,Newsletters,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+medium_stories,Medium Author Articles,Publishing,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+linktree_socials,Linktree External Destinations,Link in Bio,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+carrd_portfolio,Carrd Interactive Showcase,Portfolios,Specialized Deep Extraction,STATUS_CODE,Profile Existence Validation,No (URL Validation Only),Public Profile Web,No,0.93
+github_repositories,GitHub Repositories Showcase,Developer & Tech,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93
+gitlab_projects,GitLab Public Projects,Developer & Tech,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93
+chess_com_tournaments,Chess.com Tournament History,Chess,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93
+lichess_activity,Lichess Games & Puzzles,Chess,Specialized Deep Extraction,JSON_API,Metadata Extraction,Yes,Public Profile Web,No,0.93

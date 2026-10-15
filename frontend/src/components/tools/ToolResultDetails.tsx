@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { StatusBadge } from '../common/StatusBadge';
 import { Button } from '../ui/Button';
-import { CheckCircle2, AlertTriangle, Clock, RefreshCw, Copy, Check, ExternalLink, Play, Video } from 'lucide-react';
+import {
+  CheckCircle2, AlertTriangle, Clock, RefreshCw, Copy, Check,
+  ExternalLink, Play, Video, UserCheck, ShieldCheck, Database, FileText
+} from 'lucide-react';
+import { apiRequest } from '../../core/api/client';
 
 export interface ToolResultDetailsProps {
   result: {
@@ -28,11 +32,39 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [refreshingIdx, setRefreshingIdx] = useState<number | null>(null);
+  const [refreshedItems, setRefreshedItems] = useState<Record<number, any>>({});
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRefreshProfile = async (platformId: string, username: string, idx: number) => {
+    setRefreshingIdx(idx);
+    try {
+      const res = await apiRequest<{ status: string; result: any; changes: any[] }>(
+        '/tools/profile/refresh',
+        {
+          method: 'POST',
+          body: JSON.stringify({ platform_id: platformId.toLowerCase(), username }),
+        }
+      );
+      if (res && res.result) {
+        setRefreshedItems((prev) => ({
+          ...prev,
+          [idx]: {
+            ...res.result,
+            changes: res.changes,
+          },
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to refresh profile:', err);
+    } finally {
+      setRefreshingIdx(null);
+    }
   };
 
   const isSuccess = result.status === 'SUCCESS';
@@ -118,24 +150,45 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
 
           <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-card overflow-hidden">
             {result.results.map((item, idx) => {
-              const avatar = item.metadata?.avatar_url || item.metadata?.image_url || item.metadata?.thumbnail_url || item.metadata?.hero_image;
-              const profileUrl = item.metadata?.profile_url || item.metadata?.watch_url || item.metadata?.url;
-              const isVideo = item.metadata?.is_video || item.type === 'VIDEO';
-              const embedUrl = item.metadata?.embed_url;
-              const platform = item.metadata?.platform;
+              const refreshed = refreshedItems[idx];
+              const meta = refreshed ? { ...item.metadata, ...refreshed } : item.metadata;
+              const avatar = meta?.avatar_url || meta?.image_url || meta?.thumbnail_url || meta?.hero_image;
+              const profileUrl = meta?.profile_url || meta?.canonical_url || meta?.watch_url || meta?.url;
+              const isVideo = meta?.is_video || item.type === 'VIDEO';
+              const embedUrl = meta?.embed_url;
+              const platform = meta?.platform || meta?.platform_id;
+              const extractionStatus = meta?.status || (meta?.is_metadata_extracted ? 'METADATA_EXTRACTED' : 'PROFILE_VALIDATED');
+              const bio = meta?.bio || meta?.description;
+              const displayName = meta?.display_name || meta?.name;
+              const fieldsExtracted = meta?.fields_extracted || [];
 
               return (
-                <div key={idx} className="p-3.5 text-xs space-y-2 hover:bg-muted/20 transition-colors">
+                <div key={idx} className="p-3.5 text-xs space-y-2.5 hover:bg-muted/20 transition-colors">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {platform && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary uppercase">
                           {platform}
                         </span>
                       )}
                       <span className="font-semibold text-foreground">
-                        {item.metadata?.title || item.title || item.type || `Record #${idx + 1}`}
+                        {displayName || item.metadata?.title || item.title || item.type || `Record #${idx + 1}`}
                       </span>
+                      {extractionStatus && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold ${
+                            extractionStatus === 'METADATA_EXTRACTED'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : extractionStatus === 'PARTIAL_EXTRACTION'
+                              ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                              : extractionStatus === 'CONFIG_REQUIRED'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              : 'bg-muted text-muted-foreground border border-border/60'
+                          }`}
+                        >
+                          {extractionStatus}
+                        </span>
+                      )}
                     </div>
                     {item.severity && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">
@@ -150,7 +203,7 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
                         <img
                           src={avatar}
                           alt="Extracted Media"
-                          className={isVideo ? "w-24 h-16 rounded-lg object-cover border border-border" : "w-10 h-10 rounded-xl object-cover border border-border"}
+                          className={isVideo ? "w-24 h-16 rounded-lg object-cover border border-border" : "w-11 h-11 rounded-xl object-cover border border-border"}
                           onError={(e) => {
                             (e.target as any).style.display = 'none';
                           }}
@@ -163,21 +216,62 @@ export const ToolResultDetails: React.FC<ToolResultDetailsProps> = ({
                       </div>
                     )}
                     <div className="flex-1 min-w-0 space-y-1">
+                      {bio && (
+                        <p className="text-foreground/90 text-xs leading-relaxed bg-muted/20 p-2 rounded border border-border/40">
+                          {bio}
+                        </p>
+                      )}
                       {item.value && (
-                        <p className="font-mono text-muted-foreground break-all">
+                        <p className="font-mono text-muted-foreground break-all text-[11px]">
                           {item.value}
                         </p>
                       )}
-                      {profileUrl && (
-                        <div className="pt-1">
+
+                      {/* Fields Extracted Chips */}
+                      {fieldsExtracted.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap pt-1">
+                          <span className="text-[10px] text-muted-foreground font-mono">Parsed:</span>
+                          {fieldsExtracted.map((f: string, fIdx: number) => (
+                            <span key={fIdx} className="px-1.5 py-0.2 rounded text-[9px] bg-secondary text-secondary-foreground font-mono">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-1">
+                        {profileUrl && (
                           <a
                             href={profileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-sans text-primary hover:underline font-medium"
+                            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium"
                           >
-                            {isVideo ? "Open YouTube Video" : "Open Public Profile"} <ExternalLink className="w-3 h-3" />
+                            {isVideo ? "Open YouTube Video" : "Open Public Source"} <ExternalLink className="w-3 h-3" />
                           </a>
+                        )}
+                        {platform && result.target && (
+                          <button
+                            type="button"
+                            disabled={refreshingIdx === idx}
+                            onClick={() => handleRefreshProfile(platform, result.target, idx)}
+                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground hover:underline font-mono"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${refreshingIdx === idx ? 'animate-spin' : ''}`} />
+                            {refreshingIdx === idx ? 'Refreshing...' : 'Live Refresh'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Refreshed change alert */}
+                      {refreshed?.changes && refreshed.changes.length > 0 && (
+                        <div className="mt-2 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300">
+                          <span className="font-semibold">Recent Changes Detected: </span>
+                          {refreshed.changes.map((c: any, cIdx: number) => (
+                            <span key={cIdx} className="mr-2">
+                              {c.field_name}: {String(c.previous_value)} → {String(c.new_value)}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>

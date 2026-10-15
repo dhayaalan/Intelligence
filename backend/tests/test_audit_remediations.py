@@ -184,3 +184,26 @@ def test_news_wire_syndication_classification():
     assert syn_type == "INDEPENDENT"
     assert wire_orig is None
     assert is_ind is True
+
+
+def test_health_and_readiness_endpoints(client):
+    """Verify /health, /health/live, and /health/ready endpoints."""
+    # 1. Health
+    res = client.get("/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "healthy"
+    assert "modules_registered" in data
+
+    # 2. Liveness
+    res_live = client.get("/health/liveness")
+    assert res_live.status_code == 200
+    assert res_live.json()["status"] == "alive"
+
+    # 3. Readiness
+    res_ready = client.get("/health/readiness")
+    assert res_ready.status_code in [200, 503]
+    ready_data = res_ready.json()
+    assert "database" in ready_data
+    assert "modules_registered" in ready_data
+
