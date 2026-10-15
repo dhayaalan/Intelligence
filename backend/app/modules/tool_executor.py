@@ -156,6 +156,16 @@ class ToolExecutor:
                 res = await self._run_zap_active_scan(exec_id, tool_id, cleaned_target)
             elif tool_id in ["tool_zap_spider", "zap_spider", "tool_zap_crawler"]:
                 res = await self._run_zap_spider(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_wayback", "wayback", "wayback_cdx"]:
+                res = await self._run_wayback_cdx(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_urlscan", "urlscan"]:
+                res = await self._run_urlscan(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_opensanctions", "opensanctions", "sanctions"]:
+                res = await self._run_opensanctions(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_threatfox", "threatfox", "abusech"]:
+                res = await self._run_threatfox(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_nvd_cve", "nvd_cve"]:
+                res = await self._run_nvd_cve(exec_id, tool_id, cleaned_target)
             # Commercial / API-Key Required Tools
             elif tool_id in ["tool_shodan", "shodan"]:
                 res = await self._run_shodan(exec_id, tool_id, cleaned_target)
@@ -1708,11 +1718,223 @@ class ToolExecutor:
         except ValueError:
             pass
 
-        loop = asyncio.get_event_loop()
-        try:
-            return await loop.run_in_executor(None, socket.gethostbyname, domain)
-        except Exception:
-            return None
+    async def _run_wayback_cdx(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """Internet Archive Wayback Machine historical URL snapshots."""
+        from app.modules.osint.providers.wayback_cdx import WaybackCDXProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = WaybackCDXProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="domain"))
+        results: List[NormalizedResult] = []
+
+        raw_snapshots = resp.raw_data.get("snapshots", []) if resp.raw_data else []
+        for snap in raw_snapshots[:20]:
+            results.append(
+                NormalizedResult(
+                    id=f"wayback_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="ARCHIVED_SNAPSHOT",
+                    target=target,
+                    value=f"{snap.get('original_url')} (Status: {snap.get('status_code')})",
+                    source="Internet Archive Wayback Machine",
+                    confidence=0.90,
+                    severity="INFO",
+                    metadata=snap,
+                    raw_result=snap
+                )
+            )
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS" if resp.status == "success" else "FAILED",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=f"Discovered {len(results)} historical Wayback Machine snapshots for {target}",
+            error=resp.error
+        )
+
+    async def _run_urlscan(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """urlscan.io historical scans and technologies discovery."""
+        from app.modules.osint.providers.urlscan import URLScanProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = URLScanProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="domain"))
+        results: List[NormalizedResult] = []
+
+        raw_results = resp.raw_data.get("results", []) if resp.raw_data else []
+        for r in raw_results[:20]:
+            page = r.get("page", {})
+            ip = page.get("ip", "")
+            server = page.get("server", "")
+            title = page.get("title", "")
+            url = page.get("url", target)
+            summary_val = f"{url} | IP: {ip} | Server: {server}"
+            if title:
+                summary_val += f" | Title: {title[:40]}"
+
+            results.append(
+                NormalizedResult(
+                    id=f"urlscan_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="URL_SCAN",
+                    target=target,
+                    value=summary_val,
+                    source="urlscan.io",
+                    confidence=0.92,
+                    severity="INFO",
+                    metadata={
+                        "scan_id": r.get("_id"),
+                        "page": page,
+                        "task": r.get("task", {}),
+                        "screenshot": r.get("screenshot"),
+                        "result_url": r.get("result")
+                    },
+                    raw_result=r
+                )
+            )
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS" if resp.status == "success" else "FAILED",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=f"Found {len(results)} urlscan.io historical scans and observations for {target}",
+            error=resp.error
+        )
+
+    async def _run_opensanctions(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """OpenSanctions PEP, sanctions, and entity watchlists matching."""
+        from app.modules.osint.providers.opensanctions import OpenSanctionsProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = OpenSanctionsProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="name"))
+        results: List[NormalizedResult] = []
+
+        raw_matches = resp.raw_data.get("matches", []) if resp.raw_data else []
+        for m in raw_matches[:20]:
+            caption = m.get("caption") or target
+            schema = m.get("schema", "Entity")
+            score = m.get("score", 0.0)
+            topics = ", ".join(m.get("topics", []))
+            datasets = ", ".join(m.get("datasets", []))
+            val = f"{caption} [{schema}] - Score: {score:.2f}"
+            if topics:
+                val += f" | Topics: {topics}"
+            if datasets:
+                val += f" | Datasets: {datasets}"
+
+            results.append(
+                NormalizedResult(
+                    id=f"sanctions_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="SANCTION_RECORD",
+                    target=target,
+                    value=val,
+                    source="OpenSanctions Community Database",
+                    confidence=round(float(score), 2) if score else 0.85,
+                    severity="HIGH" if any(t in ["sanction", "debarment"] for t in m.get("topics", [])) else "MEDIUM",
+                    metadata=m,
+                    raw_result=m
+                )
+            )
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS" if resp.status == "success" else "FAILED",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=f"Matched {len(results)} OpenSanctions records for {target}",
+            error=resp.error
+        )
+
+    async def _run_threatfox(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """abuse.ch ThreatFox IOC, malware family, and C2 intelligence."""
+        from app.modules.threat_intelligence.providers.threatfox import ThreatFoxProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = ThreatFoxProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="ioc"))
+        results: List[NormalizedResult] = []
+
+        raw_iocs = resp.raw_data.get("iocs", []) if resp.raw_data else []
+        for ioc in raw_iocs[:20]:
+            ioc_val = ioc.get("ioc_value") or target
+            threat_type = ioc.get("threat_type_desc") or ioc.get("threat_type", "IOC")
+            malware = ioc.get("malware_printable") or ioc.get("malware", "Unknown Malware")
+            conf = float(ioc.get("confidence_level", 75)) / 100.0
+
+            results.append(
+                NormalizedResult(
+                    id=f"threatfox_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="IOC",
+                    target=target,
+                    value=f"{ioc_val} | Threat: {threat_type} | Malware: {malware}",
+                    source="abuse.ch ThreatFox",
+                    confidence=conf,
+                    severity="CRITICAL" if conf >= 0.8 else "HIGH",
+                    metadata=ioc,
+                    raw_result=ioc
+                )
+            )
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS" if resp.status == "success" else "FAILED",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=f"Found {len(results)} abuse.ch ThreatFox IOC matches for {target}",
+            error=resp.error
+        )
+
+    async def _run_nvd_cve(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """NIST NVD CVE API 2.0 authoritative vulnerability lookup."""
+        from app.modules.threat_intelligence.providers.nvd_cve import NVDVulnerabilityProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = NVDVulnerabilityProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="cve"))
+        results: List[NormalizedResult] = []
+
+        raw_cves = resp.raw_data.get("vulnerabilities", []) if resp.raw_data else []
+        for v in raw_cves[:20]:
+            cve_id = v.get("cve_id", target)
+            severity = v.get("severity", "MEDIUM")
+            cvss = v.get("cvss_score")
+            desc = v.get("description", "")
+            cvss_str = f"CVSS {cvss}" if cvss is not None else ""
+            val = f"{cve_id} [{severity} {cvss_str}]: {desc[:80]}"
+
+            results.append(
+                NormalizedResult(
+                    id=f"nvd_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="VULNERABILITY",
+                    target=target,
+                    value=val,
+                    source="NIST National Vulnerability Database (NVD)",
+                    confidence=0.98,
+                    severity=severity.upper() if severity else "MEDIUM",
+                    metadata=v,
+                    raw_result=v
+                )
+            )
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS" if resp.status == "success" else "FAILED",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=f"Found {len(results)} authoritative NIST NVD CVE records for {target}",
+            error=resp.error
+        )
 
     def _record_history(self, response: ToolExecutionResponse, user: Optional[UserRecord]):
         record = {

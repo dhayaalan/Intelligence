@@ -7,7 +7,7 @@ THREAT_INTEL_MANIFEST = ModuleManifest(
     description="Proactive cybersecurity intelligence, threat indicator enrichment, vulnerability assessment, and attack surface analytics.",
     capabilities=["search", "enrichment", "threat_assessment", "vulnerability_intel"],
     permissions=["search", "view_results"],
-    providers=["dns_intel", "host_discovery", "service_discovery", "zap_scanner", "vulnerability_intel", "ioc_feed", "tls_inspector", "web_crawler"],
+    providers=["dns_intel", "host_discovery", "service_discovery", "zap_scanner", "vulnerability_intel", "ioc_feed", "tls_inspector", "web_crawler", "threatfox", "nvd_cve"],
     configuration_schema=[
         ModuleConfigField(
             key="zap_api_endpoint",

@@ -40,7 +40,11 @@ class SearchOrchestrator:
         # 2. Scope-based module mapping
         selected_scopes = request.selected_scopes or ["ALL INTELLIGENCE"]
         all_registered_module_ids = module_registry.list_modules()
-        extra_pluggable_modules = [m for m in all_registered_module_ids if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]]
+        extra_pluggable_modules = [
+            m for m in all_registered_module_ids
+            if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]
+            and module_registry.is_module_enabled(m)
+        ]
 
         all_core_mods = ["osint", "news_intelligence", "social_media_intelligence"]
         if is_technical:

@@ -96,7 +96,7 @@ class ExampleModule(IntelligenceModule):
         exec_id = f"exec_ex_{uuid.uuid4().hex[:8]}"
 
         resp = await self._providers["example_verifier"].execute(
-            ProviderRequest(query=context.query, target_type=context.target_type)
+            ProviderRequest(query=context.query, target_type=context.target_type or "domain")
         )
 
         entities = [
@@ -104,7 +104,8 @@ class ExampleModule(IntelligenceModule):
                 entity_type=EntityType.ORGANIZATION,
                 value=f"Verified Organization for {context.query}",
                 confidence=0.99,
-                sources=["example_intelligence"]
+                sources=["example_intelligence"],
+                metadata={"is_synthetic": True, "plugin_demonstration": True}
             )
         ]
 
@@ -113,7 +114,7 @@ class ExampleModule(IntelligenceModule):
             provider="example_verifier",
             module=self.module_id,
             raw_data=resp.raw_data,
-            reference=f"Target: {context.query}"
+            reference=f"Target: {context.query} [TEST FIXTURE ONLY]"
         )
 
         duration = round((time.time() - start_time) * 1000, 2)

@@ -64,12 +64,27 @@ class TestIntelligenceModule(IntelligenceModule):
         start_time = time.time()
         exec_id = f"exec_test_{uuid.uuid4().hex[:8]}"
         
+        from app.core.config import settings
+        # Strict isolation: Synthetic test modules are strictly disabled from producing findings in production
+        if settings.APP_ENV.lower() in ["production", "prod"]:
+            return NormalizedModuleResult(
+                module=self.module_id,
+                execution_id=exec_id,
+                status="skipped",
+                entities=[],
+                relationships=[],
+                evidence=[],
+                sources=["test_intelligence"],
+                duration_ms=0.0
+            )
+
         entities = [
             ModuleSDK.create_entity(
                 entity_type=EntityType.ORGANIZATION,
-                value=f"Verified Organization for {context.query}",
-                confidence=0.99,
-                sources=["test_intelligence"]
+                value=f"Test Fixture (Isolated): {context.query}",
+                confidence=0.10,
+                sources=["test_intelligence"],
+                metadata={"is_synthetic": True, "test_fixture": True}
             )
         ]
         
@@ -77,8 +92,8 @@ class TestIntelligenceModule(IntelligenceModule):
             source="TestIntelligence - mock_verifier",
             provider="mock_verifier",
             module=self.module_id,
-            raw_data={"verification_status": "Passed", "target": context.query},
-            reference=f"Target: {context.query}"
+            raw_data={"verification_status": "Passed (Synthetic)", "target": context.query, "is_synthetic": True},
+            reference=f"Target: {context.query} [TEST FIXTURE ONLY]"
         )
         
         duration = round((time.time() - start_time) * 1000, 2)

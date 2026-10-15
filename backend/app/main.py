@@ -47,8 +47,10 @@ async def startup_event():
     module_registry.register(threat_intelligence_module, default_enabled=True)
     module_registry.register(news_intelligence_module, default_enabled=True)
     module_registry.register(social_media_intelligence_module, default_enabled=True)
-    module_registry.register(example_module, default_enabled=True)
-    module_registry.register(test_intelligence_module, default_enabled=True)
+    # Test and demonstration plugins are registered disabled by default
+    # to prevent synthetic or mocked data contamination in production searches
+    module_registry.register(example_module, default_enabled=False)
+    module_registry.register(test_intelligence_module, default_enabled=False)
     
     # 2. Bootstrap Secure Super Admin only (NO fake business data, NO demo tenants)
     await bootstrap_super_admin()

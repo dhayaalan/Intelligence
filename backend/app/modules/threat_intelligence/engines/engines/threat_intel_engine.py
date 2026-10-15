@@ -9,15 +9,8 @@ from app.modules.threat_intelligence.engines.base import (
     NormalizedEngineResult,
     NormalizedFinding
 )
-try:
-    from app.core.database import db as store
-except Exception:
-    class DummyStore:
-        ti_threat_actors = {}
-        ti_malware = {}
-        ti_campaigns = {}
-        ti_vulnerabilities = {}
-    store = DummyStore()
+from app.core.database import db as memory_store
+from app.infrastructure.mongodb.client import mongo_manager
 
 
 
@@ -80,24 +73,48 @@ class ThreatIntelligenceCorrelationEngine(ScannerEngine):
         # Indicators passed from previous pipeline stages
         prior_indicators = context.get("indicators", [])
 
-        # Match against threat actors in store
-        for actor in getattr(store, "ti_threat_actors", {}).values():
+        # Retrieve threat data from MongoDB collections or fallback to memory store
+        threat_actors = []
+        malware_items = []
+        campaign_items = []
+        vulnerabilities = []
+
+        if mongo_manager.sync_db is not None:
+            try:
+                threat_actors = list(mongo_manager.sync_db["ti_threat_actors"].find({}))
+                malware_items = list(mongo_manager.sync_db["ti_malware"].find({}))
+                campaign_items = list(mongo_manager.sync_db["ti_campaigns"].find({}))
+                vulnerabilities = list(mongo_manager.sync_db["ti_vulnerabilities"].find({}))
+            except Exception:
+                pass
+
+        if not threat_actors and hasattr(memory_store, "ti_threat_actors"):
+            threat_actors = list(memory_store.ti_threat_actors.values())
+        if not malware_items and hasattr(memory_store, "ti_malware"):
+            malware_items = list(memory_store.ti_malware.values())
+        if not campaign_items and hasattr(memory_store, "ti_campaigns"):
+            campaign_items = list(memory_store.ti_campaigns.values())
+        if not vulnerabilities and hasattr(memory_store, "ti_vulnerabilities"):
+            vulnerabilities = list(memory_store.ti_vulnerabilities.values())
+
+        # Match against threat actors
+        for actor in threat_actors:
             infra = [str(inf).lower() for inf in actor.get("infrastructure_indicators", [])]
             if t_clean in infra or any(i.get("value", "").lower() in infra for i in prior_indicators):
                 matched_actors.append(actor)
 
-        # Match against malware in store
-        for mal in getattr(store, "ti_malware", {}).values():
+        # Match against malware
+        for mal in malware_items:
             if t_clean in str(mal).lower() or any(i.get("value", "").lower() in str(mal).lower() for i in prior_indicators):
                 matched_malware.append(mal)
 
-        # Match against campaigns in store
-        for camp in getattr(store, "ti_campaigns", {}).values():
+        # Match against campaigns
+        for camp in campaign_items:
             if t_clean in str(camp).lower():
                 matched_campaigns.append(camp)
 
-        # Match against vulnerabilities in store or CISA KEV
-        for vuln in getattr(store, "ti_vulnerabilities", {}).values():
+        # Match against vulnerabilities
+        for vuln in vulnerabilities:
             if t_clean in str(vuln).lower():
                 matched_vulnerabilities.append(vuln)
 

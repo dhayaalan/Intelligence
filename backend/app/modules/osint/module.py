@@ -25,6 +25,9 @@ from app.modules.osint.providers.image_engine import ImageOSINTProvider
 from app.modules.osint.providers.username_recon import UsernameReconProvider
 from app.modules.osint.providers.marketplace_recon import MarketplaceReconProvider
 from app.modules.osint.providers.financial_intel import FinancialIntelProvider
+from app.modules.osint.providers.wayback_cdx import WaybackCDXProvider
+from app.modules.osint.providers.urlscan import URLScanProvider
+from app.modules.osint.providers.opensanctions import OpenSanctionsProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -55,7 +58,10 @@ class OsintModule(IntelligenceModule):
             ("image_osint", ImageOSINTProvider(), "IMAGE_METADATA", ["image", "exif", "person"], ["image", "url", "person"]),
             ("username_recon", UsernameReconProvider(), "SOCIAL_IDENTITY", ["username", "handle", "person", "email"], ["username", "handle", "person"]),
             ("marketplace_recon", MarketplaceReconProvider(), "MARKETPLACE_INTEL", ["product", "asin", "marketplace", "url"], ["product", "url", "asin"]),
-            ("financial_intel", FinancialIntelProvider(), "FINANCIAL_INTEL", ["company", "organization", "bank", "lei", "cik"], ["organization", "company", "bank", "lei", "cik", "domain"])
+            ("financial_intel", FinancialIntelProvider(), "FINANCIAL_INTEL", ["company", "organization", "bank", "lei", "cik"], ["organization", "company", "bank", "lei", "cik", "domain"]),
+            ("wayback_cdx", WaybackCDXProvider(), "ARCHIVE_INTEL", ["snapshots", "historical_urls", "archives"], ["domain", "url", "hostname"]),
+            ("urlscan", URLScanProvider(), "WEB_INTEL", ["historical_scans", "technologies", "screenshots", "ip"], ["domain", "url", "ip", "hostname"]),
+            ("opensanctions", OpenSanctionsProvider(), "COMPLIANCE_WATCHLIST", ["sanctions", "pep", "debarment", "crime"], ["person", "organization", "company", "keyword", "username"])
         ]
 
         for pid, provider, category, caps, targets in primary_providers:

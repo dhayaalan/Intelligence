@@ -1,4 +1,13 @@
 import pytest
+import httpx
+
+# Compatibility patch for httpx >= 0.28.0 with Starlette 0.27 TestClient
+_orig_httpx_client_init = httpx.Client.__init__
+def _compat_httpx_client_init(self, *args, **kwargs):
+    kwargs.pop("app", None)
+    return _orig_httpx_client_init(self, *args, **kwargs)
+httpx.Client.__init__ = _compat_httpx_client_init
+
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.security import create_access_token, get_password_hash
@@ -18,8 +27,8 @@ def init_app():
     module_registry.register(threat_intelligence_module, default_enabled=True)
     module_registry.register(news_intelligence_module, default_enabled=True)
     module_registry.register(social_media_intelligence_module, default_enabled=True)
-    module_registry.register(test_intelligence_module, default_enabled=True)
-    module_registry.register(example_module, default_enabled=True)
+    module_registry.register(test_intelligence_module, default_enabled=False)
+    module_registry.register(example_module, default_enabled=False)
     
     # In-memory test tenant fixtures strictly for pytest isolated unit runs
     with db._lock:

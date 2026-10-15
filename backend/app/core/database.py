@@ -22,6 +22,10 @@ class DataStore:
         self.news_articles: Dict[str, Dict[str, Any]] = {}
         self.audit_logs: List[Dict[str, Any]] = []
         self.module_configs: Dict[str, Dict[str, Any]] = {} # keyed by (tenant_id, module_id)
+        self.ti_threat_actors: Dict[str, Dict[str, Any]] = {}
+        self.ti_malware: Dict[str, Dict[str, Any]] = {}
+        self.ti_campaigns: Dict[str, Dict[str, Any]] = {}
+        self.ti_vulnerabilities: Dict[str, Dict[str, Any]] = {}
 
     def clear(self):
         with self._lock:
@@ -40,5 +44,9 @@ class DataStore:
             self.news_articles.clear()
             self.audit_logs.clear()
             self.module_configs.clear()
+            self.ti_threat_actors.clear()
+            self.ti_malware.clear()
+            self.ti_campaigns.clear()
+            self.ti_vulnerabilities.clear()
 
 db = DataStore()

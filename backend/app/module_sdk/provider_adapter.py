@@ -5,7 +5,7 @@ from app.module_sdk.models import HealthCheckResult, NormalizedModuleResult, Sea
 
 class ProviderRequest(BaseModel):
     query: str
-    target_type: str
+    target_type: str = "general"
     config: Dict[str, Any] = {}
     options: Dict[str, Any] = {}
 

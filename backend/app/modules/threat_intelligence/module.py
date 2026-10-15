@@ -15,6 +15,10 @@ from app.modules.threat_intelligence.manifest import THREAT_INTEL_MANIFEST
 from app.modules.threat_intelligence.normalization.normalizer import threat_normalizer
 from app.modules.threat_intelligence.engines.registry import ScannerRegistry
 from app.modules.threat_intelligence.scanner_adapter import ThreatIntelEngineAdapter
+from app.modules.threat_intelligence.providers.threatfox import ThreatFoxProvider
+from app.modules.threat_intelligence.providers.nvd_cve import NVDVulnerabilityProvider
+from app.modules.threat_intelligence.providers.vulnerability_intel import VulnerabilityIntelProvider
+from app.modules.threat_intelligence.providers.ioc_feed import IOCFeedProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -24,17 +28,17 @@ logger = logging.getLogger("sential.threat_intelligence")
 class ThreatIntelligenceModule(IntelligenceModule):
     """
     Independent Threat Intelligence Module conforming strictly to the IntelligenceModule contract.
-    Orchestrates all 33 specialized security & threat scanner engines without hardcoded Core logic.
+    Orchestrates all 33 specialized security & threat scanner engines plus authoritative threat feeds.
     """
     
     def __init__(self):
         self._manifest = THREAT_INTEL_MANIFEST
-        self._providers: Dict[str, ThreatIntelEngineAdapter] = {}
+        self._providers: Dict[str, Any] = {}
         self._config: Dict[str, Any] = {}
         self._bootstrap_engines()
 
     def _bootstrap_engines(self):
-        """Loads and registers all 33 threat intelligence scanning engines."""
+        """Loads and registers all 33 threat intelligence scanning engines and primary threat providers."""
         scanner_reg = ScannerRegistry.get_instance()
         for engine_id, engine in scanner_reg._engines.items():
             adapter = ThreatIntelEngineAdapter(engine)
@@ -57,7 +61,33 @@ class ThreatIntelligenceModule(IntelligenceModule):
             )
             provider_registry.register(adapter, meta)
 
-        logger.info(f"ThreatIntelligenceModule initialized with {len(self._providers)} verified engines.")
+        # Primary Threat Intel & CVE Feeds
+        primary_threat_providers = [
+            ("threatfox", ThreatFoxProvider(), "THREAT_INTEL", ["ioc_search", "malware_family", "confidence"], ["ip", "domain", "url", "hash", "ioc"]),
+            ("nvd_cve", NVDVulnerabilityProvider(), "VULNERABILITY", ["cve_authoritative", "cvss_v31", "cwes"], ["cve", "keyword", "software"]),
+            ("vulnerability_intel", VulnerabilityIntelProvider(), "VULNERABILITY", ["epss", "cisa_kev"], ["cve", "domain", "ip"]),
+            ("ioc_feed", IOCFeedProvider(), "THREAT_INTEL", ["alienvault_otx", "urlhaus", "abuseipdb"], ["ip", "domain", "hash", "url"])
+        ]
+
+        for pid, provider, category, caps, targets in primary_threat_providers:
+            self._providers[pid] = provider
+            meta = ProviderMetadata(
+                provider_id=pid,
+                name=provider.name,
+                module_id="threat_intelligence",
+                category=category,
+                provider_type="DEEP_ENGINE",
+                capabilities=caps,
+                supported_targets=targets,
+                version=getattr(provider, "version", "1.0.0"),
+                is_enabled=True,
+                status="HEALTHY",
+                timeout_seconds=float(getattr(provider, "timeout_seconds", 10.0)),
+                rate_limit="60/min"
+            )
+            provider_registry.register(provider, meta)
+
+        logger.info(f"ThreatIntelligenceModule initialized with {len(self._providers)} verified engines and threat providers.")
 
     @property
     def manifest(self) -> ModuleManifest:
