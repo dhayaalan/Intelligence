@@ -12,11 +12,20 @@ class MongoDBManager:
     sync_client: Optional[pymongo.MongoClient] = None
     sync_db: Optional[SyncDatabase] = None
 
+import re
+
 mongo_manager = MongoDBManager()
 
+def sanitize_mongo_uri(uri: str) -> str:
+    """Masks credentials in MongoDB connection URI for secure audit logging."""
+    if not uri:
+        return ""
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:*****@', uri)
+
 async def connect_to_mongo():
+    masked_uri = sanitize_mongo_uri(settings.MONGODB_URI)
     try:
-        app_logger.info(f"Connecting to MongoDB at {settings.MONGODB_URI} (db: {settings.MONGODB_DATABASE})...")
+        app_logger.info(f"Connecting to MongoDB at {masked_uri} (db: {settings.MONGODB_DATABASE})...")
         mongo_manager.client = AsyncIOMotorClient(
             settings.MONGODB_URI,
             serverSelectionTimeoutMS=3000
@@ -43,6 +52,12 @@ async def connect_to_mongo():
         await restore_data_from_mongo()
         
     except Exception as e:
+        if settings.APP_ENV.lower() in ["production", "prod"]:
+            app_logger.error(f"FATAL: Production database connection failed to {masked_uri}: {e}")
+            raise RuntimeError(
+                f"Production startup failed: MongoDB is unavailable at {masked_uri}. "
+                "Operating in unverified in-memory fallback mode is strictly prohibited in production."
+            )
         app_logger.warning(f"Could not connect to MongoDB ({e}). Falling back to memory-synced repository mode.")
 
 async def close_mongo_connection():

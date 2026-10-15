@@ -79,12 +79,27 @@ class InstagramCollector:
                 )
             return posts
 
-        # 3. Authorized Graph API Hashtag Search
+        # 3. Authorized Graph API Hashtag Search requires both access token and business account ID
+        ig_user_id = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")
+        if not ig_user_id:
+            app_logger.info(
+                f"Instagram Graph API search for '{clean_query}' requires INSTAGRAM_BUSINESS_ACCOUNT_ID. Reporting CONFIG_REQUIRED."
+            )
+            if job_id:
+                resilient_crawler_engine.save_checkpoint(
+                    job_id=job_id,
+                    platform=SocialPlatformType.INSTAGRAM,
+                    query=clean_query,
+                    cursor=None,
+                    items_count=0,
+                    status=CollectorStatus.CONFIG_REQUIRED
+                )
+            return posts
+
         tag = clean_query.lstrip("#").split()[0]
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Step A: Get hashtag ID
-                ig_user_id = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID", "17841400000000000")
                 tag_url = f"{GRAPH_API_BASE}/ig_hashtag_search"
                 tag_resp = await client.get(
                     tag_url,

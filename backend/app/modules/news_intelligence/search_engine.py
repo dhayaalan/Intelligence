@@ -218,7 +218,12 @@ class MultiSourceRetrievalEngine:
         else:
             countries_searched_names = ["Worldwide (All Configured Global Sources)"]
 
-        languages_searched: List[str] = req.languages if req.languages else ([req.language_filter] if req.language_filter else ["en"])
+        if req.languages:
+            languages_searched = [l for l in req.languages if l and l.lower() not in ["all", "any"]]
+        elif req.language_filter and req.language_filter.lower() not in ["all", "any", ""]:
+            languages_searched = [req.language_filter]
+        else:
+            languages_searched = []  # Genuinely unconstrained (Any Language)
 
         # 2. Build fetch tasks with bounded concurrency
         provider_statuses: Dict[str, str] = {}
@@ -230,7 +235,7 @@ class MultiSourceRetrievalEngine:
         ]
 
         if requested_countries:
-            for c_entry in requested_countries[:10]:
+            for c_entry in requested_countries:
                 gl_code = c_entry.google_news_gl or c_entry.alpha2
                 hl_code = c_entry.google_news_hl or "en"
                 fetch_tasks.append(
@@ -244,26 +249,28 @@ class MultiSourceRetrievalEngine:
                 )
                 fetch_names.append(f"google_news_{c_entry.alpha2.lower()}")
         else:
-            # Worldwide search: query global wires + representative regional editions
-            worldwide_editions = [
-                ("US", "en-US", "United States"),
-                ("GB", "en-GB", "United Kingdom"),
-                ("FR", "fr", "France"),
-                ("DE", "de", "Germany"),
-                ("JP", "ja", "Japan"),
-                ("IN", "en-IN", "India"),
-            ]
-            for gl_code, hl_code, c_name in worldwide_editions:
+            # Worldwide search: dynamically query verified regional editions from registry across continents
+            verified_entries = country_registry.list_countries(has_verified_sources=True)
+            selected_editions = []
+            seen_regions = set()
+            for c in verified_entries:
+                if c.google_news_gl and (c.region not in seen_regions or len(selected_editions) < 8):
+                    selected_editions.append((c.google_news_gl, c.google_news_hl or "en", c.name, c.alpha2))
+                    seen_regions.add(c.region)
+                if len(selected_editions) >= 10:
+                    break
+
+            for gl_code, hl_code, c_name, edition_code in selected_editions:
                 fetch_tasks.append(
                     self._fetch_google_news_rss(
                         req.query,
                         gl=gl_code,
                         hl=hl_code,
                         country_name=c_name,
-                        edition=gl_code
+                        edition=edition_code
                     )
                 )
-                fetch_names.append(f"google_news_{gl_code.lower()}")
+                fetch_names.append(f"google_news_{edition_code.lower()}")
 
         # Secondary semantic expansion if requested
         if req.search_mode == SearchMode.SEMANTIC and expansions:
@@ -408,8 +415,8 @@ class MultiSourceRetrievalEngine:
                     article_subject_country=final_country if event_loc == final_country else event_loc,
                     source_edition=source_edition,
                     collection_route=coll_route,
-                    author=item.get("author") or "Special Investigation Desk",
-                    category=item.get("category") or "Investigative Wire",
+                    author=item.get("author") or "",
+                    category=item.get("category") or "General News",
                     language=orig_lang,
                     read_time_minutes=item.get("read_time_minutes") or 5,
                     cluster_id=cluster_id,
@@ -449,7 +456,7 @@ class MultiSourceRetrievalEngine:
                 if self._matches_category(it, req.category_filter)
             ]
 
-        # Calculate category counts
+        # Calculate category counts strictly from observed records
         category_counts = {
             "all": len(scored_items),
             "articles": sum(1 for it in scored_items if it.content_type == "article"),
@@ -459,8 +466,8 @@ class MultiSourceRetrievalEngine:
             "claims": sum(len(it.claim_indicators) for it in scored_items),
             "sources": len(set(it.publisher for it in scored_items if it.publisher)),
             "entities": len(set(ent for it in scored_items for ent in it.detected_entities)),
-            "narratives": max(1, len(scored_items) // 3) if scored_items else 0,
-            "evidence": len(scored_items) * 2,
+            "narratives": 1 if scored_items else 0,
+            "evidence": len(scored_items),
         }
 
         # 3. Build dynamic evidence-based Country Comparison Matrix
@@ -487,7 +494,7 @@ class MultiSourceRetrievalEngine:
                 pub_count = len(set(it.publisher for it in c_items if it.publisher))
                 langs = list(set(it.original_language or it.language for it in c_items if it.original_language or it.language))
                 indep_count = sum(1 for it in c_items if it.is_independent and it.syndication_type != "SYNDICATED_COPY")
-                indep_score = round((max(1, indep_count) / max(1, len(c_items))) * 100, 1)
+                indep_score = round((indep_count / len(c_items)) * 100, 1) if (c_items and indep_count > 0) else 0.0
 
                 valid_dates = [it.publication_date for it in c_items if it.publication_date]
                 earliest_pub = valid_dates[0] if valid_dates else None
@@ -527,9 +534,11 @@ class MultiSourceRetrievalEngine:
                     claim_support_count=sum(len(it.claim_indicators) for it in c_items),
                     claim_contradiction_count=0,
                     coverage_gaps=gaps,
-                    operational_status="WORKING_TESTED_REAL"
+                    operational_status="WORKING_TESTED_REAL" if (c_ent and c_ent.verified_coverage) else "PARTIAL"
                 ))
             elif c_ent:
+                has_configured_sources = len(c_ent.sources) > 0 or len(c_ent.major_publishers) > 0
+                op_status = "NO_MATCHING_RESULTS" if has_configured_sources else "NO_SOURCES_CONFIGURED"
                 comparison_rows.append(CountryComparisonMatrixRow(
                     country_name=c_ent.name,
                     country_code=c_ent.alpha2,
@@ -541,11 +550,15 @@ class MultiSourceRetrievalEngine:
                     earliest_publication=None,
                     latest_update=None,
                     primary_headline="No articles indexed for query",
-                    dominant_framing="UNREPORTED / ABSENT",
+                    dominant_framing="UNASSESSED",
                     claim_support_count=0,
                     claim_contradiction_count=0,
-                    coverage_gaps=["Zero matching articles observed in configured national feeds for this event"],
-                    operational_status=c_ent.operational_status
+                    coverage_gaps=[
+                        "Zero matching articles observed in configured national feeds for this event"
+                        if has_configured_sources else
+                        "No operational news sources currently configured for this jurisdiction"
+                    ],
+                    operational_status=op_status
                 ))
 
         # 4. Global coverage summary
@@ -610,18 +623,24 @@ class MultiSourceRetrievalEngine:
                 return cached
 
         item = self._items_cache.get(article_id)
-        query_val = query_hint or (item.title if item else "Intelligence Inquiry")
-        title = item.title if item else f"Investigative Report: {query_val}"
-        summary = item.summary if item else f"Comprehensive intelligence dossier examining verified assertions, source lineage, and telemetry concerning {query_val}."
-        canonical_url = item.canonical_url if item else "https://wire.reuters.com/investigations/target-report"
-        publisher = item.publisher if item else "Global Wire Intelligence"
-        country = item.country if item else "International"
-        hero_img = (item.hero_image if item and item.hero_image else None) or self._pick_default_hero_image(query_val, 0)
-        entities = item.detected_entities if (item and item.detected_entities) else [query_val, publisher, "DisinfoLab"]
-        is_video = bool(item.is_video if item else False)
-        video_embed_url = item.video_embed_url if item else None
-        relevance_score = float(item.relevance_score if item else 96.0)
-        publication_date = item.publication_date if item and item.publication_date else "Oct 7, 2026"
+        if not item:
+            # If an article identifier does not resolve to an actual stored or collected article,
+            # return None from the service (which results in HTTP 404 from the API).
+            # Do NOT synthesize a fallback article or turn a search query into a fabricated dossier.
+            return None
+
+        query_val = query_hint or item.title
+        title = item.title
+        summary = item.summary or item.title
+        canonical_url = item.canonical_url or ""
+        publisher = item.publisher or "News Wire"
+        country = item.country or item.publisher_country or "International"
+        hero_img = item.hero_image or self._pick_default_hero_image(query_val, 0)
+        entities = item.detected_entities or []
+        is_video = bool(item.is_video)
+        video_embed_url = item.video_embed_url
+        relevance_score = float(item.relevance_score) if item.relevance_score is not None else 80.0
+        publication_date = item.publication_date or ""
 
         # Compile extracted news data into structured investigative dossier
         article = news_dossier_compiler.compile_article(
@@ -710,83 +729,61 @@ class MultiSourceRetrievalEngine:
 
     def investigate_claim(self, claim_text: str, context_article_id: Optional[str] = None) -> ClaimInvestigationResult:
         """
-        Executes dedicated single-claim forensic verification with supporting,
-        contradicting sources, and 4-tier claim verification matrix (NEWS-01).
+        Executes dedicated single-claim forensic verification strictly against
+        actual recorded evidence and independent fact-check registries.
+        Zero fabricated contradiction verdicts, synthetic publishers, or fake quotes.
         """
-        is_suspicious = any(w in claim_text.lower() for w in ["hack", "tamper", "unprecedented", "fake", "50,000", "rigged", "malfunction"])
-        is_wire_syndicated = any(w in claim_text.lower() for w in ["syndicate", "wire", "press release", "communique", "circular"])
-        is_unverified = any(w in claim_text.lower() for w in ["rumor", "alleged", "anonymous", "unconfirmed"])
+        from app.modules.news_intelligence.factcheck_service import fact_check_service
 
-        if is_suspicious:
-            v_tier = ClaimMatrixStatus.CONTRADICTED
-            verdict = "MISLEADING"
-            confidence = 94.0
-            indep_count = 1
-            synd_count = 6
-            orig_wire = "District Social Repost"
-            rationale = "Claim contradicted by authoritative technical audit logs and open source forensic fact-checkers."
-            supporting = [
-                {"publisher": "Derivative Social Channels", "country": "International", "date": "2026-10-06", "stance": "AMPLIFYING", "credibility": 42.0},
-                {"publisher": "Syndicated Reprints", "country": "Regional", "date": "2026-10-06", "stance": "REPORTING_ALLEGATIONS", "credibility": 65.0},
-            ]
-            contradicting = [
-                {"publisher": "Official Technical Audit Commission", "country": "National", "date": "2026-10-06", "stance": "DIRECT_REFUTATION", "credibility": 98.0},
-                {"publisher": "DisinfoLab Open Source Fact-Checkers", "country": "International", "date": "2026-10-07", "stance": "MEDIA_PROVENANCE_DISPROVED", "credibility": 95.0},
-            ]
-        elif is_wire_syndicated:
-            v_tier = ClaimMatrixStatus.SINGLE_SOURCE_REPEATED
-            verdict = "PARTIALLY TRUE"
-            confidence = 82.0
-            indep_count = 1
-            synd_count = 8
-            orig_wire = "Primary Wire Syndicate"
-            rationale = "Repeated across 8 syndicated republishers, but all tracing back to a single originating dispatch without independent corroboration."
-            supporting = [
-                {"publisher": "Reuters Wire", "country": "International", "date": "2026-10-06", "stance": "ORIGINATING_STATEMENT", "credibility": 92.0},
-                {"publisher": "Regional Daily Copy A", "country": "Regional", "date": "2026-10-06", "stance": "SYNDICATED_REPRINT", "credibility": 70.0},
-                {"publisher": "Regional Daily Copy B", "country": "Regional", "date": "2026-10-06", "stance": "SYNDICATED_REPRINT", "credibility": 70.0},
-            ]
-            contradicting = []
-        elif is_unverified:
-            v_tier = ClaimMatrixStatus.UNVERIFIED
-            verdict = "UNVERIFIED"
-            confidence = 60.0
-            indep_count = 0
-            synd_count = 1
-            orig_wire = None
-            rationale = "Secondary reporting with anonymous or unconfirmed provenance; no peer corroboration available."
-            supporting = [
-                {"publisher": "Unverified Blog Post", "country": "Regional", "date": "2026-10-06", "stance": "ASSERTION", "credibility": 35.0}
-            ]
-            contradicting = []
-        else:
-            v_tier = ClaimMatrixStatus.CORROBORATED
-            verdict = "VERIFIED"
-            confidence = 91.0
-            indep_count = 3
-            synd_count = 2
-            orig_wire = "State Gazette & Press Trust"
-            rationale = "Corroborated by 3 independent peer-tier newsrooms with cross-referenced official gazettes."
-            supporting = [
-                {"publisher": "The Hindu", "country": "India", "date": "2026-10-06", "stance": "PRIMARY_CORROBORATION", "credibility": 95.0},
-                {"publisher": "BBC World News", "country": "International", "date": "2026-10-06", "stance": "INDEPENDENT_VERIFICATION", "credibility": 94.0},
-                {"publisher": "Indian Express", "country": "India", "date": "2026-10-06", "stance": "INVESTIGATIVE_REPORT", "credibility": 92.0},
-            ]
-            contradicting = []
+        claim_id = f"clm_{hashlib.md5(claim_text.encode()).hexdigest()[:8]}"
+        supporting: List[Dict[str, Any]] = []
+        contradicting: List[Dict[str, Any]] = []
+        supp_pubs: List[str] = []
+        orig_wire = None
 
-        matrix_item = ClaimVerificationMatrixItem(
-            claim_id=f"clm_{hashlib.md5(claim_text.encode()).hexdigest()[:8]}",
+        context_article = self.get_article(context_article_id) if context_article_id else None
+        if context_article and context_article.publisher:
+            supp_pubs.append(context_article.publisher)
+            supporting.append({
+                "publisher": context_article.publisher,
+                "country": context_article.country or "International",
+                "date": context_article.publication_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "stance": "PRIMARY_SOURCE",
+                "credibility": 85.0
+            })
+            orig_wire = context_article.publisher
+
+        matrix_item = fact_check_service.evaluate_claim_evidence(
+            claim_id=claim_id,
             claim_text=claim_text,
-            verification_tier=v_tier,
-            independent_publishers_count=indep_count,
-            syndicated_publishers_count=synd_count,
+            supporting_publishers=supp_pubs,
+            contradicting_publishers=[],
             origin_wire=orig_wire,
-            supporting_publishers=[s["publisher"] for s in supporting],
-            contradicting_publishers=[s["publisher"] for s in contradicting],
-            confidence_score=confidence,
-            forensic_rationale=rationale,
-            evidence_references=["EV-001-PRIMARY-DISPATCH", "EV-002-AUDIT-LOG"],
+            is_wire_syndicated=False,
+            fact_check_rating=None
         )
+
+        v_tier = matrix_item.verification_tier
+        verdict = v_tier.value
+        confidence = matrix_item.confidence_score
+        rationale = matrix_item.forensic_rationale
+
+        timeline: List[Dict[str, Any]] = []
+        if context_article:
+            timeline.append({
+                "timestamp": context_article.publication_date or datetime.now(timezone.utc).isoformat(),
+                "event": f"Claim identified in published coverage by {context_article.publisher}"
+            })
+
+        assessment_notes = f"The analyzed claim is categorized as {v_tier.value}: {rationale}"
+
+        why_reasons: List[str] = []
+        if v_tier == ClaimMatrixStatus.INSUFFICIENT_EVIDENCE:
+            why_reasons.append("No independent verification records or corroborating newsrooms currently indexed for this claim.")
+        elif v_tier == ClaimMatrixStatus.UNVERIFIED:
+            why_reasons.append(f"Claim currently relies on a single reporting source ({orig_wire or 'Primary Source'}); awaiting independent cross-outlet corroboration.")
+        elif v_tier == ClaimMatrixStatus.CORROBORATED:
+            why_reasons.append(f"Independently corroborated across {len(supp_pubs)} distinct newsrooms.")
 
         return ClaimInvestigationResult(
             claim_text=claim_text,
@@ -794,29 +791,14 @@ class MultiSourceRetrievalEngine:
             verdict=verdict,
             verification_tier=v_tier.value,
             confidence=confidence,
-            original_source=orig_wire or "Primary Wire Dispatch",
-            independent_publishers_count=indep_count,
-            syndicated_publishers_count=synd_count,
+            original_source=orig_wire or "Unspecified Source",
+            independent_publishers_count=matrix_item.independent_publishers_count,
+            syndicated_publishers_count=matrix_item.syndicated_publishers_count,
             supporting_sources=supporting,
             contradicting_sources=contradicting,
-            timeline=[
-                {"timestamp": "2026-10-06 08:15", "event": "Claim first posted in localized online forum"},
-                {"timestamp": "2026-10-06 13:45", "event": "Claim amplified with repurposed media/dispatch"},
-                {"timestamp": "2026-10-06 16:00", "event": "Official technical telemetry publishes verified telemetry"},
-            ],
-            assessment_notes=(
-                "The analyzed claim is categorized as CONTRADICTED because forensic telemetry and technical logs directly disprove the assertion."
-                if v_tier == ClaimMatrixStatus.CONTRADICTED else
-                f"The analyzed claim is categorized as {v_tier.value}: {rationale}"
-            ),
-            why_reasons=[
-                "Evidence reveals visual media paired with this claim originated 4 years prior.",
-                "Official random sampling audit logs showed 0% statistical discrepancy.",
-                "Source lineage confirmed copy-paste syndication without independent verification.",
-            ] if v_tier == ClaimMatrixStatus.CONTRADICTED else [
-                "Cross-referenced against verified government gazettes and peer newsrooms.",
-                "Multiple independent technical observers confirmed telemetry.",
-            ],
+            timeline=timeline,
+            assessment_notes=assessment_notes,
+            why_reasons=why_reasons,
             claim_matrix_item=matrix_item,
         )
 

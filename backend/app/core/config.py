@@ -19,7 +19,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "sential-super-secure-production-ready-secret-key-32-chars-min")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-    
+    INITIAL_SUPER_ADMIN_EMAIL: str = os.getenv("INITIAL_SUPER_ADMIN_EMAIL", "superadmin@sential.io")
+    INITIAL_SUPER_ADMIN_PASSWORD: Optional[str] = os.getenv("INITIAL_SUPER_ADMIN_PASSWORD", None)
+
     # Primary Database: MongoDB
     MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
     MONGODB_DATABASE: str = os.getenv("MONGODB_DATABASE", "sential_db")
@@ -62,5 +64,51 @@ class Settings(BaseSettings):
     
     class Config:
         case_sensitive = True
+
+    def validate_production_configuration(self) -> None:
+        """
+        Validates critical security configuration before production execution.
+        Fails fast if production secrets or required bootstrap parameters are missing,
+        weak, or default placeholders.
+        """
+        known_weak_secrets = {
+            "sential-super-secure-production-ready-secret-key-32-chars-min",
+            "sential-production-ultra-secure-jwt-key-256-bit-signature",
+            "change-me",
+            "changeme",
+            "secret",
+            "default",
+        }
+        known_weak_passwords = {
+            "SuperAdmin123!",
+            "password",
+            "admin",
+            "changeme",
+            "12345678",
+        }
+
+        if self.APP_ENV.lower() in ["production", "prod"]:
+            # 1. Validate SECRET_KEY
+            lowered_secret = (self.SECRET_KEY or "").strip().lower()
+            if (
+                not self.SECRET_KEY
+                or self.SECRET_KEY.strip() in known_weak_secrets
+                or len(self.SECRET_KEY.strip()) < 32
+                or "changeme" in lowered_secret
+                or "changethis" in lowered_secret
+                or "placeholder" in lowered_secret
+            ):
+                raise RuntimeError(
+                    "Production startup failed: SECRET_KEY must be explicitly set to a high-entropy secret "
+                    "(at least 32 characters) and cannot be a default placeholder or weak string."
+                )
+
+            # 2. Validate INITIAL_SUPER_ADMIN_PASSWORD if platform bootstrap is required
+            if self.INITIAL_SUPER_ADMIN_PASSWORD:
+                cleaned_pw = self.INITIAL_SUPER_ADMIN_PASSWORD.strip()
+                if cleaned_pw in known_weak_passwords or len(cleaned_pw) < 12:
+                    raise RuntimeError(
+                        "Production startup failed: INITIAL_SUPER_ADMIN_PASSWORD cannot be a default or weak password (minimum 12 characters required)."
+                    )
 
 settings = Settings()

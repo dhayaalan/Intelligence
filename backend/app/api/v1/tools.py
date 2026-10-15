@@ -761,7 +761,8 @@ async def get_profile_history(
     from app.modules.osint.snapshot_service import profile_snapshot_service
     snapshots = await profile_snapshot_service.get_snapshot_history(
         platform_id=platform_id,
-        username=username
+        username=username,
+        tenant_id=current_user.tenant_id
     )
     return {
         "platform_id": platform_id,

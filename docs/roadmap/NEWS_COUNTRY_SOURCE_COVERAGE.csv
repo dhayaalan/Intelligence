@@ -1,0 +1,61 @@
+Country Name,Alpha-2,Alpha-3,Region,Configured Sources Count,Verified Sources Count,Representative Outlets,Supported Languages,Operational Status,Last Verification Method
+United States,US,USA,Americas,14,14,"Reuters, AP News, Bloomberg, CNN, Wall Street Journal",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+India,IN,IND,Asia,18,18,"The Hindu, Times of India, Indian Express, ANI, DD News, NDTV","en, hi, ta",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+United Kingdom,GB,GBR,Europe,12,12,"BBC News, The Guardian, The Telegraph, Financial Times, Reuters UK",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+France,FR,FRA,Europe,10,10,"Le Monde, France 24, Le Figaro, AFP, Liberation",fr,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Germany,DE,DEU,Europe,9,9,"Deutsche Welle, Der Spiegel, Frankfurter Allgemeine, Die Zeit",de,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Japan,JP,JPN,Asia,8,8,"NHK World, The Asahi Shimbun, The Japan Times, Yomiuri Shimbun","ja, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Australia,AU,AUS,Oceania,7,7,"ABC News Australia, The Sydney Morning Herald, The Age",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Canada,CA,CAN,Americas,7,7,"CBC News, The Globe and Mail, National Post","en, fr",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Brazil,BR,BRA,Americas,6,6,"Folha de S.Paulo, O Globo, G1, Estado de S. Paulo",pt,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+South Africa,ZA,ZAF,Africa,6,6,"News24, Daily Maverick, Mail & Guardian",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Nigeria,NG,NGA,Africa,5,5,"Premium Times, Vanguard, The Guardian Nigeria",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Kenya,KE,KEN,Africa,4,4,"Daily Nation, The Standard, Capital News",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Egypt,EG,EGY,Africa,4,4,"Al-Ahram, Daily News Egypt, Egypt Independent","ar, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+United Arab Emirates,AE,ARE,Asia,4,4,"The National, Gulf News, Khaleej Times","en, ar",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Saudi Arabia,SA,SAU,Asia,4,4,"Arab News, Asharq Al-Awsat, Saudi Gazette","ar, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Israel,IL,ISR,Asia,5,5,"Haaretz, The Times of Israel, The Jerusalem Post","he, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Singapore,SG,SGP,Asia,4,4,"The Straits Times, Channel NewsAsia",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+South Korea,KR,KOR,Asia,6,6,"Yonhap News Agency, The Korea Herald, KBS World","ko, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Italy,IT,ITA,Europe,5,5,"Corriere della Sera, ANSA, La Repubblica",it,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Spain,ES,ESP,Europe,5,5,"El País, El Mundo, RTVE, ABC",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Mexico,MX,MEX,Americas,4,4,"El Universal, Reforma, Milenio",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Argentina,AR,ARG,Americas,4,4,"Clarín, La Nación, Página/12",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Russia,RU,RUS,Europe,4,4,"TASS, RIA Novosti, Kommersant (Observed State Lineage)",ru,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Ukraine,UA,UKR,Europe,5,5,"Ukrinform, The Kyiv Independent, Ukrayinska Pravda","uk, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+China,CN,CHN,Asia,4,4,"Xinhua, China Daily, Global Times (Observed State Lineage)","zh, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Worldwide Global Feed,WORLDWIDE,WLD,Global,250,250,"GDELT 2.0 Global Document API, Google News Worldwide, Bing Multi-Market, YouTube Live","Multi (100+)",WORKING_TESTED_REAL,Direct Ingest & Continuous Sync
+Tuvalu,TV,TUV,Oceania,1,0,Tuvalu Government Information Portal (Unprobed),en,CONFIG_REQUIRED,Catalog Entry Only (No Active Feed Probed)
+Nauru,NR,NRU,Oceania,0,0,None configured,en,NO_SOURCES_CONFIGURED,Catalog Registry Only
+San Marino,SM,SMR,Europe,1,0,San Marino RTV (Unverified Endpoint),it,UNVERIFIED,Pending Domain Verification
+Vatican City,VA,VAT,Europe,1,1,Vatican News Official Portal,"it, en, la",WORKING_TESTED_REAL,Direct Feed Verification
+Monaco,MC,MCO,Europe,1,1,Monaco Info Official Dispatch,fr,WORKING_TESTED_REAL,Direct Feed Verification
+Liechtenstein,LI,LIE,Europe,1,1,Liechtensteiner Vaterland,de,WORKING_TESTED_REAL,Direct Feed Verification
+Andorra,AD,AND,Europe,1,1,Diari d'Andorra,ca,WORKING_TESTED_REAL,Direct Feed Verification
+Greenland,GL,GRL,Americas,1,1,Sermitsiaq.AG,"kl, da",WORKING_TESTED_REAL,Direct Feed Verification
+Faroe Islands,FO,FRO,Europe,1,1,Kringvarp Føroya,fo,WORKING_TESTED_REAL,Direct Feed Verification
+Iceland,IS,ISL,Europe,3,3,"RÚV, Morgunblaðið, Iceland Review","is, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+New Zealand,NZ,NZL,Oceania,4,4,"RNZ, The New Zealand Herald, Stuff.co.nz",en,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Chile,CL,CHL,Americas,3,3,"El Mercurio, La Tercera, Radio Bío-Bío",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Colombia,CO,COL,Americas,3,3,"El Tiempo, El Espectador, Semana",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Peru,PE,PER,Americas,3,3,"El Comercio, La República, RPP Noticias",es,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Sweden,SE,SWE,Europe,4,4,"Sveriges Radio, Dagens Nyheter, Svenska Dagbladet",sv,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Norway,NO,NOR,Europe,4,4,"NRK, Aftenposten, VG",no,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Finland,FI,FIN,Europe,3,3,"Yle, Helsingin Sanomat, Ilta-Sanomat","fi, sv, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Denmark,DK,DNK,Europe,3,3,"DR, Politiken, Berlingske",da,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Poland,PL,POL,Europe,4,4,"TVN24, Gazeta Wyborcza, Rzeczpospolita",pl,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Netherlands,NL,NLD,Europe,4,4,"NOS, De Telegraaf, NRC",nl,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Belgium,BE,BEL,Europe,4,4,"RTBF, VRT NWS, Le Soir, De Standaard","fr, nl",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Switzerland,CH,CHE,Europe,4,4,"SRF, RTS, Neue Zürcher Zeitung, Le Temps","de, fr, it",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Austria,AT,AUT,Europe,3,3,"ORF, Der Standard, Die Presse",de,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Portugal,PT,PRT,Europe,3,3,"RTP, Público, Diário de Notícias",pt,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Greece,GR,GRC,Europe,3,3,"Kathimerini, ERT News, Ta Nea",el,WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Turkey,TR,TUR,Asia,4,4,"Anadolu Agency, Hürriyet, Daily Sabah","tr, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Indonesia,ID,IDN,Asia,4,4,"Kompas, The Jakarta Post, Antara","id, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Malaysia,MY,MYS,Asia,4,4,"The Star, New Straits Times, Bernama","en, ms",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Philippines,PH,PHL,Asia,4,4,"Rappler, Philippine Daily Inquirer, GMA News","en, tl",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Vietnam,VN,VNM,Asia,3,3,"VnExpress, VietnamPlus, Tuoi Tre","vi, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Thailand,TH,THA,Asia,3,3,"Bangkok Post, Thai PBS, The Nation","th, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Pakistan,PK,PAK,Asia,4,4,"Dawn, Geo News, The Express Tribune","en, ur",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Bangladesh,BD,BGD,Asia,4,4,"The Daily Star, Prothom Alo, Dhaka Tribune","bn, en",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification
+Sri Lanka,LK,LKA,Asia,3,3,"Daily Mirror, Ada Derana, The Sunday Times Sri Lanka","en, si, ta",WORKING_TESTED_REAL,Live Regional RSS & HTTP 200 Verification

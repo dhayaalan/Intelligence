@@ -36,7 +36,8 @@ class ProfileSnapshotService:
         Compares new extraction result against previous snapshot and records versioned observation.
         """
         profile_key = f"{result.platform_id}:{result.username.lower()}"
-        previous_snapshots = await self.get_snapshot_history(result.platform_id, result.username)
+        memory_key = f"{tenant_id}:{profile_key}"
+        previous_snapshots = await self.get_snapshot_history(result.platform_id, result.username, tenant_id=tenant_id)
         
         changes: List[ProfileChangeRecord] = []
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -85,29 +86,38 @@ class ProfileSnapshotService:
             except Exception as e:
                 app_logger.warning(f"Could not persist profile snapshot to MongoDB: {e}")
 
-        # Keep memory cache
-        if profile_key not in self._memory_snapshots:
-            self._memory_snapshots[profile_key] = []
-        self._memory_snapshots[profile_key].append(snapshot)
-        if len(self._memory_snapshots[profile_key]) > 20:
-            self._memory_snapshots[profile_key] = self._memory_snapshots[profile_key][-20:]
+        # Keep memory cache isolated by tenant
+        if memory_key not in self._memory_snapshots:
+            self._memory_snapshots[memory_key] = []
+        self._memory_snapshots[memory_key].append(snapshot)
+        if len(self._memory_snapshots[memory_key]) > 20:
+            self._memory_snapshots[memory_key] = self._memory_snapshots[memory_key][-20:]
 
         return snapshot, changes
 
-    async def get_snapshot_history(self, platform_id: str, username: str) -> List[ProfileSnapshot]:
-        """Retrieves historical snapshots for a profile."""
+    async def get_snapshot_history(
+        self,
+        platform_id: str,
+        username: str,
+        tenant_id: str = "default"
+    ) -> List[ProfileSnapshot]:
+        """Retrieves historical snapshots for a profile scoped strictly to the authenticated tenant."""
         profile_key = f"{platform_id}:{username.lower()}"
+        memory_key = f"{tenant_id}:{profile_key}"
         mongo_db = get_database()
         if mongo_db is not None:
             try:
-                cursor = mongo_db.profile_snapshots.find({"profile_key": profile_key}).sort("timestamp", 1)
+                cursor = mongo_db.profile_snapshots.find({
+                    "profile_key": profile_key,
+                    "tenant_id": tenant_id
+                }).sort("timestamp", 1)
                 docs = await cursor.to_list(length=50)
                 if docs:
                     return [ProfileSnapshot(**{k: v for k, v in d.items() if k != "_id"}) for d in docs]
             except Exception as e:
                 app_logger.warning(f"MongoDB snapshot lookup failed: {e}")
 
-        return self._memory_snapshots.get(profile_key, [])
+        return self._memory_snapshots.get(memory_key, [])
 
     async def refresh_profile(self, platform_id: str, username: str, tenant_id: str = "default") -> Tuple[ProfileExtractionResult, List[ProfileChangeRecord]]:
         """

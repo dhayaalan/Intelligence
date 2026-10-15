@@ -6,6 +6,7 @@ Adheres to Phase 14 of the Master Implementation Specification.
 
 import pytest
 import asyncio
+import httpx
 from datetime import datetime, timezone
 
 from app.modules.osint.models import (
@@ -133,7 +134,7 @@ def test_username_recon_provider_distinguishes_status():
     asyncio.run(_run())
 
 
-def test_egress_controller_multi_region_and_fail_closed():
+def test_egress_controller_multi_region_and_fail_closed(monkeypatch):
     """Validates multi-region route selection (INDIA, US, UK) and strict fail-closed enforcement."""
     # Direct route
     ok, msg, status = egress_controller.verify_egress_route(EgressRouteType.DIRECT)
@@ -141,35 +142,74 @@ def test_egress_controller_multi_region_and_fail_closed():
     assert status.is_active is True
     assert status.egress_ip_masked == "local_direct"
 
-    # Regional route: India
-    ok_in, msg_in, status_in = egress_controller.verify_egress_route(
-        route_type=EgressRouteType.INDIA,
-        gateway_name="INDIA",
-        fail_closed=True
-    )
-    assert ok_in is True
-    assert status_in.is_active is True
-    assert status_in.verification_state == EgressVerificationState.ROUTE_VERIFIED
+    # Configure mock test proxies at the network boundary
+    orig_in_proxy = egress_controller._gateway_configs["INDIA"].get("proxy_url")
+    orig_us_proxy = egress_controller._gateway_configs["UNITED_STATES"].get("proxy_url")
+    egress_controller._gateway_configs["INDIA"]["proxy_url"] = "http://127.0.0.1:8118"
+    egress_controller._gateway_configs["UNITED_STATES"]["proxy_url"] = "http://127.0.0.1:8119"
 
-    # Regional route: United States
-    ok_us, msg_us, status_us = egress_controller.verify_egress_route(
-        route_type=EgressRouteType.UNITED_STATES,
-        gateway_name="UNITED_STATES",
-        fail_closed=True
-    )
-    assert ok_us is True
-    assert status_us.is_active is True
+    class MockResponse:
+        def __init__(self, data, status_code=200):
+            self._data = data
+            self.status_code = status_code
+        def json(self):
+            return self._data
 
-    # Fail closed for invalid/unregistered profile
-    ok_bad, msg_bad, status_bad = egress_controller.verify_egress_route(
-        route_type=EgressRouteType.REGIONAL_GATEWAY_APPROVED,
-        gateway_name="non_existent_antarctica_gateway",
-        fail_closed=True
-    )
-    assert ok_bad is False
-    assert status_bad.is_active is False
-    assert "OPSEC_FAIL_CLOSED" in msg_bad
-    assert "Direct network fallback is prohibited" in msg_bad
+    def mock_get(self, url, **kwargs):
+        if "ipapi.co" in str(url):
+            if "103.21." in str(url):
+                return MockResponse({"country_code": "IN", "country_name": "India"})
+            return MockResponse({"country_code": "US", "country_name": "United States"})
+        if "api.ipify.org" in str(url):
+            # Return country-appropriate IP based on gateway
+            return MockResponse({"ip": "103.21.244.10"})
+        return MockResponse({"ip": "103.21.244.10"})
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+
+    try:
+        # Regional route: India
+        ok_in, msg_in, status_in = egress_controller.verify_egress_route(
+            route_type=EgressRouteType.INDIA,
+            gateway_name="INDIA",
+            fail_closed=True
+        )
+        assert ok_in is True
+        assert status_in.is_active is True
+        assert status_in.verification_state == EgressVerificationState.ROUTE_VERIFIED
+
+        # Regional route: United States
+        def mock_get_us(self, url, **kwargs):
+            if "ipapi.co" in str(url):
+                return MockResponse({"country_code": "US", "country_name": "United States"})
+            return MockResponse({"ip": "198.51.100.12"})
+
+        monkeypatch.setattr(httpx.Client, "get", mock_get_us)
+        # Clear cache to force fresh verification
+        egress_controller._verified_routes_cache.pop("UNITED_STATES", None)
+
+        ok_us, msg_us, status_us = egress_controller.verify_egress_route(
+            route_type=EgressRouteType.UNITED_STATES,
+            gateway_name="UNITED_STATES",
+            fail_closed=True
+        )
+        assert ok_us is True
+        assert status_us.is_active is True
+
+        # Fail closed for invalid/unregistered profile
+        ok_bad, msg_bad, status_bad = egress_controller.verify_egress_route(
+            route_type=EgressRouteType.REGIONAL_GATEWAY_APPROVED,
+            gateway_name="non_existent_antarctica_gateway",
+            fail_closed=True
+        )
+        assert ok_bad is False
+        assert status_bad.is_active is False
+        assert "OPSEC_FAIL_CLOSED" in msg_bad
+        assert "Direct network fallback is prohibited" in msg_bad
+    finally:
+        egress_controller._gateway_configs["INDIA"]["proxy_url"] = orig_in_proxy
+        egress_controller._gateway_configs["UNITED_STATES"]["proxy_url"] = orig_us_proxy
+        egress_controller._verified_routes_cache.clear()
 
 
 def test_instagram_and_facebook_collectors_config_required():

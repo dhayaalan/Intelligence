@@ -35,6 +35,8 @@ app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 async def startup_event():
+    # 0. Validate production security configuration
+    settings.validate_production_configuration()
     app_logger.info("Initializing Sential Intelligence Platform Core with MongoDB...")
     
     # Connect to MongoDB and create collection indexes

@@ -163,8 +163,11 @@ class TestGlobalSearchAndComparisonEngine:
                 "VERIFIED_COVERAGE",
                 "UNVERIFIED_COVERAGE",
                 "CONFIG_REQUIRED",
+                "NO_MATCHING_RESULTS",
                 "NO_MATCHING_ARTICLES",
                 "NO_SOURCES_CONFIGURED",
+                "UNVERIFIED",
+                "PARTIAL",
             ]
             assert isinstance(row.coverage_gaps, list)
             assert 0 <= row.source_independence_score <= 100
@@ -220,15 +223,15 @@ class TestNewsApiEndpoints:
     def test_register_source_endpoint(self, client, analyst_headers):
         """Verify POST /api/v1/news/sources registers new publisher dynamically."""
         payload = {
-            "publisher_name": "Nordic Observer",
-            "canonical_domain": "nordicobserver.se",
+            "publisher_name": "Sveriges Television",
+            "canonical_domain": "svt.se",
             "country_code": "SE",
             "country_name": "Sweden",
             "original_language": "sv",
             "source_category": "news",
             "is_official": False,
             "is_verified": True,
-            "feed_or_endpoint": "https://nordicobserver.se/rss",
+            "feed_or_endpoint": "https://www.svt.se/nyheter/rss.xml",
         }
         resp = client.post("/api/v1/news/sources", json=payload, headers=analyst_headers)
         assert resp.status_code == 200

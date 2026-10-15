@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
-from app.identity.models import UserRecord
+from app.identity.models import UserRecord, UserRole
 from app.tenancy.context import get_current_user
 from app.core.network_safety import network_safety
+from app.audit.logger import audit_logger
 from app.modules.news_intelligence.models import (
     AddToCaseRequest,
     ClaimInvestigationResult,
@@ -387,7 +388,7 @@ class RegisterSourcePayload(BaseModel):
     source_category: Optional[str] = "COMMERCIAL"
     source_type: Optional[str] = "COMMERCIAL"
     is_official: bool = False
-    is_verified: bool = True
+    is_verified: bool = False
 
 
 @router.post("/sources")
@@ -397,20 +398,59 @@ async def register_custom_source(
 ):
     """
     Registers a newly discovered publisher domain in the central country source directory.
+    Enforces role authorization, SSRF validation, and sets unverified by default unless super-admin.
     """
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.TENANT_ADMIN, UserRole.ANALYST]:
+        raise HTTPException(status_code=403, detail="Forbidden: insufficient permissions to register news sources")
+
+    dom = (payload.canonical_domain or payload.domain or "").strip()
+    if not dom:
+        raise HTTPException(status_code=400, detail="Domain cannot be empty")
+
+    test_domain_url = dom if "://" in dom else f"https://{dom}"
+    is_safe, reason = network_safety.validate_url(test_domain_url)
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=f"SSRF Protection: domain validation failed: {reason}")
+
+    feed_url = payload.feed_or_endpoint or payload.feed_url
+    if feed_url:
+        feed_url = feed_url.strip()
+        is_safe, reason = network_safety.validate_url(feed_url)
+        if not is_safe:
+            raise HTTPException(status_code=400, detail=f"SSRF Protection: feed URL validation failed: {reason}")
+
     code = (payload.alpha2 or payload.country_code or "US").upper()
-    dom = payload.canonical_domain or payload.domain or "unknown.domain"
+
+    # Newly submitted sources default to unverified unless registered by SUPER_ADMIN explicitly verifying them
+    is_verified = (current_user.role == UserRole.SUPER_ADMIN) and bool(payload.is_verified)
+
     rec = CountrySourceRecord(
         publisher_name=payload.publisher_name,
         domain=dom,
-        feed_url=payload.feed_or_endpoint or payload.feed_url,
+        feed_url=feed_url,
         language=payload.original_language or payload.language or "en",
         source_type=payload.source_category or payload.source_type or "COMMERCIAL",
-        is_verified=payload.is_verified,
+        is_verified=is_verified,
     )
     ok = country_registry.register_custom_source(code, rec)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Country '{code}' not found")
+
+    audit_logger.log(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        action="news_source.registered",
+        resource_type="news_source",
+        resource_id=f"{code}:{dom}",
+        details={
+            "publisher": payload.publisher_name,
+            "domain": dom,
+            "country_code": code,
+            "is_verified": is_verified,
+            "user_role": current_user.role.value,
+        }
+    )
+
     c_entry = country_registry.get_country(code)
     country_display = c_entry.name if c_entry else code
     return {
@@ -419,7 +459,8 @@ async def register_custom_source(
         "country_code": code,
         "publisher": payload.publisher_name,
         "domain": dom,
-        "message": f"Source '{payload.publisher_name}' registered for {country_display}"
+        "is_verified": is_verified,
+        "message": f"Source '{payload.publisher_name}' registered for {country_display} (verified={is_verified})"
     }
 
 

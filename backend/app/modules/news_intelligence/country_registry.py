@@ -399,9 +399,29 @@ class GlobalCountryRegistry:
         if source.publisher_name not in c.major_publishers:
             c.major_publishers.append(source.publisher_name)
         c.source_count = len(c.sources)
-        c.verified_coverage = True
-        c.operational_status = "WORKING_TESTED_REAL"
+        if source.is_verified:
+            c.verified_coverage = True
+            c.operational_status = "WORKING_TESTED_REAL"
+        elif c.operational_status == "NO_SOURCES_CONFIGURED":
+            c.operational_status = "UNVERIFIED"
         c.last_collection_at = datetime.now(timezone.utc).isoformat()
+
+        # Persist to MongoDB if available
+        try:
+            from app.infrastructure.mongodb.client import get_sync_database
+            sync_db = get_sync_database()
+            if sync_db is not None:
+                doc = source.dict()
+                doc["country_code"] = c.alpha2
+                doc["country_name"] = c.name
+                sync_db.news_sources.update_one(
+                    {"country_code": c.alpha2, "domain": source.domain},
+                    {"$set": doc},
+                    upsert=True
+                )
+        except Exception:
+            pass
+
         return True
 
     def get_coverage_summary(self) -> Dict[str, Any]:

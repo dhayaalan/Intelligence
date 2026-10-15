@@ -41,7 +41,7 @@ export const NewsIntelligencePage: React.FC = () => {
   // Global Worldwide & Multi-Country Comparative States
   const [isWorldwide, setIsWorldwide] = useState<boolean>(true);
   const [compareCountries, setCompareCountries] = useState<boolean>(false);
-  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
+  const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>([]);
 
   // Direct URL ingestion modal state
   const [directUrl, setDirectUrl] = useState('');
@@ -83,7 +83,9 @@ export const NewsIntelligencePage: React.FC = () => {
       setQuery(customQuery);
     }
 
-    const targetCountries = selectedCountryCode ? [selectedCountryCode] : (isWorldwide ? ['WORLDWIDE'] : []);
+    const targetCountries = selectedCountryCodes.length > 0
+      ? selectedCountryCodes
+      : (isWorldwide ? ['WORLDWIDE'] : []);
 
     searchMutation.mutate(
       {
@@ -94,10 +96,10 @@ export const NewsIntelligencePage: React.FC = () => {
         date_filter: dateFilter || undefined,
         location_filter: locationFilter || undefined,
         source_filter: sourceFilter || undefined,
-        language_filter: languageFilter === 'all' ? undefined : languageFilter,
+        language_filter: (languageFilter === 'all' || !languageFilter) ? undefined : languageFilter,
         countries: targetCountries,
-        is_worldwide: isWorldwide && !selectedCountryCode,
-        compare_countries: compareCountries,
+        is_worldwide: isWorldwide && selectedCountryCodes.length === 0,
+        compare_countries: compareCountries || selectedCountryCodes.length > 1,
       },
       {
         onSuccess: () => {
@@ -383,21 +385,27 @@ export const NewsIntelligencePage: React.FC = () => {
                     Country / Scope ({globalCountries.length || 249}+)
                   </label>
                   <select
-                    value={selectedCountryCode}
+                    value=""
                     onChange={(e) => {
-                      setSelectedCountryCode(e.target.value);
-                      if (e.target.value) {
+                      const val = e.target.value;
+                      if (val === 'WORLDWIDE') {
+                        setSelectedCountryCodes([]);
+                        setIsWorldwide(true);
+                      } else if (val && !selectedCountryCodes.includes(val)) {
+                        setSelectedCountryCodes((prev) => [...prev, val]);
                         setIsWorldwide(false);
                       }
                     }}
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-[11px]"
                   >
-                    <option value="">Worldwide (All Configured Providers)</option>
+                    <option value="">+ Add Country to Filter / Comparison...</option>
+                    <option value="WORLDWIDE">Worldwide (All Configured Providers)</option>
                     {globalCountries.map((c) => {
                       const code = c.alpha2 || c.code || '';
+                      const isSelected = selectedCountryCodes.includes(code);
                       return (
-                        <option key={code} value={code}>
-                          {c.name} ({code}) — {c.region}
+                        <option key={code} value={code} disabled={isSelected}>
+                          {isSelected ? '✓ ' : ''}{c.name} ({code}) — {c.region}
                         </option>
                       );
                     })}
@@ -441,16 +449,50 @@ export const NewsIntelligencePage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Selected Country Chips */}
+              {selectedCountryCodes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    Selected Countries ({selectedCountryCodes.length}):
+                  </span>
+                  {selectedCountryCodes.map((cCode) => {
+                    const c = globalCountries.find((x) => (x.alpha2 || x.code) === cCode);
+                    return (
+                      <span
+                        key={cCode}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-mono"
+                      >
+                        {c?.name || cCode} ({cCode})
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCountryCodes((prev) => prev.filter((x) => x !== cCode))}
+                          className="hover:text-rose-500 font-bold ml-0.5 cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCountryCodes([])}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 underline ml-1 cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+
               {/* Geographic Investigation Modes */}
               <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center space-x-4">
                   <label className="flex items-center space-x-1.5 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300 font-medium">
                     <input
                       type="checkbox"
-                      checked={isWorldwide}
+                      checked={isWorldwide && selectedCountryCodes.length === 0}
                       onChange={(e) => {
                         setIsWorldwide(e.target.checked);
-                        if (e.target.checked) setSelectedCountryCode('');
+                        if (e.target.checked) setSelectedCountryCodes([]);
                       }}
                       className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5"
                     />

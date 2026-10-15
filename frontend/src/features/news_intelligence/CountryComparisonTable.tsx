@@ -192,11 +192,13 @@ export const CountryComparisonTable: React.FC<CountryComparisonTableProps> = ({
                         </div>
                       ))}
                     </div>
-                  ) : (
+                  ) : row.article_count >= 2 ? (
                     <div className="flex items-center space-x-1 text-[10px] text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-3 h-3" />
-                      <span>Sufficient multi-source coverage</span>
+                      <span>Multi-source coverage observed</span>
                     </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">Unassessed / single or zero source</span>
                   )}
                 </td>
 
@@ -208,8 +210,14 @@ export const CountryComparisonTable: React.FC<CountryComparisonTableProps> = ({
                       'text-[9px] font-mono font-bold',
                       row.operational_status === 'WORKING_TESTED_REAL'
                         ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
-                        : row.operational_status === 'CONFIG_REQUIRED'
+                        : row.operational_status === 'NO_MATCHING_RESULTS'
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                        : row.operational_status === 'NO_SOURCES_CONFIGURED'
                         ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                        : row.operational_status === 'UNVERIFIED'
+                        ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                        : row.operational_status === 'PROVIDER_ERROR' || row.operational_status === 'PROBE_FAILED'
+                        ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                     )}
                   >

@@ -63,11 +63,13 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     environment:
-      - APP_ENV=production
+      - APP_ENV=${APP_ENV:-production}
       - APP_NAME=Sential Intelligence Platform
-      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-sential_db}
-      - SECRET_KEY=${SECRET_KEY:-sential-production-ultra-secure-jwt-key-256-bit-signature}
+      - SECRET_KEY=${SECRET_KEY}
+      - INITIAL_SUPER_ADMIN_EMAIL=${INITIAL_SUPER_ADMIN_EMAIL:-superadmin@sential.io}
+      - INITIAL_SUPER_ADMIN_PASSWORD=${INITIAL_SUPER_ADMIN_PASSWORD:-}
       - SEARCH_JOB_TIMEOUT_SECONDS=${SEARCH_JOB_TIMEOUT_SECONDS:-60}
       - PROVIDER_TIMEOUT_SECONDS=${PROVIDER_TIMEOUT_SECONDS:-10}
       - ML_SERVICE_URL=${ML_SERVICE_URL:-}
@@ -136,8 +138,8 @@ services:
       - "127.0.0.1:${MINIO_PORT:-9002}:9000"
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9003}:9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-miniopassword}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data

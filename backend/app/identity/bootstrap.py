@@ -34,18 +34,30 @@ async def bootstrap_super_admin():
         app_logger.info("Platform already initialized with Super Admin. Skipping bootstrap.")
         return
 
-    # 2. Check if already marked in system_settings
+    # 2. Check if already marked in system_settings or users
     if mongo_db is not None:
         try:
             flag = await mongo_db.system_settings.find_one({"key": "super_admin_bootstrapped"})
-            if flag:
+            existing_user = await mongo_db.users.find_one({"id": "usr_super_admin"})
+            if flag or existing_user:
+                app_logger.info("Super admin initialization marker found. Preserving existing credentials.")
                 return
         except Exception:
             pass
 
     # 3. Securely create the platform Super Admin from environment
     email = (getattr(settings, "INITIAL_SUPER_ADMIN_EMAIL", None) or "superadmin@sential.io").strip().lower()
-    raw_password = getattr(settings, "INITIAL_SUPER_ADMIN_PASSWORD", None) or "SuperAdmin123!"
+    raw_password = getattr(settings, "INITIAL_SUPER_ADMIN_PASSWORD", None)
+
+    is_prod = settings.APP_ENV.lower() in ["production", "prod"]
+    if is_prod and (not raw_password or raw_password == "SuperAdmin123!"):
+        raise RuntimeError(
+            "Production security violation: INITIAL_SUPER_ADMIN_PASSWORD must be explicitly provided in environment. "
+            "Default fallback administrator passwords are prohibited in production."
+        )
+
+    if not raw_password:
+        raw_password = "SuperAdmin123!"
     
     super_admin_record = {
         "id": "usr_super_admin",
@@ -60,12 +72,12 @@ async def bootstrap_super_admin():
         "last_login": None
     }
 
-    # Write to MongoDB
+    # Write to MongoDB (insert only if not exists, never silently overwrite)
     if mongo_db is not None:
         try:
             await mongo_db.users.update_one(
                 {"id": "usr_super_admin"},
-                {"$set": super_admin_record},
+                {"$setOnInsert": super_admin_record},
                 upsert=True
             )
             await mongo_db.system_settings.update_one(
