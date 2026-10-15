@@ -12,9 +12,9 @@ logger = logging.getLogger("sential.threat_intel.threatfox")
 class ThreatFoxProvider(ProviderAdapter):
     """
     abuse.ch ThreatFox Community IOC & Malware Intelligence Provider.
-    Queries the ThreatFox public API for Indicators of Compromise (IOCs) including IP:ports, domains,
-    URLs, and file hashes, returning malware family attribution, threat types, and confidence scores.
-    Free community threat intelligence.
+    Queries abuse.ch ThreatFox public API for community-sourced Indicators of Compromise (IOCs),
+    associated malware families, threat types, and confidence metrics.
+    No API key required.
     """
 
     @property
@@ -23,11 +23,11 @@ class ThreatFoxProvider(ProviderAdapter):
 
     @property
     def name(self) -> str:
-        return "abuse.ch ThreatFox Community IOC & Malware Intelligence"
+        return "abuse.ch ThreatFox IOC Intelligence"
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "1.1.0"
 
     @property
     def timeout_seconds(self) -> float:
@@ -38,18 +38,23 @@ class ThreatFoxProvider(ProviderAdapter):
             async with httpx.AsyncClient(timeout=4.0) as client:
                 res = await client.post(
                     "https://threatfox-api.abuse.ch/api/v1/",
-                    json={"query": "tag_info", "tag": "cobaltstrike", "limit": 1},
+                    json={"query": "tag_info", "tag": "emotet"},
                     headers={"User-Agent": "SentialIntelligence/1.0"}
                 )
                 if res.status_code == 200:
                     data = res.json()
-                    status_str = data.get("query_status", "")
-                    if status_str in ["ok", "no_result"]:
+                    if data.get("query_status") in ("ok", "no_result"):
                         return HealthCheckResult(
                             status=ModuleHealthStatus.HEALTHY,
-                            message="abuse.ch ThreatFox API is active and operational",
+                            message="abuse.ch ThreatFox API is online and operational",
                             latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
                         )
+                elif res.status_code == 429:
+                    return HealthCheckResult(
+                        status=ModuleHealthStatus.DEGRADED,
+                        message="ThreatFox rate limit encountered",
+                        latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
+                    )
                 return HealthCheckResult(
                     status=ModuleHealthStatus.DEGRADED,
                     message=f"ThreatFox returned HTTP {res.status_code}",
@@ -86,54 +91,120 @@ class ThreatFoxProvider(ProviderAdapter):
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True) as client:
                 resp = await client.post(api_url, json=payload, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    query_status = data.get("query_status")
-                    if query_status == "ok":
-                        raw_matches = data.get("data", [])
-                        for item in raw_matches[:20]:
-                            ioc_val = item.get("ioc")
-                            threat_type = item.get("threat_type_desc") or item.get("threat_type")
-                            malware = item.get("malware_printable") or item.get("malware")
-                            confidence = item.get("confidence_level", 75)
-                            tags = item.get("tags") or []
-                            first_seen = item.get("first_seen")
-                            last_seen = item.get("last_seen")
+                duration = round((time.time() - start_time) * 1000, 2)
 
-                            ioc_record = {
-                                "id": item.get("id"),
-                                "ioc": ioc_val,
-                                "ioc_type": item.get("ioc_type"),
+                if resp.status_code == 429:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error="abuse.ch ThreatFox rate limit exceeded (HTTP 429)."
+                    )
+                elif resp.status_code >= 400:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"ThreatFox returned HTTP {resp.status_code}."
+                    )
+
+                data = resp.json()
+                query_status = data.get("query_status")
+
+                if query_status == "illegal_search_term":
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error="Illegal search term supplied to ThreatFox API."
+                    )
+                elif query_status not in ("ok", "no_result"):
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"ThreatFox API query status: {query_status}"
+                    )
+
+                if query_status == "ok":
+                    raw_matches = data.get("data", [])
+                    for item in raw_matches[:20]:
+                        ioc_val = item.get("ioc") or target
+                        ioc_type = item.get("ioc_type", "unknown")
+                        threat_type = item.get("threat_type_desc") or item.get("threat_type") or "IOC"
+                        malware = item.get("malware_printable") or item.get("malware") or "Unknown Malware"
+                        raw_conf = item.get("confidence_level")
+                        conf_normalized = float(raw_conf) / 100.0 if raw_conf is not None else None
+                        tags = item.get("tags") or []
+                        first_seen = item.get("first_seen")
+                        last_seen = item.get("last_seen")
+
+                        ioc_record = {
+                            "id": item.get("id"),
+                            "ioc": ioc_val,
+                            "ioc_value": ioc_val,
+                            "ioc_type": ioc_type,
+                            "threat_type": threat_type,
+                            "malware_family": malware,
+                            "malware_printable": malware,
+                            "confidence_level": raw_conf,
+                            "tags": tags,
+                            "first_seen": first_seen,
+                            "last_seen": last_seen,
+                            "reporter": item.get("reporter"),
+                            "reference": item.get("reference")
+                        }
+                        iocs.append(ioc_record)
+
+                        # Determine correct entity type: IOC is NOT a vulnerability!
+                        if ioc_type in ("ip:port", "ip"):
+                            ent_type = EntityType.IP
+                            ent_val = ioc_val.split(":")[0]
+                        elif ioc_type in ("domain", "hostname"):
+                            ent_type = EntityType.DOMAIN
+                            ent_val = ioc_val
+                        elif ioc_type in ("url",):
+                            ent_type = EntityType.URL
+                            ent_val = ioc_val
+                        else:
+                            ent_type = EntityType.THREAT_INDICATOR
+                            ent_val = ioc_val
+
+                        entities.append(EntityPayload(
+                            type=ent_type,
+                            value=ent_val,
+                            confidence=conf_normalized if conf_normalized is not None else 0.80,
+                            sources=[self.provider_id],
+                            metadata={
+                                "indicator_value": ioc_val,
+                                "ioc_type": ioc_type,
                                 "threat_type": threat_type,
                                 "malware_family": malware,
-                                "confidence_level": confidence,
                                 "tags": tags,
+                                "confidence_level": raw_conf,
                                 "first_seen": first_seen,
-                                "last_seen": last_seen,
-                                "reporter": item.get("reporter"),
-                                "reference": item.get("reference")
+                                "source": "abuse.ch ThreatFox",
+                                "is_ioc": True
                             }
-                            iocs.append(ioc_record)
+                        ).dict())
 
-                            # Emit VULNERABILITY / MALWARE entity
-                            entities.append(EntityPayload(
-                                type=EntityType.VULNERABILITY,
-                                value=f"ThreatFox: {malware or 'Malware IOC'} ({ioc_val})",
-                                confidence=min(0.98, max(0.40, confidence / 100.0)),
-                                sources=[self.provider_id],
-                                metadata={
-                                    "ioc": ioc_val,
-                                    "ioc_type": item.get("ioc_type"),
-                                    "threat_type": threat_type,
-                                    "malware_family": malware,
-                                    "tags": tags,
-                                    "confidence": confidence,
-                                    "first_seen": first_seen,
-                                    "source": "abuse.ch ThreatFox"
-                                }
-                            ).dict())
+        except httpx.TimeoutException:
+            duration = round((time.time() - start_time) * 1000, 2)
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error="ThreatFox API request timed out."
+            )
         except Exception as e:
+            duration = round((time.time() - start_time) * 1000, 2)
             logger.warning(f"ThreatFox search failed for '{target}': {e}")
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error=f"ThreatFox query error: {str(e)}"
+            )
 
         duration = round((time.time() - start_time) * 1000, 2)
         ev = ModuleSDK.create_evidence(
@@ -155,6 +226,7 @@ class ThreatFoxProvider(ProviderAdapter):
             raw_data={
                 "target": target,
                 "matches": iocs,
+                "iocs": iocs,
                 "count": len(iocs),
                 "entities": entities,
                 "evidence": [ev.dict() if hasattr(ev, "dict") else ev]

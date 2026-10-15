@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "database": "MongoDB",
   "counts": {
-    "total_providers": 368,
-    "osint": 335,
-    "threat_intelligence": 33
+    "total_providers": 375,
+    "osint": 339,
+    "threat_intelligence": 36
   },
   "osint": {
-    "count": 335,
+    "count": 339,
     "tools": [
       {
         "tool_id": "spiderfoot",
@@ -26,6 +26,93 @@
         ],
         "timeout_seconds": 15.0,
         "rate_limit": "120/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "urlscan",
+        "name": "urlscan.io Historical Web Scan & Tech Discovery",
+        "category": "WEB_INTEL",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "historical_scans",
+          "technologies",
+          "screenshots",
+          "ip"
+        ],
+        "supported_targets": [
+          "domain",
+          "url",
+          "ip",
+          "hostname"
+        ],
+        "timeout_seconds": 8.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "opensanctions",
+        "name": "OpenSanctions & PEP Compliance Screening",
+        "category": "COMPLIANCE_WATCHLIST",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "sanctions",
+          "pep",
+          "debarment",
+          "crime"
+        ],
+        "supported_targets": [
+          "person",
+          "organization",
+          "company",
+          "keyword",
+          "username"
+        ],
+        "timeout_seconds": 8.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "wayback_cdx",
+        "name": "Internet Archive Wayback Machine CDX",
+        "category": "ARCHIVE_INTEL",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "snapshots",
+          "historical_urls",
+          "archives"
+        ],
+        "supported_targets": [
+          "domain",
+          "url",
+          "hostname"
+        ],
+        "timeout_seconds": 8.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "gleif_lei",
+        "name": "GLEIF Legal Entity Identifier & Corporate Records",
+        "category": "FINANCIAL_INTEL",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "legal_entity_identifier",
+          "corporate_ownership",
+          "regulatory_records",
+          "lei_lookup"
+        ],
+        "supported_targets": [
+          "organization",
+          "company",
+          "lei",
+          "domain"
+        ],
+        "timeout_seconds": 10.0,
+        "rate_limit": "60/min",
         "status": "HEALTHY",
         "migration_status": "FULLY_MIGRATED"
       },
@@ -8161,6 +8248,68 @@
           "ip"
         ],
         "timeout_seconds": 30.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "threatfox",
+        "name": "abuse.ch ThreatFox IOC Intelligence",
+        "category": "THREAT_INTEL",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "ioc_search",
+          "malware_family",
+          "confidence"
+        ],
+        "supported_targets": [
+          "ip",
+          "domain",
+          "url",
+          "hash",
+          "ioc"
+        ],
+        "timeout_seconds": 8.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "nvd_cve",
+        "name": "NIST National Vulnerability Database CVE 2.0",
+        "category": "VULNERABILITY",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "cve_authoritative",
+          "cvss_v31",
+          "cwes"
+        ],
+        "supported_targets": [
+          "cve",
+          "keyword",
+          "software"
+        ],
+        "timeout_seconds": 10.0,
+        "rate_limit": "60/min",
+        "status": "HEALTHY",
+        "migration_status": "FULLY_MIGRATED"
+      },
+      {
+        "tool_id": "greynoise_community",
+        "name": "GreyNoise Community IP Threat & Noise Intelligence",
+        "category": "THREAT_INTEL",
+        "provider_type": "DEEP_ENGINE",
+        "capabilities": [
+          "ip_reputation",
+          "internet_noise",
+          "scanner_detection",
+          "riot_validation"
+        ],
+        "supported_targets": [
+          "ip",
+          "ipv4"
+        ],
+        "timeout_seconds": 8.0,
         "rate_limit": "60/min",
         "status": "HEALTHY",
         "migration_status": "FULLY_MIGRATED"

@@ -19,6 +19,7 @@ from app.modules.threat_intelligence.providers.threatfox import ThreatFoxProvide
 from app.modules.threat_intelligence.providers.nvd_cve import NVDVulnerabilityProvider
 from app.modules.threat_intelligence.providers.vulnerability_intel import VulnerabilityIntelProvider
 from app.modules.threat_intelligence.providers.ioc_feed import IOCFeedProvider
+from app.modules.threat_intelligence.providers.greynoise import GreyNoiseCommunityProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -66,7 +67,8 @@ class ThreatIntelligenceModule(IntelligenceModule):
             ("threatfox", ThreatFoxProvider(), "THREAT_INTEL", ["ioc_search", "malware_family", "confidence"], ["ip", "domain", "url", "hash", "ioc"]),
             ("nvd_cve", NVDVulnerabilityProvider(), "VULNERABILITY", ["cve_authoritative", "cvss_v31", "cwes"], ["cve", "keyword", "software"]),
             ("vulnerability_intel", VulnerabilityIntelProvider(), "VULNERABILITY", ["epss", "cisa_kev"], ["cve", "domain", "ip"]),
-            ("ioc_feed", IOCFeedProvider(), "THREAT_INTEL", ["alienvault_otx", "urlhaus", "abuseipdb"], ["ip", "domain", "hash", "url"])
+            ("ioc_feed", IOCFeedProvider(), "THREAT_INTEL", ["alienvault_otx", "urlhaus", "abuseipdb"], ["ip", "domain", "hash", "url"]),
+            ("greynoise_community", GreyNoiseCommunityProvider(), "THREAT_INTEL", ["ip_reputation", "internet_noise", "scanner_detection", "riot_validation"], ["ip", "ipv4"])
         ]
 
         for pid, provider, category, caps, targets in primary_threat_providers:

@@ -531,6 +531,32 @@ CURATED_TOOL_DEFINITIONS = [
         "status": "AVAILABLE",
         "requires_api_key": False,
         "supported_inputs": ["cve", "query"],
+    },
+    {
+        "id": "tool_greynoise",
+        "name": "GreyNoise Community IP Threat & Noise Intelligence",
+        "category": "Threat Intelligence",
+        "description": "Authoritative GreyNoise Community API v3 lookup identifying mass internet scanners, benign business services (RIOT), and malicious IP actors.",
+        "provider": "GreyNoise Community",
+        "module_id": "threat_intelligence",
+        "version": "3.0.0",
+        "execution_type": "REAL_TIME",
+        "status": "AVAILABLE",
+        "requires_api_key": False,
+        "supported_inputs": ["ip", "ipv4"],
+    },
+    {
+        "id": "tool_gleif",
+        "name": "GLEIF Legal Entity Identifier & Corporate Records",
+        "category": "Identity",
+        "description": "Global Legal Entity Identifier Foundation (GLEIF) Golden Copy lookup for verified corporate legal entity identity, LEI codes, and jurisdictions.",
+        "provider": "GLEIF API",
+        "module_id": "osint",
+        "version": "1.0.0",
+        "execution_type": "REAL_TIME",
+        "status": "AVAILABLE",
+        "requires_api_key": False,
+        "supported_inputs": ["organization", "company", "lei", "domain"],
     }
 ]
 

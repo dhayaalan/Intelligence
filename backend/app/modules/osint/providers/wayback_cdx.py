@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
-from app.module_sdk.models import HealthCheckResult, ModuleHealthStatus, EntityPayload, EntityType, EvidencePayload
+from app.module_sdk.models import HealthCheckResult, ModuleHealthStatus, EntityPayload, EntityType
 from app.module_sdk.sdk import ModuleSDK
 
 logger = logging.getLogger("sential.osint.wayback")
@@ -27,7 +27,7 @@ class WaybackCDXProvider(ProviderAdapter):
 
     @property
     def version(self) -> str:
-        return "2.0.0"
+        return "2.1.0"
 
     @property
     def timeout_seconds(self) -> float:
@@ -37,13 +37,20 @@ class WaybackCDXProvider(ProviderAdapter):
         try:
             async with httpx.AsyncClient(timeout=4.0) as client:
                 res = await client.get(
-                    "https://web.archive.org/cdx/search/cdx?url=example.com&limit=1&output=json",
+                    "https://web.archive.org/cdx/search/cdx",
+                    params={"url": "example.com", "limit": 1, "output": "json"},
                     headers={"User-Agent": "SentialIntelligence/1.0 (investigations@sential.org)"}
                 )
                 if res.status_code == 200:
                     return HealthCheckResult(
                         status=ModuleHealthStatus.HEALTHY,
                         message="Internet Archive CDX API is reachable and operational",
+                        latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
+                    )
+                elif res.status_code == 429:
+                    return HealthCheckResult(
+                        status=ModuleHealthStatus.DEGRADED,
+                        message="Wayback CDX rate limit encountered",
                         latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
                     )
                 return HealthCheckResult(
@@ -72,10 +79,13 @@ class WaybackCDXProvider(ProviderAdapter):
                 error="Invalid domain target for Wayback CDX lookup."
             )
 
-        cdx_url = (
-            f"https://web.archive.org/cdx/search/cdx"
-            f"?url={domain}/*&output=json&fl=original,timestamp,statuscode,mimetype&collapse=urlkey&limit=30"
-        )
+        cdx_params = {
+            "url": f"{domain}/*",
+            "output": "json",
+            "fl": "original,timestamp,statuscode,mimetype",
+            "collapse": "urlkey",
+            "limit": 30
+        }
         headers = {"User-Agent": "SentialIntelligence/1.0 (investigations@sential.org)"}
 
         discovered_snapshots: List[Dict[str, Any]] = []
@@ -83,42 +93,78 @@ class WaybackCDXProvider(ProviderAdapter):
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True) as client:
-                resp = await client.get(cdx_url, headers=headers)
-                if resp.status_code == 200:
-                    try:
-                        rows = resp.json()
-                        # rows[0] is header ['original', 'timestamp', 'statuscode', 'mimetype']
-                        if len(rows) > 1:
-                            for row in rows[1:]:
-                                if len(row) >= 4:
-                                    orig, ts, code, mime = row[0], row[1], row[2], row[3]
-                                    archive_url = f"https://web.archive.org/web/{ts}/{orig}"
-                                    snap = {
-                                        "original_url": orig,
-                                        "timestamp": ts,
+                resp = await client.get("https://web.archive.org/cdx/search/cdx", params=cdx_params, headers=headers)
+                duration = round((time.time() - start_time) * 1000, 2)
+
+                if resp.status_code == 429:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error="Internet Archive Wayback CDX rate limit exceeded (HTTP 429)."
+                    )
+                elif resp.status_code >= 400:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"Wayback CDX API returned HTTP {resp.status_code}."
+                    )
+
+                try:
+                    rows = resp.json()
+                    if isinstance(rows, list) and len(rows) > 1:
+                        for row in rows[1:]:
+                            if len(row) >= 4:
+                                orig, ts, code, mime = row[0], row[1], row[2], row[3]
+                                archive_url = f"https://web.archive.org/web/{ts}/{orig}"
+                                snap = {
+                                    "original_url": orig,
+                                    "timestamp": ts,
+                                    "status_code": code,
+                                    "mimetype": mime,
+                                    "archive_url": archive_url
+                                }
+                                discovered_snapshots.append(snap)
+                                entities.append(EntityPayload(
+                                    type=EntityType.URL,
+                                    value=orig,
+                                    confidence=0.88,
+                                    sources=[self.provider_id],
+                                    metadata={
+                                        "archive_url": archive_url,
+                                        "snapshot_timestamp": ts,
                                         "status_code": code,
                                         "mimetype": mime,
-                                        "archive_url": archive_url
+                                        "source": "Internet Archive Wayback Machine",
+                                        "is_historical_archive": True
                                     }
-                                    discovered_snapshots.append(snap)
-                                    entities.append(EntityPayload(
-                                        type=EntityType.URL,
-                                        value=orig,
-                                        confidence=0.88,
-                                        sources=[self.provider_id],
-                                        metadata={
-                                            "archive_url": archive_url,
-                                            "snapshot_timestamp": ts,
-                                            "status_code": code,
-                                            "mimetype": mime,
-                                            "source": "Internet Archive Wayback Machine",
-                                            "is_historical": True
-                                        }
-                                    ).dict())
-                    except Exception as parse_err:
-                        logger.warning(f"Failed to parse CDX JSON from Wayback: {parse_err}")
+                                ).dict())
+                except Exception as parse_err:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"Failed to parse CDX JSON from Wayback: {str(parse_err)}"
+                    )
+
+        except httpx.TimeoutException:
+            duration = round((time.time() - start_time) * 1000, 2)
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error="Wayback CDX API request timed out."
+            )
         except Exception as e:
+            duration = round((time.time() - start_time) * 1000, 2)
             logger.warning(f"Wayback CDX query failed for {domain}: {e}")
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error=f"Wayback CDX query error: {str(e)}"
+            )
 
         duration = round((time.time() - start_time) * 1000, 2)
         ev = ModuleSDK.create_evidence(

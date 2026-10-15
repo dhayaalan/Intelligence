@@ -61,6 +61,31 @@ async def test_example_intelligence_tags_synthetic_fixtures():
         target_type="domain"
     )
     res = await example_module.search(ctx)
-    assert len(res.entities) > 0
     assert res.entities[0].metadata.get("is_synthetic") is True
     assert res.entities[0].metadata.get("plugin_demonstration") is True
+
+
+@pytest.mark.asyncio
+async def test_disabled_module_blocked_at_execution_boundary():
+    """Verify SearchOrchestrator strictly blocks disabled modules even if explicitly requested in selected_modules."""
+    module_registry.disable_module("test_intelligence")
+    orchestrator = SearchOrchestrator()
+    admin_user = UserRecord(
+        id="usr_admin_1",
+        email="admin@sential.local",
+        hashed_password="hashed_admin_pw",
+        name="Administrator",
+        role=UserRole.SUPER_ADMIN,
+        tenant_id="tenant_default",
+        assigned_modules=["*"]
+    )
+    req = SearchRequest(
+        query="target-entity.com",
+        selected_modules=["test_intelligence"]
+    )
+    result = await orchestrator.execute_search(req, admin_user)
+    # The disabled module must NOT appear in module jobs or have emitted any results
+    executed_mods = [job.module for job in result.module_jobs]
+    assert "test_intelligence" not in executed_mods
+    assert len(result.entities) == 0
+

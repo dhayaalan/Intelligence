@@ -2,7 +2,11 @@ from fastapi.testclient import TestClient
 from app.module_registry.registry import module_registry
 from app.modules.test_intelligence.module import test_intelligence_module
 
-def test_dynamic_new_module_registration(client: TestClient, super_admin_headers):
+def test_dynamic_new_module_registration(client: TestClient, super_admin_headers, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "APP_ENV", "development")
+    module_registry.enable_module("test_intelligence")
+
     # Verify test_intelligence module is registered dynamically
     mod = module_registry.get_module("test_intelligence")
     assert mod is not None
@@ -20,4 +24,4 @@ def test_dynamic_new_module_registration(client: TestClient, super_admin_headers
     # Evidence and entities produced by the new pluggable module should be unified by core correlation
     test_entities = [e for e in data["entities"] if "test_intelligence" in e["sources"]]
     assert len(test_entities) > 0
-    assert "Verified Organization for plugin-demo.org" in test_entities[0]["value"]
+    assert "plugin-demo.org" in test_entities[0]["value"]

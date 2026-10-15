@@ -1,14 +1,15 @@
 # Sential Platform — Comprehensive Tool & Provider Inventory
 
-This document is the verified migration inventory of all **335 OSINT tools/platforms** and **33 Threat Intelligence engines** recovered from `saas_platform` and operational in Sential.
+This document is the verified migration and live inventory of all **339 OSINT tools/platforms** and **36 Threat Intelligence engines/providers** operational in Sential.
 
 ## Summary Metrics
 
-- **Total Integrated Tools / Providers**: 368
-- **OSINT Capabilities / Providers**: 335 (Requirement: 300+)
-- **Threat Intelligence Capabilities / Providers**: 33 (Requirement: 33)
+- **Total Integrated Tools / Providers**: 375
+- **OSINT Capabilities / Providers**: 339 (329 public platform probes + 10 core deep engines: SpiderFoot, Shodan, Maltego, theHarvester, Google Dork, Image Engine, Wayback CDX, urlscan.io, OpenSanctions, GLEIF LEI)
+- **Threat Intelligence Capabilities / Providers**: 36 (33 Specialized Scanning Engines + ThreatFox, NIST NVD CVE 2.0, GreyNoise Community)
 - **Primary Database**: MongoDB (`sential_db`)
-- **Architecture**: Pluggable Provider Registry with Zero Core Coupling
+- **Architecture**: Pluggable Provider Registry with Strict Disabled-Module Boundary Enforcement
+
 
 ---
 

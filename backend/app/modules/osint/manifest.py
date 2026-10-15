@@ -7,7 +7,7 @@ OSINT_MANIFEST = ModuleManifest(
     description="Comprehensive Open Source Intelligence engine covering recon, transforms, and public footprint analysis.",
     capabilities=["search", "enrichment", "entity_discovery"],
     permissions=["search", "view_results"],
-    providers=["spiderfoot", "shodan", "maltego", "theharvester", "google_dork", "image_osint", "username_recon", "marketplace_recon", "financial_intel", "wayback_cdx", "urlscan", "opensanctions"],
+    providers=["spiderfoot", "shodan", "maltego", "theharvester", "google_dork", "image_osint", "username_recon", "marketplace_recon", "financial_intel", "wayback_cdx", "urlscan", "opensanctions", "gleif_lei"],
     configuration_schema=[
         ModuleConfigField(
             key="spiderfoot_url",

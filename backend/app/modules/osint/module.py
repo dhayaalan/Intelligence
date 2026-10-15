@@ -28,6 +28,7 @@ from app.modules.osint.providers.financial_intel import FinancialIntelProvider
 from app.modules.osint.providers.wayback_cdx import WaybackCDXProvider
 from app.modules.osint.providers.urlscan import URLScanProvider
 from app.modules.osint.providers.opensanctions import OpenSanctionsProvider
+from app.modules.osint.providers.gleif import GLEIFProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -61,7 +62,8 @@ class OsintModule(IntelligenceModule):
             ("financial_intel", FinancialIntelProvider(), "FINANCIAL_INTEL", ["company", "organization", "bank", "lei", "cik"], ["organization", "company", "bank", "lei", "cik", "domain"]),
             ("wayback_cdx", WaybackCDXProvider(), "ARCHIVE_INTEL", ["snapshots", "historical_urls", "archives"], ["domain", "url", "hostname"]),
             ("urlscan", URLScanProvider(), "WEB_INTEL", ["historical_scans", "technologies", "screenshots", "ip"], ["domain", "url", "ip", "hostname"]),
-            ("opensanctions", OpenSanctionsProvider(), "COMPLIANCE_WATCHLIST", ["sanctions", "pep", "debarment", "crime"], ["person", "organization", "company", "keyword", "username"])
+            ("opensanctions", OpenSanctionsProvider(), "COMPLIANCE_WATCHLIST", ["sanctions", "pep", "debarment", "crime"], ["person", "organization", "company", "keyword", "username"]),
+            ("gleif_lei", GLEIFProvider(), "FINANCIAL_INTEL", ["legal_entity_identifier", "corporate_ownership", "regulatory_records", "lei_lookup"], ["organization", "company", "lei", "domain"])
         ]
 
         for pid, provider, category, caps, targets in primary_providers:
