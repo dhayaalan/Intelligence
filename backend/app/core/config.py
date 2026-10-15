@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     ML_SERVICE_URL: Optional[str] = os.getenv("ML_SERVICE_URL", None)
     ML_SERVICE_API_KEY: Optional[str] = os.getenv("ML_SERVICE_API_KEY", None)
     ML_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("ML_SERVICE_TIMEOUT_SECONDS", "30"))
+
+    # Dynamic Application Security Testing (DAST) - OWASP ZAP
+    ZAP_API_URL: str = os.getenv("ZAP_API_URL") or os.getenv("ZAP_API_ENDPOINT") or "http://172.17.0.1:8090"
+    ZAP_API_KEY: str = os.getenv("ZAP_API_KEY", "changeme")
     
     # CORS
     CORS_ORIGINS: List[str] = [

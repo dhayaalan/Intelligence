@@ -159,16 +159,27 @@ class ThreatIntelEngineAdapter(ProviderAdapter):
 
             # 2. Discovered Application Endpoints (from ZAP Spider & Crawlers)
             for ep in getattr(norm_res, "endpoints", []):
+                is_act = getattr(ep, "is_active", True) and (ep.status_code is not None and ep.status_code > 0)
+                status_label = "ACTIVE" if is_act else "NOT ACTIVE"
                 entities.append(EntityPayload(
                     type=EntityType.URL,
                     value=ep.url,
-                    confidence=0.90,
+                    confidence=0.90 if is_act else 0.35,
                     sources=[self.provider_id],
                     metadata={
                         "method": ep.method,
                         "status_code": ep.status_code,
                         "content_type": ep.content_type,
-                        "source_engine": ep.source_engine
+                        "source_engine": getattr(ep, "source_engine", self.provider_id),
+                        "is_active": is_act,
+                        "status": status_label,
+                        "reachability": "REACHABLE" if is_act else "NOT ACTIVE",
+                        "validation_status": status_label,
+                        "validation_notes": (
+                            f"HTTP {ep.status_code} active response"
+                            if is_act else
+                            "Target host is not active or could not be resolved in DNS"
+                        )
                     }
                 ).dict())
 

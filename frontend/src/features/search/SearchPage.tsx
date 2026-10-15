@@ -1630,6 +1630,20 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                                 >
                                   RELEVANCE: {relevanceTier}
                                 </Badge>
+                                {ent.type.toUpperCase() === 'URL' && (
+                                  ent.metadata?.is_active === false ||
+                                  ent.metadata?.status === 'NOT ACTIVE' ||
+                                  ent.metadata?.reachability === 'NOT ACTIVE' ||
+                                  (ent.metadata?.status_code !== undefined && !ent.metadata?.status_code) ? (
+                                    <Badge variant="danger" size="sm" className="text-[10px] font-bold">
+                                      NOT ACTIVE
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="success" size="sm" className="text-[10px]">
+                                      ACTIVE
+                                    </Badge>
+                                  )
+                                )}
                               </div>
                               <Badge
                                 variant={confTier === 'HIGH' ? 'success' : confTier === 'MEDIUM' ? 'warning' : 'neutral'}
@@ -1652,8 +1666,14 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                               <span className="font-mono text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
                                 Investigation Relevance:
                               </span>
-                              Correlated as {ent.type.toLowerCase()} across{' '}
-                              {(ent.sources || []).length || 1} independent telemetry sources for target '{query}'.
+                              {ent.type.toUpperCase() === 'URL' && (ent.metadata?.is_active === false || ent.metadata?.status === 'NOT ACTIVE') ? (
+                                <span className="text-rose-500 dark:text-rose-400 font-semibold">
+                                  Target endpoint is NOT ACTIVE or unreachable (DNS resolution / HTTP probe failed).
+                                </span>
+                              ) : (
+                                <>Correlated as {ent.type.toLowerCase()} across{' '}
+                                {(ent.sources || []).length || 1} independent telemetry sources for target '{query}'.</>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-1 border-t border-slate-100 dark:border-slate-800/80">
@@ -1666,7 +1686,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                               <div>
                                 <span className="text-slate-400 block">Observed:</span>
                                 <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                  {ent.first_seen ? formatDate(ent.first_seen) : 'Active Session'}
+                                  {ent.metadata?.is_active === false || ent.metadata?.status === 'NOT ACTIVE'
+                                    ? 'Unreachable / Inactive'
+                                    : ent.first_seen ? formatDate(ent.first_seen) : 'Active Session'}
                                 </span>
                               </div>
                             </div>

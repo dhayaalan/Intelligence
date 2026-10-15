@@ -96,6 +96,7 @@ class DiscoveredEndpoint(BaseModel):
     parameters: List[str] = Field(default_factory=list)
     forms: List[Dict[str, Any]] = Field(default_factory=list)
     source_engine: str = "web_crawler"
+    is_active: bool = True
 
 
 class DiscoveredTechnology(BaseModel):
