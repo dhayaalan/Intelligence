@@ -1,8 +1,12 @@
 import time
 import shutil
 import asyncio
+import socket
+import re
+import httpx
 import logging
 from typing import Dict, Any, List
+from urllib.parse import urlparse, urljoin
 from app.modules.threat_intelligence.engines.base import (
     ScannerEngine,
     EngineCategory,
@@ -19,7 +23,7 @@ logger = logging.getLogger("sentinel.scanner.katana")
 class KatanaEngine(ScannerEngine):
     """
     Katana Next-Gen Web Crawler & Application Spider Engine.
-    Discovers URLs, forms, parameters, and endpoints with JavaScript parsing and scope enforcement.
+    Discovers URLs, forms, parameters, and endpoints with scope enforcement and authentic target validation.
     """
 
     def engine_id(self) -> str:
@@ -66,25 +70,91 @@ class KatanaEngine(ScannerEngine):
         }
 
     async def preflight(self, target: str, target_type: str) -> PreflightResult:
-        return PreflightResult(ready=True)
+        base_url = target if target.startswith("http") else f"https://{target}"
+        parsed = urlparse(base_url)
+        host = (parsed.hostname or target).split(":")[0].strip()
+        if not host:
+            return PreflightResult(ready=False, error_message="Empty target hostname.")
+        try:
+            socket.gethostbyname(host)
+            return PreflightResult(ready=True)
+        except Exception:
+            return PreflightResult(
+                ready=False,
+                error_message=f"Target '{host}' is not active or could not be resolved in DNS."
+            )
 
     async def execute(self, target: str, target_type: str, context: Dict[str, Any]) -> RawEngineOutput:
         start_time = time.time()
         base_url = target if target.startswith("http") else f"https://{target}"
-        discovered = [
-            {"url": f"{base_url}/", "method": "GET", "status_code": 200},
-            {"url": f"{base_url}/login", "method": "GET", "status_code": 200},
-            {"url": f"{base_url}/api/v1/health", "method": "GET", "status_code": 200},
-            {"url": f"{base_url}/docs", "method": "GET", "status_code": 200},
-            {"url": f"{base_url}/api/v1/auth", "method": "POST", "status_code": 401}
-        ]
+        parsed = urlparse(base_url)
+        host = (parsed.hostname or target).split(":")[0].strip()
+
+        # 1. Authentic target reachability check
+        is_active = False
+        try:
+            socket.gethostbyname(host)
+            is_active = True
+        except Exception:
+            is_active = False
+
+        if not is_active:
+            duration = (time.time() - start_time) * 1000
+            return RawEngineOutput(
+                engine_id=self.engine_id(),
+                success=True,
+                duration_ms=duration,
+                raw_data={
+                    "endpoints": [],
+                    "target": base_url,
+                    "is_active": False,
+                    "status": "NOT ACTIVE",
+                    "reason": f"Target host '{host}' is not active or could not be resolved."
+                }
+            )
+
+        # 2. Genuine crawling of active target
+        discovered: List[Dict[str, Any]] = []
+        try:
+            async with httpx.AsyncClient(timeout=4.0, verify=False, follow_redirects=True) as client:
+                resp = await client.get(base_url)
+                if resp is not None:
+                    discovered.append({
+                        "url": str(resp.url),
+                        "method": "GET",
+                        "status_code": resp.status_code,
+                        "content_type": resp.headers.get("content-type", "text/html"),
+                        "is_active": True
+                    })
+
+                    html_text = resp.text
+                    hrefs = re.findall(r'href=["\']([^"\']+)["\']', html_text, re.IGNORECASE)
+                    for h in hrefs[:25]:
+                        full = urljoin(str(resp.url), h)
+                        p = urlparse(full)
+                        if p.scheme in ["http", "https"] and p.hostname == host:
+                            if not any(d["url"] == full for d in discovered):
+                                discovered.append({
+                                    "url": full,
+                                    "method": "GET",
+                                    "status_code": 200,
+                                    "content_type": "text/html",
+                                    "is_active": True
+                                })
+        except Exception as e:
+            logger.warning(f"Katana probe error for {base_url}: {e}")
 
         duration = (time.time() - start_time) * 1000
         return RawEngineOutput(
             engine_id=self.engine_id(),
             success=True,
             duration_ms=duration,
-            raw_data={"endpoints": discovered, "target": base_url}
+            raw_data={
+                "endpoints": discovered,
+                "target": base_url,
+                "is_active": len(discovered) > 0,
+                "status": "ACTIVE" if len(discovered) > 0 else "NOT ACTIVE"
+            }
         )
 
     def normalize(
@@ -96,12 +166,17 @@ class KatanaEngine(ScannerEngine):
         tenant_id: str
     ) -> NormalizedEngineResult:
         result = NormalizedEngineResult(engine_id=self.engine_id())
-        endpoints = raw_output.raw_data.get("endpoints", [])
+        data = raw_output.raw_data or {}
+        endpoints = data.get("endpoints", [])
+        is_active = data.get("is_active", len(endpoints) > 0)
+
         for ep in endpoints:
             result.endpoints.append(DiscoveredEndpoint(
                 url=ep.get("url", target),
                 method=ep.get("method", "GET"),
                 status_code=ep.get("status_code", 200),
-                content_type="text/html"
+                content_type=ep.get("content_type", "text/html"),
+                source_engine=self.engine_id(),
+                is_active=ep.get("is_active", is_active)
             ))
         return result

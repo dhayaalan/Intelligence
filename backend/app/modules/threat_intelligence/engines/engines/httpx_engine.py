@@ -68,13 +68,54 @@ class HTTPXEngine(ScannerEngine):
         }
 
     async def preflight(self, target: str, target_type: str) -> PreflightResult:
-        return PreflightResult(ready=True)
+        import socket
+        from urllib.parse import urlparse
+        base_url = target if target.startswith("http") else f"https://{target}"
+        parsed = urlparse(base_url)
+        host = (parsed.hostname or target).split(":")[0].strip()
+        if not host:
+            return PreflightResult(ready=False, error_message="Empty target hostname.")
+        try:
+            socket.gethostbyname(host)
+            return PreflightResult(ready=True)
+        except Exception:
+            return PreflightResult(
+                ready=False,
+                error_message=f"Target '{host}' is not active or could not be resolved in DNS."
+            )
 
     async def execute(self, target: str, target_type: str, context: Dict[str, Any]) -> RawEngineOutput:
+        import socket
+        from urllib.parse import urlparse
         start_time = time.time()
         url = target if target.startswith("http") else f"https://{target}"
-        probe_result = {}
+        parsed = urlparse(url)
+        host = (parsed.hostname or target).split(":")[0].strip()
 
+        # 1. DNS / Reachability Check
+        is_active = False
+        try:
+            socket.gethostbyname(host)
+            is_active = True
+        except Exception:
+            is_active = False
+
+        if not is_active:
+            duration = (time.time() - start_time) * 1000
+            return RawEngineOutput(
+                engine_id=self.engine_id(),
+                success=True,
+                duration_ms=duration,
+                raw_data={
+                    "url": url,
+                    "status_code": None,
+                    "is_active": False,
+                    "status": "NOT ACTIVE",
+                    "reason": f"Target host '{host}' is not active or unresolvable in DNS."
+                }
+            )
+
+        probe_result = {}
         try:
             async with httpx.AsyncClient(timeout=4.0, verify=False, follow_redirects=True) as client:
                 resp = await client.get(url)
@@ -82,23 +123,22 @@ class HTTPXEngine(ScannerEngine):
                 probe_result = {
                     "url": str(resp.url),
                     "status_code": resp.status_code,
-                    "server": headers.get("server", "nginx"),
+                    "is_active": True,
+                    "status": "ACTIVE",
+                    "server": headers.get("server", ""),
                     "content_type": headers.get("content-type", "text/html"),
                     "content_length": len(resp.content),
                     "hsts": "strict-transport-security" in headers,
                     "csp": "content-security-policy" in headers,
                     "x_frame": "x-frame-options" in headers
                 }
-        except Exception:
+        except Exception as e:
             probe_result = {
                 "url": url,
-                "status_code": 200,
-                "server": "nginx/1.24.0",
-                "content_type": "text/html; charset=utf-8",
-                "content_length": 4200,
-                "hsts": True,
-                "csp": False,
-                "x_frame": True
+                "status_code": None,
+                "is_active": False,
+                "status": "NOT ACTIVE",
+                "reason": f"Connection failed: {str(e)}"
             }
 
         duration = (time.time() - start_time) * 1000
@@ -118,36 +158,43 @@ class HTTPXEngine(ScannerEngine):
         tenant_id: str
     ) -> NormalizedEngineResult:
         result = NormalizedEngineResult(engine_id=self.engine_id())
-        data = raw_output.raw_data
+        data = raw_output.raw_data or {}
 
         url = data.get("url", target)
+        is_active = data.get("is_active", False)
+        status_code = data.get("status_code")
+
         result.endpoints.append(DiscoveredEndpoint(
             url=url,
             method="GET",
-            status_code=data.get("status_code", 200),
-            content_type=data.get("content_type", "text/html")
+            status_code=status_code,
+            content_type=data.get("content_type", "text/html"),
+            source_engine=self.engine_id(),
+            is_active=is_active
         ))
 
-        server_tech = data.get("server")
-        if server_tech:
-            result.technologies.append(DiscoveredTechnology(
-                name=server_tech,
-                category="Web Server",
-                confidence="HIGH"
-            ))
+        # Only emit technologies and findings if the target is ACTIVE
+        if is_active and status_code is not None:
+            server_tech = data.get("server")
+            if server_tech:
+                result.technologies.append(DiscoveredTechnology(
+                    name=server_tech,
+                    category="Web Server",
+                    confidence="HIGH"
+                ))
 
-        if not data.get("csp"):
-            result.findings.append(NormalizedFinding(
-                id=f"f_csp_{scan_id[:8]}",
-                scan_id=scan_id,
-                tenant_id=tenant_id,
-                engine=self.engine_id(),
-                engine_version=self.version(),
-                target=target,
-                finding_type="MISSING_SECURITY_HEADER",
-                title="Missing Content-Security-Policy (CSP) Header",
-                description="The target web endpoint does not return a Content-Security-Policy header, reducing defense against XSS and data injection attacks.",
-                severity="LOW",
+            if not data.get("csp"):
+                result.findings.append(NormalizedFinding(
+                    id=f"f_csp_{scan_id[:8]}",
+                    scan_id=scan_id,
+                    tenant_id=tenant_id,
+                    engine=self.engine_id(),
+                    engine_version=self.version(),
+                    target=target,
+                    finding_type="MISSING_SECURITY_HEADER",
+                    title="Missing Content-Security-Policy (CSP) Header",
+                    description="The target web endpoint does not return a Content-Security-Policy header, reducing defense against XSS and data injection attacks.",
+                    severity="LOW",
                 confidence="HIGH",
                 status="OPEN",
                 source="HTTPX Web Surface Prober",

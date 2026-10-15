@@ -47,19 +47,23 @@ class ZAPSpiderEngine(ScannerEngine):
         return ["traditional_spider", "ajax_spider", "spa_crawling", "form_discovery", "zap_automation_framework"]
 
     async def health_check(self) -> Dict[str, Any]:
-        zap_url = getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8080")
+        zap_url = getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8090")
+        zap_key = getattr(settings, "ZAP_API_KEY", "changeme")
+        headers = {"X-ZAP-API-Key": zap_key} if zap_key else {}
         is_ready = False
+        version_str = "2.17.0"
         try:
-            async with httpx.AsyncClient(timeout=1.5) as client:
+            async with httpx.AsyncClient(timeout=1.5, headers=headers) as client:
                 res = await client.get(f"{zap_url}/JSON/core/view/version/")
                 if res.status_code == 200:
                     is_ready = True
+                    version_str = res.json().get("version", "2.17.0")
         except Exception:
             is_ready = False
 
         return {
             "status": "READY",
-            "version": "2.14.0" if is_ready else "2.14.0 (Autonomous Adapter Mode)",
+            "version": version_str if is_ready else f"{version_str} (Autonomous Adapter Mode)",
             "details": f"ZAP Automation Gateway: {'Connected to daemon at ' + zap_url if is_ready else 'Autonomous high-concurrency spider driver active'}"
         }
 
@@ -75,11 +79,13 @@ class ZAPSpiderEngine(ScannerEngine):
 
         try:
             # 1. Check for live ZAP API Daemon
-            zap_url = context.get("zap_api_endpoint") or getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8080")
+            zap_url = context.get("zap_api_endpoint") or getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8090")
+            zap_key = context.get("zap_api_key") or getattr(settings, "ZAP_API_KEY", "changeme")
+            zap_headers = {"X-ZAP-API-Key": zap_key} if zap_key else {}
             zap_connected = False
 
             try:
-                async with httpx.AsyncClient(timeout=1.5) as client:
+                async with httpx.AsyncClient(timeout=2.0, headers=zap_headers) as client:
                     chk = await client.get(f"{zap_url}/JSON/core/view/version/")
                     if chk.status_code == 200:
                         zap_connected = True

@@ -58,19 +58,23 @@ class ZAPActiveScanEngine(ScannerEngine):
         return 60
 
     async def health_check(self) -> Dict[str, Any]:
-        zap_url = getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8080")
+        zap_url = getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8090")
+        zap_key = getattr(settings, "ZAP_API_KEY", "changeme")
+        headers = {"X-ZAP-API-Key": zap_key} if zap_key else {}
         is_daemon_live = False
+        version_str = self.version()
         try:
-            async with httpx.AsyncClient(timeout=1.5) as client:
+            async with httpx.AsyncClient(timeout=1.5, headers=headers) as client:
                 chk = await client.get(f"{zap_url}/JSON/core/view/version/")
                 if chk.status_code == 200:
                     is_daemon_live = True
+                    version_str = chk.json().get("version", self.version())
         except Exception:
             is_daemon_live = False
 
         return {
             "status": "READY",
-            "version": self.version(),
+            "version": version_str,
             "details": f"OWASP ZAP Assessment Engine loaded with OWASP Core Ruleset ({'ZAP Daemon online' if is_daemon_live else 'Autonomous DAST Engine active'})"
         }
 
@@ -84,11 +88,13 @@ class ZAPActiveScanEngine(ScannerEngine):
 
         try:
             # 1. Connect to ZAP daemon if configured and reachable
-            zap_url = context.get("zap_api_endpoint") or getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8080")
+            zap_url = context.get("zap_api_endpoint") or getattr(settings, "ZAP_API_URL", "http://127.0.0.1:8090")
+            zap_key = context.get("zap_api_key") or getattr(settings, "ZAP_API_KEY", "changeme")
+            zap_headers = {"X-ZAP-API-Key": zap_key} if zap_key else {}
             zap_connected = False
 
             try:
-                async with httpx.AsyncClient(timeout=1.5) as client:
+                async with httpx.AsyncClient(timeout=2.0, headers=zap_headers) as client:
                     chk = await client.get(f"{zap_url}/JSON/core/view/version/")
                     if chk.status_code == 200:
                         zap_connected = True
