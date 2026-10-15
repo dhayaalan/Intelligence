@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging import app_logger
@@ -8,7 +8,7 @@ from app.modules.osint.module import osint_module
 from app.modules.threat_intelligence.module import threat_intelligence_module
 from app.modules.test_intelligence.module import test_intelligence_module
 from app.identity.bootstrap import bootstrap_super_admin
-from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_connection
+from app.infrastructure.mongodb.client import connect_to_mongo, close_mongo_connection, mongo_manager
 from app.modules.example_intelligence.module import example_module
 from app.modules.news_intelligence.module import news_intelligence_module
 from app.modules.social_media_intelligence.module import social_media_intelligence_module
@@ -64,5 +64,51 @@ async def health_check():
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "modules_registered": len(module_registry.list_all_modules())
+    }
+
+@app.get("/health/liveness")
+@app.get("/health/live")
+async def liveness_check():
+    return {
+        "status": "alive",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION
+    }
+
+@app.get("/health/readiness")
+@app.get("/health/ready")
+async def readiness_check(response: Response):
+    db_connected = False
+    db_details = "disconnected"
+    try:
+        if mongo_manager.db is not None:
+            await mongo_manager.db.command("ping")
+            db_connected = True
+            db_details = "connected"
+        else:
+            db_details = "uninitialized"
+    except Exception as e:
+        db_details = "error"
+
+    # In production, database connectivity is required for readiness
+    is_ready = db_connected if settings.APP_ENV == "production" else True
+    modules_count = len(module_registry.list_all_modules())
+    if modules_count == 0:
+        is_ready = False
+
+    if not is_ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "unready",
+            "database": db_details,
+            "modules_registered": modules_count,
+            "environment": settings.APP_ENV
+        }
+
+    return {
+        "status": "ready",
+        "database": db_details,
+        "modules_registered": modules_count,
+        "environment": settings.APP_ENV
     }
 

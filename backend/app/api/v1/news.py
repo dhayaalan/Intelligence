@@ -26,6 +26,11 @@ from app.modules.news_intelligence.multimodal_engine import (
     SeedIngestRequest,
     IngestedSeedResult,
 )
+from app.modules.news_intelligence.country_registry import (
+    country_registry,
+    CountryEntry,
+    CountrySourceRecord,
+)
 
 router = APIRouter(prefix="/news", tags=["News Intelligence"])
 
@@ -325,4 +330,119 @@ async def ingest_multimodal_seed(
     and 64-bit dHash perceptual media hashing.
     """
     return await multimodal_engine.ingest_url_seed(req.target_url, req.media_type)
+
+
+# --- Global Country Registry & Comparative Analysis Endpoints ---
+
+@router.get("/countries", response_model=List[CountryEntry])
+async def list_countries(
+    region: Optional[str] = Query(None),
+    verified_only: Optional[bool] = Query(None),
+    query: Optional[str] = Query(None),
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Returns the dynamic global country and territory registry based on ISO 3166-1 standards.
+    Supports filtering by region, verified news sources, or name/code search.
+    """
+    return country_registry.list_countries(region=region, has_verified_sources=verified_only, query=query)
+
+
+@router.get("/countries/{identifier}", response_model=CountryEntry)
+async def get_country_detail(
+    identifier: str,
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Resolves country metadata by ISO alpha-2, alpha-3, canonical name, alias, or TLD.
+    """
+    entry = country_registry.get_country(identifier)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Country '{identifier}' not found in global registry")
+    return entry
+
+
+@router.get("/coverage-summary")
+async def get_global_coverage_summary(
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Returns an honest, data-driven summary of worldwide news coverage, verified sources,
+    and regional distributions without synthetic inflation.
+    """
+    return country_registry.get_coverage_summary()
+
+
+class RegisterSourcePayload(BaseModel):
+    publisher_name: str
+    domain: Optional[str] = None
+    canonical_domain: Optional[str] = None
+    country_code: Optional[str] = None
+    alpha2: Optional[str] = None
+    country_name: Optional[str] = None
+    original_language: Optional[str] = "en"
+    language: Optional[str] = "en"
+    feed_or_endpoint: Optional[str] = None
+    feed_url: Optional[str] = None
+    source_category: Optional[str] = "COMMERCIAL"
+    source_type: Optional[str] = "COMMERCIAL"
+    is_official: bool = False
+    is_verified: bool = True
+
+
+@router.post("/sources")
+async def register_custom_source(
+    payload: RegisterSourcePayload,
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Registers a newly discovered publisher domain in the central country source directory.
+    """
+    code = (payload.alpha2 or payload.country_code or "US").upper()
+    dom = payload.canonical_domain or payload.domain or "unknown.domain"
+    rec = CountrySourceRecord(
+        publisher_name=payload.publisher_name,
+        domain=dom,
+        feed_url=payload.feed_or_endpoint or payload.feed_url,
+        language=payload.original_language or payload.language or "en",
+        source_type=payload.source_category or payload.source_type or "COMMERCIAL",
+        is_verified=payload.is_verified,
+    )
+    ok = country_registry.register_custom_source(code, rec)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Country '{code}' not found")
+    c_entry = country_registry.get_country(code)
+    country_display = c_entry.name if c_entry else code
+    return {
+        "status": "registered",
+        "country": country_display,
+        "country_code": code,
+        "publisher": payload.publisher_name,
+        "domain": dom,
+        "message": f"Source '{payload.publisher_name}' registered for {country_display}"
+    }
+
+
+class CompareCountriesPayload(BaseModel):
+    query: str
+    countries: List[str]
+    languages: Optional[List[str]] = None
+
+
+@router.post("/compare", response_model=NewsSearchResponse)
+async def compare_countries_coverage(
+    payload: CompareCountriesPayload,
+    current_user: UserRecord = Depends(get_current_user),
+):
+    """
+    Executes simultaneous multi-country comparative analysis for an event or claim,
+    returning article records and a side-by-side country comparison matrix.
+    """
+    req = NewsSearchRequest(
+        query=payload.query,
+        countries=payload.countries,
+        languages=payload.languages or [],
+        compare_countries=True,
+    )
+    return await news_intelligence_service.execute_search(req, current_user)
 

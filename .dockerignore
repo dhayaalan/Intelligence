@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Environments & secrets
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+env
+.pytest_cache
+.coverage
+htmlcov/
+
+# Node
+node_modules
+dist
+build
+.vite
+
+# IDEs
+.vscode
+.idea
+
+# Logs & Data
+*.log
+logs/
+data/
+mongo-data/
+mongodb_data/

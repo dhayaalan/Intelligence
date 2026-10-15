@@ -726,3 +726,49 @@ async def abort_vapt_scan(
     return vapt_scope_enforcer.abort_scan(job_id, reason=req.reason)
 
 
+class ProfileRefreshRequest(BaseModel):
+    platform_id: str
+    username: str
+
+
+@router.post("/profile/refresh")
+async def refresh_profile_metadata(
+    req: ProfileRefreshRequest,
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Manually triggers live profile metadata refresh and identifies attribute changes."""
+    from app.modules.osint.snapshot_service import profile_snapshot_service
+    result, changes = await profile_snapshot_service.refresh_profile(
+        platform_id=req.platform_id,
+        username=req.username,
+        tenant_id=current_user.tenant_id
+    )
+    return {
+        "status": "SUCCESS",
+        "result": result.dict(),
+        "changes": [c.dict() for c in changes],
+        "refreshed_at": result.fetched_at
+    }
+
+
+@router.get("/profile/history")
+async def get_profile_history(
+    platform_id: str = Query(..., description="Platform identifier (e.g. github, gitlab)"),
+    username: str = Query(..., description="Target account username"),
+    current_user: UserRecord = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Returns versioned historical observations and change log for an OSINT profile."""
+    from app.modules.osint.snapshot_service import profile_snapshot_service
+    snapshots = await profile_snapshot_service.get_snapshot_history(
+        platform_id=platform_id,
+        username=username
+    )
+    return {
+        "platform_id": platform_id,
+        "username": username,
+        "total_snapshots": len(snapshots),
+        "snapshots": [s.dict() for s in snapshots]
+    }
+
+
+

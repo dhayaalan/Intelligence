@@ -23,6 +23,8 @@ from app.modules.osint.providers.theharvester import TheHarvesterProvider
 from app.modules.osint.providers.google_dork import GoogleDorkProvider
 from app.modules.osint.providers.image_engine import ImageOSINTProvider
 from app.modules.osint.providers.username_recon import UsernameReconProvider
+from app.modules.osint.providers.marketplace_recon import MarketplaceReconProvider
+from app.modules.osint.providers.financial_intel import FinancialIntelProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -51,7 +53,9 @@ class OsintModule(IntelligenceModule):
             ("google_dork", GoogleDorkProvider(), "SEARCH_OPERATORS", ["domain", "dorks", "files"], ["domain"]),
             ("maltego", MaltegoProvider(), "TRANSFORMS", ["domain", "ip", "dns", "whois"], ["domain", "ip"]),
             ("image_osint", ImageOSINTProvider(), "IMAGE_METADATA", ["image", "exif", "person"], ["image", "url", "person"]),
-            ("username_recon", UsernameReconProvider(), "SOCIAL_IDENTITY", ["username", "handle", "person", "email"], ["username", "handle", "person"])
+            ("username_recon", UsernameReconProvider(), "SOCIAL_IDENTITY", ["username", "handle", "person", "email"], ["username", "handle", "person"]),
+            ("marketplace_recon", MarketplaceReconProvider(), "MARKETPLACE_INTEL", ["product", "asin", "marketplace", "url"], ["product", "url", "asin"]),
+            ("financial_intel", FinancialIntelProvider(), "FINANCIAL_INTEL", ["company", "organization", "bank", "lei", "cik"], ["organization", "company", "bank", "lei", "cik", "domain"])
         ]
 
         for pid, provider, category, caps, targets in primary_providers:

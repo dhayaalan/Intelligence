@@ -14,6 +14,8 @@ import {
   useNewsSearchHistory,
   useNewsInvestigations,
   useCreateNewsInvestigation,
+  useNewsCountries,
+  useNewsCoverageSummary,
   NewsSearchResultItem,
   SearchMode,
   ContentCategory,
@@ -22,6 +24,7 @@ import { NewsInvestigationWorkspace } from './NewsInvestigationWorkspace';
 import { NewsArticleReaderView } from './NewsArticleReaderView';
 import { WatchlistsModal } from './WatchlistsModal';
 import { AddToCaseModal } from './AddToCaseModal';
+import { CountryComparisonTable } from './CountryComparisonTable';
 import { cn } from '../../lib/utils';
 
 export const NewsIntelligencePage: React.FC = () => {
@@ -32,8 +35,13 @@ export const NewsIntelligencePage: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<string>('');
   const [locationFilter, setLocationFilter] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<string>('');
-  const [languageFilter, setLanguageFilter] = useState<string>('en');
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Global Worldwide & Multi-Country Comparative States
+  const [isWorldwide, setIsWorldwide] = useState<boolean>(true);
+  const [compareCountries, setCompareCountries] = useState<boolean>(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
 
   // Direct URL ingestion modal state
   const [directUrl, setDirectUrl] = useState('');
@@ -64,6 +72,7 @@ export const NewsIntelligencePage: React.FC = () => {
   const searchMutation = useNewsSearch();
   const { data: searchHistory = [], refetch: refetchHistory } = useNewsSearchHistory();
   const { data: activeInvestigations = [], refetch: refetchInvestigations } = useNewsInvestigations();
+  const { data: globalCountries = [] } = useNewsCountries();
   const createInvestigationMutation = useCreateNewsInvestigation();
 
   const handleSearch = (customQuery?: string) => {
@@ -74,6 +83,8 @@ export const NewsIntelligencePage: React.FC = () => {
       setQuery(customQuery);
     }
 
+    const targetCountries = selectedCountryCode ? [selectedCountryCode] : (isWorldwide ? ['WORLDWIDE'] : []);
+
     searchMutation.mutate(
       {
         query: q,
@@ -83,7 +94,10 @@ export const NewsIntelligencePage: React.FC = () => {
         date_filter: dateFilter || undefined,
         location_filter: locationFilter || undefined,
         source_filter: sourceFilter || undefined,
-        language_filter: languageFilter || undefined,
+        language_filter: languageFilter === 'all' ? undefined : languageFilter,
+        countries: targetCountries,
+        is_worldwide: isWorldwide && !selectedCountryCode,
+        compare_countries: compareCountries,
       },
       {
         onSuccess: () => {
@@ -345,65 +359,118 @@ export const NewsIntelligencePage: React.FC = () => {
 
           {/* Advanced Filters Expandable Drawer */}
           {showAdvancedFilters && (
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs animate-in fade-in">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Temporal Filter
-                </label>
-                <select
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                >
-                  <option value="">Any Time</option>
-                  <option value="today">Past 24 Hours</option>
-                  <option value="week">Past Week</option>
-                  <option value="month">Past Month</option>
-                  <option value="year">Past Year</option>
-                </select>
+            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 space-y-3 text-xs animate-in fade-in">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Temporal Filter
+                  </label>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  >
+                    <option value="">Any Time</option>
+                    <option value="today">Past 24 Hours</option>
+                    <option value="week">Past Week</option>
+                    <option value="month">Past Month</option>
+                    <option value="year">Past Year</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Country / Scope ({globalCountries.length || 249}+)
+                  </label>
+                  <select
+                    value={selectedCountryCode}
+                    onChange={(e) => {
+                      setSelectedCountryCode(e.target.value);
+                      if (e.target.value) {
+                        setIsWorldwide(false);
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-[11px]"
+                  >
+                    <option value="">Worldwide (All Configured Providers)</option>
+                    {globalCountries.map((c) => {
+                      const code = c.alpha2 || c.code || '';
+                      return (
+                        <option key={code} value={code}>
+                          {c.name} ({code}) — {c.region}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Source / Outlet
+                  </label>
+                  <input
+                    type="text"
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value)}
+                    placeholder="e.g. Reuters, BBC, Le Monde, TASS"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Language
+                  </label>
+                  <select
+                    value={languageFilter}
+                    onChange={(e) => setLanguageFilter(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  >
+                    <option value="all">Any Language</option>
+                    <option value="en">English (en)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="de">German (de)</option>
+                    <option value="ru">Russian (ru)</option>
+                    <option value="zh">Chinese (zh)</option>
+                    <option value="ar">Arabic (ar)</option>
+                    <option value="hi">Hindi (hi)</option>
+                    <option value="ta">Tamil (ta)</option>
+                    <option value="ja">Japanese (ja)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Location / Region
-                </label>
-                <input
-                  type="text"
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
-                  placeholder="e.g. Chennai, India, Geneva"
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                />
-              </div>
+              {/* Geographic Investigation Modes */}
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-1.5 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={isWorldwide}
+                      onChange={(e) => {
+                        setIsWorldwide(e.target.checked);
+                        if (e.target.checked) setSelectedCountryCode('');
+                      }}
+                      className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5"
+                    />
+                    <span>Worldwide Multi-Provider Discovery</span>
+                  </label>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Source / Outlet
-                </label>
-                <input
-                  type="text"
-                  value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value)}
-                  placeholder="e.g. Reuters, NDTV, Twitter"
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                />
-              </div>
+                  <label className="flex items-center space-x-1.5 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={compareCountries}
+                      onChange={(e) => setCompareCountries(e.target.checked)}
+                      className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5"
+                    />
+                    <span>Compare Countries (Simultaneous Matrix)</span>
+                  </label>
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Language
-                </label>
-                <select
-                  value={languageFilter}
-                  onChange={(e) => setLanguageFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-                >
-                  <option value="en">English (en)</option>
-                  <option value="ta">Tamil (ta)</option>
-                  <option value="hi">Hindi (hi)</option>
-                  <option value="es">Spanish (es)</option>
-                  <option value="all">Any Language</option>
-                </select>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  Registry: {globalCountries.length > 0 ? `${globalCountries.length} countries loaded` : 'Loading ISO-3166 registry...'}
+                </div>
               </div>
             </div>
           )}
@@ -498,6 +565,11 @@ export const NewsIntelligencePage: React.FC = () => {
           </div>
         )}
 
+        {/* Dynamic Country Comparison Matrix */}
+        {searchMutation.data?.country_comparison_matrix && searchMutation.data.country_comparison_matrix.length > 0 && (
+          <CountryComparisonTable rows={searchMutation.data.country_comparison_matrix} />
+        )}
+
         {/* RESULTS GRID / LIST */}
         {searchMutation.isPending ? (
           <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
@@ -562,9 +634,56 @@ export const NewsIntelligencePage: React.FC = () => {
                       {item.investigation_status}
                     </Badge>
 
-                    {item.country && (
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono font-medium">
-                        {item.country}
+                    {/* Publisher Country & Code */}
+                    {(item.publisher_country || item.country) && (
+                      <span
+                        title={`Publisher Country: ${item.publisher_country || item.country}${item.publisher_country_code ? ` (${item.publisher_country_code})` : ''}`}
+                        className="px-2 py-0.5 rounded text-[10px] bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono font-medium flex items-center space-x-1"
+                      >
+                        <Globe className="w-2.5 h-2.5 inline mr-1" />
+                        <span>{item.publisher_country || item.country}</span>
+                        {item.publisher_country_code && <span className="opacity-75 text-[9px]">[{item.publisher_country_code}]</span>}
+                      </span>
+                    )}
+
+                    {/* Event Location */}
+                    {item.event_location && (
+                      <span
+                        title={`Reported Event Location: ${item.event_location}`}
+                        className="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium flex items-center space-x-1"
+                      >
+                        <MapPin className="w-2.5 h-2.5 inline mr-1" />
+                        <span>Loc: {item.event_location}</span>
+                      </span>
+                    )}
+
+                    {/* Original Language */}
+                    {item.original_language && (
+                      <span
+                        title={`Original Language: ${item.original_language}`}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono uppercase"
+                      >
+                        {item.original_language}
+                      </span>
+                    )}
+
+                    {/* Source Edition */}
+                    {item.source_edition && item.source_edition !== 'global' && (
+                      <span
+                        title={`Regional Edition: ${item.source_edition}`}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-600 dark:text-purple-400 font-mono"
+                      >
+                        ed:{item.source_edition}
+                      </span>
+                    )}
+
+                    {/* Collection Route */}
+                    {item.collection_route && item.collection_route !== 'DIRECT' && (
+                      <span
+                        title={`Egress Route: ${item.collection_route}`}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono"
+                      >
+                        {item.collection_route}
                       </span>
                     )}
 

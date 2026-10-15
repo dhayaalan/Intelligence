@@ -1,83 +1,162 @@
-version: '3.8'
+# ==============================================================================
+# Sential Intelligence Platform - Docker Compose Configuration
+# 
+# Core stack (started with `docker compose up -d`):
+#   - mongodb:    Primary persistent database (Motor / PyMongo)
+#   - backend:    FastAPI application (Python 3.10 non-root, port 8000)
+#   - frontend:   Nginx production server + SPA fallback + reverse proxy (port 3000)
+#
+# Optional supporting services (started with `docker compose --profile supporting up -d`):
+#   - redis:      Message broker & cache placeholder
+#   - minio:      S3-compatible object storage placeholder
+#
+# Scanner profile (started with `docker compose --profile scanners up -d`):
+#   - zap:        OWASP ZAP dynamic application scanner container
+# ==============================================================================
+
+networks:
+  intelligence-network:
+    driver: bridge
+    name: intelligence-network
+
+volumes:
+  mongodb_data:
+    name: intelligence_mongodb_data
+  redis_data:
+    name: intelligence_redis_data
+  minio_data:
+    name: intelligence_minio_data
 
 services:
+  # ----------------------------------------------------------------------------
+  # 1. MongoDB - Primary Data Store
+  # ----------------------------------------------------------------------------
   mongodb:
     image: mongo:7.0
-    container_name: sential-mongodb
+    container_name: intelligence-mongodb
     restart: unless-stopped
+    networks:
+      - intelligence-network
     ports:
-      - "27017:27017"
+      # Bound to localhost 27018 to prevent collision with local host mongod on 27017
+      - "127.0.0.1:${MONGODB_HOST_PORT:-27018}:27017"
     volumes:
-      - mongodata:/data/db
+      - mongodb_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    container_name: sential-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-
-  minio:
-    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
-    container_name: sential-minio
-    restart: unless-stopped
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
-    volumes:
-      - miniodata:/data
-
+  # ----------------------------------------------------------------------------
+  # 2. Backend - FastAPI Core Intelligence Platform
+  # ----------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sential-backend
+    container_name: intelligence-backend
     restart: unless-stopped
+    networks:
+      - intelligence-network
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     environment:
-      APP_ENV: production
-      MONGODB_URI: mongodb://mongodb:27017
-      MONGODB_DATABASE: sential_db
-      REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: sential-evidence
-      SECRET_KEY: sential-production-ultra-secure-jwt-key-256-bit-signature
-      SEARCH_JOB_TIMEOUT_SECONDS: 60
-      PROVIDER_TIMEOUT_SECONDS: 10
+      - APP_ENV=production
+      - APP_NAME=Sential Intelligence Platform
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-sential_db}
+      - SECRET_KEY=${SECRET_KEY:-sential-production-ultra-secure-jwt-key-256-bit-signature}
+      - SEARCH_JOB_TIMEOUT_SECONDS=${SEARCH_JOB_TIMEOUT_SECONDS:-60}
+      - PROVIDER_TIMEOUT_SECONDS=${PROVIDER_TIMEOUT_SECONDS:-10}
+      - ML_SERVICE_URL=${ML_SERVICE_URL:-}
+      - ML_SERVICE_API_KEY=${ML_SERVICE_API_KEY:-}
     depends_on:
       mongodb:
         condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
+  # ----------------------------------------------------------------------------
+  # 3. Frontend - React / Vite SPA served via Nginx Reverse Proxy
+  # ----------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: sential-frontend
+    container_name: intelligence-frontend
     restart: unless-stopped
+    networks:
+      - intelligence-network
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
-volumes:
-  mongodata:
-  redisdata:
-  miniodata:
+  # ----------------------------------------------------------------------------
+  # 4. Optional Supporting Services (Profile: supporting)
+  # ----------------------------------------------------------------------------
+  redis:
+    profiles: ["supporting"]
+    image: redis:7-alpine
+    container_name: intelligence-redis
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  minio:
+    profiles: ["supporting"]
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    container_name: intelligence-minio
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9002}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9003}:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-miniopassword}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------------------------
+  # 5. Optional Security Scanners (Profile: scanners)
+  # ----------------------------------------------------------------------------
+  zap:
+    profiles: ["scanners"]
+    image: zaproxy/zap-stable:latest
+    container_name: intelligence-zap
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${ZAP_PORT:-8091}:8090"
+    command: zap.sh -daemon -host 0.0.0.0 -port 8090 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
