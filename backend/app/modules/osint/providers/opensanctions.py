@@ -12,10 +12,10 @@ logger = logging.getLogger("sential.osint.opensanctions")
 
 class OpenSanctionsProvider(ProviderAdapter):
     """
-    OpenSanctions International Sanctions, PEP & Watchlist Screening Provider.
-    Queries the OpenSanctions global API for entity matching against international sanctions,
-    politically exposed persons (PEPs), crime watchlists, and debarment lists.
-    Explicitly indicates match confidence and source datasets.
+    OpenSanctions International Sanctions, PEP, and Watchlists Provider.
+    Queries the OpenSanctions API to screen persons, companies, and vessels against
+    consolidated global sanction regimes (OFAC, EU, UN, UK), political exposure registers,
+    and criminal watchlists.
     """
 
     @property
@@ -24,11 +24,11 @@ class OpenSanctionsProvider(ProviderAdapter):
 
     @property
     def name(self) -> str:
-        return "OpenSanctions Global PEP, Sanctions & Watchlist Screener"
+        return "OpenSanctions Global Watchlists & PEP Screening"
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "1.1.0"
 
     @property
     def timeout_seconds(self) -> float:
@@ -42,11 +42,21 @@ class OpenSanctionsProvider(ProviderAdapter):
                 headers["Authorization"] = f"ApiKey {api_key}"
 
             async with httpx.AsyncClient(timeout=4.0) as client:
-                res = await client.get("https://api.opensanctions.org/search/default?q=Vladimir+Putin&limit=1", headers=headers)
+                res = await client.get(
+                    "https://api.opensanctions.org/search/default",
+                    params={"q": "Putin", "limit": 1},
+                    headers=headers
+                )
                 if res.status_code == 200:
                     return HealthCheckResult(
                         status=ModuleHealthStatus.HEALTHY,
-                        message="OpenSanctions API is online and screening database operational",
+                        message="OpenSanctions API is online and responsive",
+                        latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
+                    )
+                elif res.status_code == 429:
+                    return HealthCheckResult(
+                        status=ModuleHealthStatus.DEGRADED,
+                        message="OpenSanctions rate limit encountered",
                         latency_ms=round(res.elapsed.total_seconds() * 1000, 2)
                     )
                 return HealthCheckResult(
@@ -69,7 +79,7 @@ class OpenSanctionsProvider(ProviderAdapter):
                 provider_id=self.provider_id,
                 status="skipped",
                 duration_ms=0.0,
-                error="Query too short for sanctions screening."
+                error="Query too short for sanctions screening (minimum 2 characters required)."
             )
 
         headers = {"User-Agent": "SentialIntelligence/1.0"}
@@ -77,59 +87,125 @@ class OpenSanctionsProvider(ProviderAdapter):
         if api_key:
             headers["Authorization"] = f"ApiKey {api_key}"
 
-        search_url = f"https://api.opensanctions.org/search/default?q={httpx.URL(query)}&limit=10"
         records: List[Dict[str, Any]] = []
         entities: List[Dict[str, Any]] = []
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds, follow_redirects=True) as client:
-                resp = await client.get(search_url, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results = data.get("results", [])
-                    for item in results:
-                        caption = item.get("caption") or query
-                        schema = item.get("schema", "LegalEntity")
-                        datasets = item.get("datasets", [])
-                        properties = item.get("properties", {})
-                        topics = properties.get("topics", [])
-                        countries = properties.get("country", []) or properties.get("jurisdiction", [])
-                        score = item.get("score", 0.85)
+                resp = await client.get(
+                    "https://api.opensanctions.org/search/default",
+                    params={"q": query, "limit": 10},
+                    headers=headers
+                )
+                duration = round((time.time() - start_time) * 1000, 2)
 
-                        ent_type = EntityType.PERSON if schema.lower() == "person" else EntityType.ORGANIZATION
-                        record = {
-                            "id": item.get("id"),
-                            "caption": caption,
+                if resp.status_code == 429:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error="OpenSanctions rate limit exceeded (HTTP 429). Please retry or provide OPENSANCTIONS_API_KEY."
+                    )
+                elif resp.status_code in (401, 403):
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"OpenSanctions authentication required or key invalid (HTTP {resp.status_code})."
+                    )
+                elif resp.status_code >= 400:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="error",
+                        duration_ms=duration,
+                        error=f"OpenSanctions returned HTTP {resp.status_code}."
+                    )
+
+                data = resp.json()
+                results = data.get("results", [])
+                for item in results:
+                    caption = item.get("caption") or query
+                    schema = item.get("schema", "LegalEntity")
+                    datasets = item.get("datasets", [])
+                    properties = item.get("properties", {})
+                    topics = properties.get("topics", [])
+                    countries = properties.get("country", []) or properties.get("jurisdiction", [])
+                    raw_score = item.get("score")  # Do NOT assign arbitrary 0.85!
+
+                    # Map schema to proper EntityType
+                    schema_lower = schema.lower()
+                    if schema_lower in ("person", "individual"):
+                        ent_type = EntityType.PERSON
+                    elif schema_lower in ("cryptoaddress", "cryptowallet"):
+                        ent_type = EntityType.CRYPTO_ADDRESS
+                    elif schema_lower in ("organization", "company", "legalentity", "bank"):
+                        ent_type = EntityType.ORGANIZATION
+                    else:
+                        ent_type = EntityType.ORGANIZATION
+
+                    is_sanctioned = any(t in ("sanction", "debarment") for t in topics)
+                    is_pep = any("pep" in str(t).lower() for t in topics)
+
+                    record = {
+                        "id": item.get("id"),
+                        "caption": caption,
+                        "schema": schema,
+                        "datasets": datasets,
+                        "topics": topics,
+                        "countries": countries,
+                        "score": raw_score,
+                        "first_seen": item.get("first_seen"),
+                        "last_seen": item.get("last_seen"),
+                        "sanctioned": is_sanctioned,
+                        "is_pep": is_pep
+                    }
+                    records.append(record)
+
+                    # Compute confidence honestly from actual provider score
+                    if raw_score is not None:
+                        try:
+                            conf = min(0.98, max(0.20, float(raw_score)))
+                        except (ValueError, TypeError):
+                            conf = 0.70
+                    else:
+                        conf = 0.70  # Qualitative unranked score
+
+                    entities.append(EntityPayload(
+                        type=ent_type,
+                        value=caption,
+                        confidence=conf,
+                        sources=[self.provider_id],
+                        metadata={
+                            "record_id": item.get("id"),
                             "schema": schema,
                             "datasets": datasets,
                             "topics": topics,
                             "countries": countries,
-                            "score": score,
-                            "first_seen": item.get("first_seen"),
-                            "last_seen": item.get("last_seen"),
-                            "sanctioned": "sanction" in topics,
-                            "is_pep": "role.pep" in topics
+                            "similarity_score": raw_score,
+                            "is_sanctioned": is_sanctioned,
+                            "is_pep": is_pep,
+                            "source": "OpenSanctions",
+                            "requires_analyst_review": conf < 0.90
                         }
-                        records.append(record)
+                    ).dict())
 
-                        entities.append(EntityPayload(
-                            type=ent_type,
-                            value=caption,
-                            confidence=min(0.95, max(0.40, float(score))),
-                            sources=[self.provider_id],
-                            metadata={
-                                "schema": schema,
-                                "datasets": datasets,
-                                "topics": topics,
-                                "countries": countries,
-                                "score": score,
-                                "sanctioned": record["sanctioned"],
-                                "is_pep": record["is_pep"],
-                                "source": "OpenSanctions"
-                            }
-                        ).dict())
+        except httpx.TimeoutException:
+            duration = round((time.time() - start_time) * 1000, 2)
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error="OpenSanctions API request timed out."
+            )
         except Exception as e:
+            duration = round((time.time() - start_time) * 1000, 2)
             logger.warning(f"OpenSanctions search failed for '{query}': {e}")
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="error",
+                duration_ms=duration,
+                error=f"OpenSanctions query error: {str(e)}"
+            )
 
         duration = round((time.time() - start_time) * 1000, 2)
         ev = ModuleSDK.create_evidence(
@@ -151,6 +227,7 @@ class OpenSanctionsProvider(ProviderAdapter):
             raw_data={
                 "query": query,
                 "matches": records,
+                "records": records,
                 "count": len(records),
                 "entities": entities,
                 "evidence": [ev.dict() if hasattr(ev, "dict") else ev]

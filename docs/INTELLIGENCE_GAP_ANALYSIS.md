@@ -23,6 +23,7 @@
   - **Wayback Machine CDX API (`WaybackCDXProvider`):** Queries Internet Archive CDX endpoint with structured timestamp, status code, and snapshot URL extraction.
   - **urlscan.io API (`URLScanProvider`):** Public search integration querying scan IDs, screenshot previews, DOM page titles, IP/ASN, and server headers.
   - **OpenSanctions / yente API (`OpenSanctionsProvider`):** Fuzzy entity screening matching international sanction lists (OFAC, EU, UN), PEP registries, and debarment catalogs with confidence scoring.
+  - **GLEIF Golden Copy API (`GLEIFProvider`):** Authoritative corporate legal entity identification, ISO 17442 LEI resolution, legal addresses, and corporate status endorsed by G20 and the Financial Stability Board.
 
 ---
 
@@ -36,10 +37,12 @@
 * **Identified Gaps:**
   - **Community Malware IOC Enrichment Gap:** Lack of automated IOC matching against malware families, botnet C2s, and malicious hashes without commercial Shodan/VirusTotal API keys.
   - **Authoritative NVD Vulnerability Details Gap:** While EPSS provided exploit probabilities and CISA KEV provided active exploitation flags, direct NIST NVD CVSS vectors, CWE classifications, and vendor advisory metadata were absent.
+  - **Internet Noise vs. Targeted Attack Disambiguation Gap:** Investigators could not easily distinguish between mass internet scanners (benign port probes, search engine indexers) and targeted attacks directed at client infrastructure.
   - **Threat Engine In-Memory Desynchronization:** `threat_intel_engine.py` was disconnected from persistent MongoDB storage.
 * **Remediation Implemented in Expansion:**
   - **abuse.ch ThreatFox Unified API (`ThreatFoxProvider`):** Direct community indicator of compromise queries returning malware printable names, threat types (botnet, payload delivery, C2), confidence levels, and tags.
   - **NIST NVD CVE API 2.0 (`NVDVulnerabilityProvider`):** Authoritative vulnerability lookup returning official CVSS v3.1 base scores, severity rankings, CWE weaknesses, and National Vulnerability Database descriptions.
+  - **GreyNoise Community API (`GreyNoiseCommunityProvider`):** Authoritative IP noise classification, RIOT (Rule It Out) verification for common business services, and mass-scanner identification.
   - **Persistent Threat Store Integration:** MongoDB collection queries for `ti_threat_actors`, `ti_malware`, `ti_campaigns`, and `ti_vulnerabilities`.
 
 ---

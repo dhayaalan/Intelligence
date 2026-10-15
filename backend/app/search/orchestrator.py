@@ -94,7 +94,11 @@ class SearchOrchestrator:
 
         # 3. Determine authorized modules dynamically via multi-layer authorization
         effective_module_ids = authorization_service.get_effective_modules_for_user(user)
-        effective_module_ids = [m for m in effective_module_ids if m in target_modules_set]
+        # Strict boundary enforcement: only modules that are authorized, selected, AND enabled in registry
+        effective_module_ids = [
+            m for m in effective_module_ids 
+            if m in target_modules_set and module_registry.is_module_enabled(m)
+        ]
         
         # 2. Prepare independent jobs for each authorized and available module
         context = SearchContext(
@@ -110,6 +114,14 @@ class SearchOrchestrator:
         normalized_results: List[NormalizedModuleResult] = []
 
         async def execute_single_module(module_id: str):
+            # Strict execution boundary guard: Never execute disabled modules even if explicitly requested
+            if not module_registry.is_module_enabled(module_id):
+                app_logger.warning(
+                    f"Execution rejected: module '{module_id}' is disabled or not enabled in registry",
+                    extra={"search_id": search_id, "module_id": module_id, "tenant_id": tenant_id}
+                )
+                return
+
             module = module_registry.get_module(module_id)
             if not module:
                 return

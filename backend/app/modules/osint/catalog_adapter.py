@@ -147,10 +147,66 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         duration_ms=duration_ms
                     )
 
-                # 4. Check for not found keywords in response body
                 body_text = resp.text or ""
                 body_lower = body_text.lower()
-                if any(kw.lower() in body_lower for kw in self._not_found_keywords):
+
+                # Extract HTML title if present for validation
+                title_match = re.search(r'<title>([^<]+)</title>', body_text, re.I)
+                page_title = title_match.group(1).strip().lower() if title_match else ""
+
+                # 4. Check for URL redirects to login/auth/homepage
+                parsed_check = urllib.parse.urlparse(check_url)
+                parsed_final = urllib.parse.urlparse(str(resp.url))
+
+                login_paths = ["/login", "/signin", "/sign-in", "/session/new", "/accounts/login", "/auth/login"]
+                if any(ind in parsed_final.path.lower() for ind in login_paths):
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="success",
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.ACCESS_RESTRICTED.value,
+                            "profile_url": prof_url,
+                            "note": f"Redirected to authentication page: {resp.url}"
+                        },
+                        duration_ms=duration_ms
+                    )
+
+                if parsed_check.path.strip("/") and not parsed_final.path.strip("/") or parsed_final.path in ["/search", "/explore", "/home"]:
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="success",
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.NOT_FOUND.value,
+                            "profile_url": prof_url,
+                            "note": f"Redirected to root or generic index page: {resp.url}"
+                        },
+                        duration_ms=duration_ms
+                    )
+
+                # 5. Bot Challenge / WAF wall detection
+                challenge_indicators = ["attention required! | cloudflare", "just a moment...", "cf-browser-verification", "turnstile", "verify you are human"]
+                if any(ind in body_lower for ind in challenge_indicators) and ("cloudflare" in body_lower or "captcha" in body_lower or "challenge" in body_lower):
+                    return ProviderResponse(
+                        provider_id=self.provider_id,
+                        status="success",
+                        raw_data={
+                            "found": False,
+                            "status": ExtractionStatus.ACCESS_RESTRICTED.value,
+                            "profile_url": prof_url,
+                            "note": "Anti-bot challenge or verification wall encountered"
+                        },
+                        duration_ms=duration_ms
+                    )
+
+                # 6. Check for not found keywords in response body or title (Soft-404)
+                soft_404_title_keywords = [
+                    "page not found", "profile not found", "user not found", 
+                    "account not found", "404 not found", "user does not exist",
+                    "this page isn't available", "account suspended"
+                ]
+                if any(kw.lower() in body_lower for kw in self._not_found_keywords) or any(kw in page_title for kw in soft_404_title_keywords):
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="success",
@@ -162,7 +218,7 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         duration_ms=duration_ms
                     )
 
-                # 5. Profile existence confirmed
+                # 7. Profile existence evaluation
                 if resp.status_code in self._expected_status:
                     extracted_fields = []
                     field_provenance: Dict[str, ExtractedFieldProvenance] = {}
@@ -343,7 +399,10 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         status = ExtractionStatus.PARTIAL_EXTRACTION
                     else:
                         # Genuine validation of account existence, without rich metadata
-                        status = ExtractionStatus.PROFILE_VALIDATED
+                        if clean_handle.lower() in body_lower or clean_handle.lower() in page_title:
+                            status = ExtractionStatus.PROFILE_VALIDATED
+                        else:
+                            status = ExtractionStatus.UNVERIFIED
 
                     extraction_res = ProfileExtractionResult(
                         platform_id=self._raw_platform_id,
@@ -374,6 +433,22 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         raw_preview={"status_code": resp.status_code, "content_type": resp.headers.get("content-type")}
                     )
 
+                    if status == ExtractionStatus.UNVERIFIED:
+                        return ProviderResponse(
+                            provider_id=self.provider_id,
+                            status="success",
+                            raw_data={
+                                "found": False,
+                                "status": ExtractionStatus.UNVERIFIED.value,
+                                "profile_url": prof_url,
+                                "note": "HTTP 200 received but target handle could not be confirmed in page body or title."
+                            },
+                            duration_ms=duration_ms
+                        )
+
+                    conf_evidence = 0.95 if status == ExtractionStatus.METADATA_EXTRACTED else 0.85
+                    conf_entity = 0.92 if status == ExtractionStatus.METADATA_EXTRACTED else 0.80
+
                     # Build evidence payload
                     sha256 = hashlib.sha256(f"{prof_url}:{resp.status_code}:{now_iso}".encode()).hexdigest()
                     evidence = [{
@@ -381,7 +456,7 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         "provider": self.provider_id,
                         "module": "osint",
                         "reference": prof_url,
-                        "confidence": 0.95 if status == ExtractionStatus.METADATA_EXTRACTED else 0.88,
+                        "confidence": conf_evidence,
                         "raw_data": {
                             "url": prof_url,
                             "platform": self._name,
@@ -397,7 +472,7 @@ class OSINTPlatformAdapter(ProviderAdapter):
                     entity = EntityPayload(
                         type=EntityType.USERNAME,
                         value=f"{clean_handle}@{self._name.lower().replace(' ', '')}",
-                        confidence=0.92 if status == ExtractionStatus.METADATA_EXTRACTED else 0.85,
+                        confidence=conf_entity,
                         sources=[self.provider_id],
                         metadata={
                             "platform": self._name,

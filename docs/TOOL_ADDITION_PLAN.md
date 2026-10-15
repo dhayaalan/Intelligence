@@ -31,6 +31,8 @@ Each prospective tool candidate was evaluated against investigative value, API s
 | **OpenSanctions Matching API** | `opensanctions` | OSINT | `https://api.opensanctions.org/match/default` | Optional API Key | Community endpoint free for non-commercial investigations | **IMPLEMENTED (Batch 1)** |
 | **abuse.ch ThreatFox Unified API** | `threatfox` | Threat Intel | `https://threatfox-api.abuse.ch/api/v1/` | Keyless / Public | Public community API; 1 req/sec safe limit | **IMPLEMENTED (Batch 1)** |
 | **NIST NVD CVE API 2.0** | `nvd_cve` | Threat Intel | `https://services.nvd.nist.gov/rest/json/cves/2.0` | Optional API Key | 5 req / 30s keyless; 50 req / 30s with NIST key | **IMPLEMENTED (Batch 1)** |
+| **GreyNoise Community API** | `greynoise_community` | Threat Intel | `https://api.greynoise.io/v3/community/{ip}` | Optional API Key | Free community queries for IP noise & scanner classification | **IMPLEMENTED (Batch 2)** |
+| **GLEIF Legal Entity Identifier** | `gleif_lei` | OSINT | `https://api.gleif.org/api/v1/lei-records` | Keyless / Open Public | Open public standard (G20/FSB) for verified corporate legal entity data | **IMPLEMENTED (Batch 2)** |
 
 ---
 

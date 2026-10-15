@@ -166,6 +166,10 @@ class ToolExecutor:
                 res = await self._run_threatfox(exec_id, tool_id, cleaned_target)
             elif tool_id in ["tool_nvd_cve", "nvd_cve"]:
                 res = await self._run_nvd_cve(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_greynoise", "greynoise", "greynoise_community"]:
+                res = await self._run_greynoise(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_gleif", "gleif", "gleif_lei"]:
+                res = await self._run_gleif(exec_id, tool_id, cleaned_target)
             # Commercial / API-Key Required Tools
             elif tool_id in ["tool_shodan", "shodan"]:
                 res = await self._run_shodan(exec_id, tool_id, cleaned_target)
@@ -1725,17 +1729,31 @@ class ToolExecutor:
 
         provider = WaybackCDXProvider()
         resp = await provider.execute(ProviderRequest(query=target, target_type="domain"))
-        results: List[NormalizedResult] = []
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"Wayback CDX lookup failed for {target}",
+                error=resp.error
+            )
 
+        results: List[NormalizedResult] = []
         raw_snapshots = resp.raw_data.get("snapshots", []) if resp.raw_data else []
         for snap in raw_snapshots[:20]:
+            orig = snap.get("original_url") or target
+            status_code = snap.get("status_code", "200")
+            ts = snap.get("timestamp", "")
             results.append(
                 NormalizedResult(
                     id=f"wayback_{uuid.uuid4().hex[:8]}",
                     tool_id=tool_id,
                     type="ARCHIVED_SNAPSHOT",
                     target=target,
-                    value=f"{snap.get('original_url')} (Status: {snap.get('status_code')})",
+                    value=f"{orig} (Status: {status_code}, Timestamp: {ts})",
                     source="Internet Archive Wayback Machine",
                     confidence=0.90,
                     severity="INFO",
@@ -1743,15 +1761,16 @@ class ToolExecutor:
                     raw_result=snap
                 )
             )
+        summary_msg = f"Discovered {len(results)} historical Wayback Machine snapshots for {target}" if results else f"No historical snapshots archived for {target}"
         return ToolExecutionResponse(
             execution_id=exec_id,
             tool_id=tool_id,
             target=target,
-            status="SUCCESS" if resp.status == "success" else "FAILED",
+            status="SUCCESS",
             duration_ms=resp.duration_ms,
             results=results,
-            summary=f"Discovered {len(results)} historical Wayback Machine snapshots for {target}",
-            error=resp.error
+            summary=summary_msg,
+            error=None
         )
 
     async def _run_urlscan(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
@@ -1761,16 +1780,32 @@ class ToolExecutor:
 
         provider = URLScanProvider()
         resp = await provider.execute(ProviderRequest(query=target, target_type="domain"))
-        results: List[NormalizedResult] = []
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"urlscan.io query failed for {target}",
+                error=resp.error
+            )
 
-        raw_results = resp.raw_data.get("results", []) if resp.raw_data else []
-        for r in raw_results[:20]:
-            page = r.get("page", {})
-            ip = page.get("ip", "")
-            server = page.get("server", "")
-            title = page.get("title", "")
-            url = page.get("url", target)
-            summary_val = f"{url} | IP: {ip} | Server: {server}"
+        results: List[NormalizedResult] = []
+        raw_scans = (resp.raw_data.get("scans") or resp.raw_data.get("results") or []) if resp.raw_data else []
+        for s in raw_scans[:20]:
+            scan_url = s.get("url") or target
+            ip = s.get("ip") or (s.get("page", {}).get("ip") if isinstance(s.get("page"), dict) else "")
+            server = s.get("server") or (s.get("page", {}).get("server") if isinstance(s.get("page"), dict) else "")
+            title = s.get("title") or (s.get("page", {}).get("title") if isinstance(s.get("page"), dict) else "")
+            scan_time = s.get("time") or (s.get("task", {}).get("time") if isinstance(s.get("task"), dict) else "")
+
+            summary_val = f"{scan_url}"
+            if ip:
+                summary_val += f" | IP: {ip}"
+            if server:
+                summary_val += f" | Server: {server}"
             if title:
                 summary_val += f" | Title: {title[:40]}"
 
@@ -1785,24 +1820,29 @@ class ToolExecutor:
                     confidence=0.92,
                     severity="INFO",
                     metadata={
-                        "scan_id": r.get("_id"),
-                        "page": page,
-                        "task": r.get("task", {}),
-                        "screenshot": r.get("screenshot"),
-                        "result_url": r.get("result")
+                        "scan_id": s.get("id") or s.get("_id"),
+                        "domain": s.get("domain"),
+                        "ip": ip,
+                        "server": server,
+                        "title": title,
+                        "scan_time": scan_time,
+                        "screenshot_url": s.get("screenshot_url") or s.get("screenshot"),
+                        "result_url": s.get("result_url") or s.get("result"),
+                        "is_historical_observation": True
                     },
-                    raw_result=r
+                    raw_result=s
                 )
             )
+        summary_msg = f"Found {len(results)} urlscan.io historical scans and observations for {target}" if results else f"No urlscan.io records found for {target}"
         return ToolExecutionResponse(
             execution_id=exec_id,
             tool_id=tool_id,
             target=target,
-            status="SUCCESS" if resp.status == "success" else "FAILED",
+            status="SUCCESS",
             duration_ms=resp.duration_ms,
             results=results,
-            summary=f"Found {len(results)} urlscan.io historical scans and observations for {target}",
-            error=resp.error
+            summary=summary_msg,
+            error=None
         )
 
     async def _run_opensanctions(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
@@ -1812,20 +1852,45 @@ class ToolExecutor:
 
         provider = OpenSanctionsProvider()
         resp = await provider.execute(ProviderRequest(query=target, target_type="name"))
-        results: List[NormalizedResult] = []
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"OpenSanctions screening failed for {target}",
+                error=resp.error
+            )
 
-        raw_matches = resp.raw_data.get("matches", []) if resp.raw_data else []
+        results: List[NormalizedResult] = []
+        raw_matches = (resp.raw_data.get("matches") or resp.raw_data.get("records") or []) if resp.raw_data else []
         for m in raw_matches[:20]:
             caption = m.get("caption") or target
-            schema = m.get("schema", "Entity")
-            score = m.get("score", 0.0)
-            topics = ", ".join(m.get("topics", []))
-            datasets = ", ".join(m.get("datasets", []))
-            val = f"{caption} [{schema}] - Score: {score:.2f}"
+            schema = m.get("schema", "LegalEntity")
+            score = m.get("score")
+            topics = m.get("topics") or []
+            datasets = m.get("datasets") or []
+            is_sanctioned = m.get("sanctioned") or any(t in ("sanction", "debarment") for t in topics)
+            is_pep = m.get("is_pep") or any("pep" in str(t).lower() for t in topics)
+
+            score_str = f"Score: {float(score):.2f}" if score is not None else "Score: Unranked"
+            val = f"{caption} [{schema}] - {score_str}"
             if topics:
-                val += f" | Topics: {topics}"
+                val += f" | Topics: {', '.join(topics[:3])}"
             if datasets:
-                val += f" | Datasets: {datasets}"
+                val += f" | Lists: {', '.join(datasets[:3])}"
+
+            # Operational severity based on legal/compliance threat
+            if is_sanctioned:
+                sev = "HIGH"
+            elif is_pep:
+                sev = "MEDIUM"
+            else:
+                sev = "LOW"
+
+            conf_val = min(0.98, max(0.30, float(score))) if score is not None else 0.70
 
             results.append(
                 NormalizedResult(
@@ -1835,21 +1900,22 @@ class ToolExecutor:
                     target=target,
                     value=val,
                     source="OpenSanctions Community Database",
-                    confidence=round(float(score), 2) if score else 0.85,
-                    severity="HIGH" if any(t in ["sanction", "debarment"] for t in m.get("topics", [])) else "MEDIUM",
+                    confidence=conf_val,
+                    severity=sev,
                     metadata=m,
                     raw_result=m
                 )
             )
+        summary_msg = f"Matched {len(results)} OpenSanctions records for {target}" if results else f"No sanctions or PEP matches found for {target}"
         return ToolExecutionResponse(
             execution_id=exec_id,
             tool_id=tool_id,
             target=target,
-            status="SUCCESS" if resp.status == "success" else "FAILED",
+            status="SUCCESS",
             duration_ms=resp.duration_ms,
             results=results,
-            summary=f"Matched {len(results)} OpenSanctions records for {target}",
-            error=resp.error
+            summary=summary_msg,
+            error=None
         )
 
     async def _run_threatfox(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
@@ -1859,14 +1925,36 @@ class ToolExecutor:
 
         provider = ThreatFoxProvider()
         resp = await provider.execute(ProviderRequest(query=target, target_type="ioc"))
-        results: List[NormalizedResult] = []
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"ThreatFox IOC lookup failed for {target}",
+                error=resp.error
+            )
 
-        raw_iocs = resp.raw_data.get("iocs", []) if resp.raw_data else []
-        for ioc in raw_iocs[:20]:
-            ioc_val = ioc.get("ioc_value") or target
-            threat_type = ioc.get("threat_type_desc") or ioc.get("threat_type", "IOC")
-            malware = ioc.get("malware_printable") or ioc.get("malware", "Unknown Malware")
-            conf = float(ioc.get("confidence_level", 75)) / 100.0
+        results: List[NormalizedResult] = []
+        raw_matches = (resp.raw_data.get("matches") or resp.raw_data.get("iocs") or []) if resp.raw_data else []
+        for ioc in raw_matches[:20]:
+            ioc_val = ioc.get("ioc") or ioc.get("ioc_value") or target
+            ioc_type = ioc.get("ioc_type", "IOC")
+            threat_type = ioc.get("threat_type") or ioc.get("threat_type_desc") or "IOC"
+            malware = ioc.get("malware_family") or ioc.get("malware_printable") or "Unknown Malware"
+            raw_conf = ioc.get("confidence_level")
+            conf = float(raw_conf) / 100.0 if raw_conf is not None else 0.80
+
+            # Traceable severity based on threat type impact
+            tt_lower = threat_type.lower()
+            if any(k in tt_lower for k in ("botnet", "c2", "command and control", "payload", "ransomware", "rat", "stealer", "trojan")):
+                sev = "HIGH"
+            elif any(k in tt_lower for k in ("phishing", "malicious_url")):
+                sev = "HIGH"
+            else:
+                sev = "MEDIUM"
 
             results.append(
                 NormalizedResult(
@@ -1874,23 +1962,24 @@ class ToolExecutor:
                     tool_id=tool_id,
                     type="IOC",
                     target=target,
-                    value=f"{ioc_val} | Threat: {threat_type} | Malware: {malware}",
+                    value=f"{ioc_val} [{ioc_type}] | Threat: {threat_type} | Malware: {malware}",
                     source="abuse.ch ThreatFox",
                     confidence=conf,
-                    severity="CRITICAL" if conf >= 0.8 else "HIGH",
+                    severity=sev,
                     metadata=ioc,
                     raw_result=ioc
                 )
             )
+        summary_msg = f"Found {len(results)} abuse.ch ThreatFox IOC matches for {target}" if results else f"No active ThreatFox IOCs matched for {target}"
         return ToolExecutionResponse(
             execution_id=exec_id,
             tool_id=tool_id,
             target=target,
-            status="SUCCESS" if resp.status == "success" else "FAILED",
+            status="SUCCESS",
             duration_ms=resp.duration_ms,
             results=results,
-            summary=f"Found {len(results)} abuse.ch ThreatFox IOC matches for {target}",
-            error=resp.error
+            summary=summary_msg,
+            error=None
         )
 
     async def _run_nvd_cve(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
@@ -1900,16 +1989,27 @@ class ToolExecutor:
 
         provider = NVDVulnerabilityProvider()
         resp = await provider.execute(ProviderRequest(query=target, target_type="cve"))
-        results: List[NormalizedResult] = []
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"NIST NVD CVE lookup failed for {target}",
+                error=resp.error
+            )
 
-        raw_cves = resp.raw_data.get("vulnerabilities", []) if resp.raw_data else []
+        results: List[NormalizedResult] = []
+        raw_cves = (resp.raw_data.get("cves") or resp.raw_data.get("vulnerabilities") or []) if resp.raw_data else []
         for v in raw_cves[:20]:
-            cve_id = v.get("cve_id", target)
-            severity = v.get("severity", "MEDIUM")
+            cid = v.get("cve_id") or v.get("id") or target
+            severity = v.get("severity") or "UNSPECIFIED"
             cvss = v.get("cvss_score")
             desc = v.get("description", "")
-            cvss_str = f"CVSS {cvss}" if cvss is not None else ""
-            val = f"{cve_id} [{severity} {cvss_str}]: {desc[:80]}"
+            cvss_str = f"CVSS {cvss}" if cvss is not None else "CVSS: N/A"
+            val = f"{cid} [{severity} | {cvss_str}]: {desc[:80]}"
 
             results.append(
                 NormalizedResult(
@@ -1920,20 +2020,133 @@ class ToolExecutor:
                     value=val,
                     source="NIST National Vulnerability Database (NVD)",
                     confidence=0.98,
-                    severity=severity.upper() if severity else "MEDIUM",
+                    severity=severity.upper() if severity in ("CRITICAL", "HIGH", "MEDIUM", "LOW") else "INFO",
                     metadata=v,
                     raw_result=v
                 )
             )
+        summary_msg = f"Found {len(results)} authoritative NIST NVD CVE records for {target}" if results else f"No NIST NVD CVE records found for {target}"
         return ToolExecutionResponse(
             execution_id=exec_id,
             tool_id=tool_id,
             target=target,
-            status="SUCCESS" if resp.status == "success" else "FAILED",
+            status="SUCCESS",
             duration_ms=resp.duration_ms,
             results=results,
-            summary=f"Found {len(results)} authoritative NIST NVD CVE records for {target}",
-            error=resp.error
+            summary=summary_msg,
+            error=None
+        )
+
+    async def _run_greynoise(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """GreyNoise Community IP noise & threat classification."""
+        from app.modules.threat_intelligence.providers.greynoise import GreyNoiseCommunityProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = GreyNoiseCommunityProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="ip"))
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"GreyNoise lookup failed for {target}",
+                error=resp.error
+            )
+
+        results: List[NormalizedResult] = []
+        raw_matches = (resp.raw_data.get("matches") or resp.raw_data.get("records") or []) if resp.raw_data else []
+        for m in raw_matches:
+            ip = m.get("ip", target)
+            classification = m.get("classification", "unknown")
+            noise = m.get("noise", False)
+            riot = m.get("riot", False)
+            actor = m.get("name", "unknown")
+            sev = m.get("severity", "INFO")
+            conf = m.get("confidence", 0.85)
+
+            results.append(
+                NormalizedResult(
+                    id=f"greynoise_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="IP_REPUTATION",
+                    target=target,
+                    value=f"IP: {ip} | Classification: {classification.upper()} | Noise: {noise} | RIOT: {riot} | Actor: {actor}",
+                    source="GreyNoise Community",
+                    confidence=conf,
+                    severity=sev,
+                    metadata=m,
+                    raw_result=m
+                )
+            )
+
+        classification_val = resp.raw_data.get("classification", "unobserved") if resp.raw_data else "unobserved"
+        summary_msg = f"GreyNoise classified {target} as {classification_val}" if results else f"No GreyNoise internet scanner observations found for {target}"
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=summary_msg,
+            error=None
+        )
+
+    async def _run_gleif(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """GLEIF Legal Entity Identifier lookup for corporate records."""
+        from app.modules.osint.providers.gleif import GLEIFProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = GLEIFProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="organization"))
+        if resp.status != "success":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"GLEIF lookup failed for {target}",
+                error=resp.error
+            )
+
+        results: List[NormalizedResult] = []
+        raw_records = (resp.raw_data.get("records") or resp.raw_data.get("matches") or []) if resp.raw_data else []
+        for r in raw_records[:20]:
+            lei = r.get("lei", "")
+            legal_name = r.get("legal_name", target)
+            jurisdiction = r.get("jurisdiction", "")
+            reg_status = r.get("registration_status", "")
+
+            results.append(
+                NormalizedResult(
+                    id=f"gleif_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="ORGANIZATION",
+                    target=target,
+                    value=f"LEI: {lei} | Legal Name: {legal_name} | Jurisdiction: {jurisdiction} | Status: {reg_status}",
+                    source="GLEIF Global Legal Entity Identifier",
+                    confidence=0.95 if lei.lower() in target.lower() else 0.85,
+                    severity="INFO",
+                    metadata=r,
+                    raw_result=r
+                )
+            )
+
+        summary_msg = f"Found {len(results)} authoritative GLEIF corporate entity records for {target}" if results else f"No GLEIF entity records found for {target}"
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=summary_msg,
+            error=None
         )
 
     def _record_history(self, response: ToolExecutionResponse, user: Optional[UserRecord]):

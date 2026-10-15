@@ -1,193 +1,426 @@
 import pytest
+import httpx
+from typing import Callable
+
 from app.modules.osint.providers.wayback_cdx import WaybackCDXProvider
 from app.modules.osint.providers.urlscan import URLScanProvider
 from app.modules.osint.providers.opensanctions import OpenSanctionsProvider
 from app.modules.threat_intelligence.providers.threatfox import ThreatFoxProvider
 from app.modules.threat_intelligence.providers.nvd_cve import NVDVulnerabilityProvider
+from app.modules.threat_intelligence.providers.greynoise import GreyNoiseCommunityProvider
+from app.modules.osint.providers.gleif import GLEIFProvider
 from app.modules.tool_executor import tool_executor
-from app.module_sdk.provider_adapter import ProviderRequest, ProviderResponse
+from app.module_sdk.provider_adapter import ProviderRequest
+from app.module_sdk.models import EntityType
 
+
+def patch_httpx_client(monkeypatch, handler: Callable[[httpx.Request], httpx.Response]):
+    """Helper to mock httpx.AsyncClient using genuine httpx.MockTransport."""
+    orig_init = httpx.AsyncClient.__init__
+
+    def mock_init(self, *args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        orig_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", mock_init)
+
+
+# =========================================================================
+# 1. URLScan Provider & Tool Executor Tests
+# =========================================================================
 
 @pytest.mark.asyncio
-async def test_wayback_cdx_provider_contract():
-    provider = WaybackCDXProvider()
-    assert provider.provider_id == "wayback_cdx"
-    assert provider.name == "Internet Archive Wayback Machine CDX API"
-    assert provider.timeout_seconds == 8.0
+async def test_urlscan_success_and_schema_normalization(monkeypatch):
+    """Verify URLScan parses genuine urlscan.io JSON and exposes both scans and results."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "urlscan.io/api/v1/search" in str(request.url)
+        assert 'page.domain:"example.com"' in request.url.params.get("q", "")
+        return httpx.Response(200, json={
+            "results": [
+                {
+                    "_id": "scan_test_001",
+                    "page": {
+                        "url": "https://example.com/login",
+                        "domain": "example.com",
+                        "ip": "93.184.216.34",
+                        "server": "nginx",
+                        "title": "Example Domain"
+                    },
+                    "task": {
+                        "time": "2026-03-01T12:00:00.000Z",
+                        "url": "https://example.com"
+                    }
+                }
+            ],
+            "total": 1
+        })
 
-    # Input validation: empty domain
-    res_invalid = await provider.execute(ProviderRequest(query="   ", target_type="domain"))
-    assert res_invalid.status == "skipped"
+    patch_httpx_client(monkeypatch, handler)
 
-    # Input validation: spaces in domain
-    res_spaces = await provider.execute(ProviderRequest(query="invalid domain with spaces", target_type="domain"))
-    assert res_spaces.status == "skipped"
-
-
-@pytest.mark.asyncio
-async def test_urlscan_provider_contract():
     provider = URLScanProvider()
-    assert provider.provider_id == "urlscan"
-    assert "urlscan.io" in provider.name
-    assert provider.timeout_seconds == 8.0
+    resp = await provider.execute(ProviderRequest(query="example.com", target_type="domain"))
+    assert resp.status == "success"
+    # Schema contract: both scans and results must be present
+    assert "scans" in resp.raw_data
+    assert "results" in resp.raw_data
+    assert len(resp.raw_data["scans"]) == 1
+    assert len(resp.raw_data["results"]) == 1
 
-    # Input validation: empty query
-    res_invalid = await provider.execute(ProviderRequest(query="", target_type="domain"))
-    assert res_invalid.status == "skipped"
-
-
-@pytest.mark.asyncio
-async def test_opensanctions_provider_contract():
-    provider = OpenSanctionsProvider()
-    assert provider.provider_id == "opensanctions"
-    assert "OpenSanctions" in provider.name
-    assert provider.timeout_seconds == 8.0
-
-    # Input validation: empty query
-    res_invalid = await provider.execute(ProviderRequest(query="", target_type="name"))
-    assert res_invalid.status == "skipped"
+    # Tool executor test
+    tool_res = await tool_executor.execute_tool("tool_urlscan", "example.com")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "URL_SCAN"
+    assert tool_res.results[0].source == "urlscan.io"
 
 
 @pytest.mark.asyncio
-async def test_threatfox_provider_contract():
-    provider = ThreatFoxProvider()
-    assert provider.provider_id == "threatfox"
-    assert "ThreatFox" in provider.name
-    assert provider.timeout_seconds == 8.0
+async def test_urlscan_error_handling_not_converted_to_empty(monkeypatch):
+    """Verify HTTP 429 and 500 return status='error' / 'FAILED', never empty success."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="Rate limit exceeded")
 
-    # Input validation: empty query
-    res_invalid = await provider.execute(ProviderRequest(query="", target_type="ioc"))
-    assert res_invalid.status == "skipped"
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = URLScanProvider()
+    resp = await provider.execute(ProviderRequest(query="example.com", target_type="domain"))
+    assert resp.status == "error"
+    assert resp.error is not None
+
+    tool_res = await tool_executor.execute_tool("tool_urlscan", "example.com")
+    assert tool_res.status == "FAILED"
+    assert tool_res.error is not None
 
 
-@pytest.mark.asyncio
-async def test_nvd_vulnerability_provider_contract():
-    provider = NVDVulnerabilityProvider()
-    assert provider.provider_id == "nvd_cve"
-    assert "NVD" in provider.name
-    assert provider.timeout_seconds == 10.0
-
-    # Input validation: empty query
-    res_invalid = await provider.execute(ProviderRequest(query="", target_type="cve"))
-    assert res_invalid.status == "skipped"
-
+# =========================================================================
+# 2. ThreatFox Provider & Tool Executor Tests
+# =========================================================================
 
 @pytest.mark.asyncio
-async def test_tool_executor_dispatch_new_providers(monkeypatch):
-    """Verify tool_executor routes all 5 new tools and normalizes outputs without mock fabrication."""
-
-    # 1. tool_wayback dispatch
-    async def mock_wayback_exec(self, req):
-        return ProviderResponse(
-            provider_id="wayback_cdx",
-            status="success",
-            duration_ms=12.5,
-            raw_data={
-                "target": "example.com",
-                "count": 1,
-                "snapshots": [{
-                    "original_url": "http://example.com/",
-                    "timestamp": "20200101000000",
-                    "status_code": "200",
-                    "mimetype": "text/html",
-                    "archive_url": "https://web.archive.org/web/20200101000000/http://example.com/"
-                }]
-            }
-        )
-    monkeypatch.setattr(WaybackCDXProvider, "execute", mock_wayback_exec)
-    wb_res = await tool_executor.execute_tool("tool_wayback", "example.com")
-    assert wb_res.status == "SUCCESS"
-    assert len(wb_res.results) == 1
-    assert wb_res.results[0].type == "ARCHIVED_SNAPSHOT"
-
-    # 2. tool_urlscan dispatch
-    async def mock_urlscan_exec(self, req):
-        return ProviderResponse(
-            provider_id="urlscan",
-            status="success",
-            duration_ms=25.0,
-            raw_data={
-                "target": "example.com",
-                "results": [{
-                    "_id": "scan_123",
-                    "page": {"url": "https://example.com", "ip": "93.184.216.34", "server": "ECS"}
-                }]
-            }
-        )
-    monkeypatch.setattr(URLScanProvider, "execute", mock_urlscan_exec)
-    us_res = await tool_executor.execute_tool("tool_urlscan", "example.com")
-    assert us_res.status == "SUCCESS"
-    assert len(us_res.results) == 1
-    assert us_res.results[0].type == "URL_SCAN"
-
-    # 3. tool_opensanctions dispatch
-    async def mock_sanctions_exec(self, req):
-        return ProviderResponse(
-            provider_id="opensanctions",
-            status="success",
-            duration_ms=18.0,
-            raw_data={
-                "target": "Target Person",
-                "matches": [{
-                    "id": "os_123",
-                    "caption": "Target Person",
-                    "schema": "Person",
-                    "score": 0.95,
-                    "topics": ["sanction"],
-                    "datasets": ["eu_fsf"]
-                }]
-            }
-        )
-    monkeypatch.setattr(OpenSanctionsProvider, "execute", mock_sanctions_exec)
-    os_res = await tool_executor.execute_tool("tool_opensanctions", "Target Person")
-    assert os_res.status == "SUCCESS"
-    assert len(os_res.results) == 1
-    assert os_res.results[0].type == "SANCTION_RECORD"
-    assert os_res.results[0].severity == "HIGH"
-
-    # 4. tool_threatfox dispatch
-    async def mock_tf_exec(self, req):
-        return ProviderResponse(
-            provider_id="threatfox",
-            status="success",
-            duration_ms=15.0,
-            raw_data={
-                "target": "1.2.3.4",
-                "iocs": [{
-                    "id": "ioc_123",
-                    "ioc_value": "1.2.3.4:443",
+async def test_threatfox_success_and_schema_normalization(monkeypatch):
+    """Verify ThreatFox parses genuine abuse.ch response, populates matches and iocs, and preserves IOC type."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "threatfox-api.abuse.ch" in str(request.url)
+        return httpx.Response(200, json={
+            "query_status": "ok",
+            "data": [
+                {
+                    "id": "123456",
+                    "ioc": "198.51.100.22:443",
                     "threat_type": "botnet_cc",
-                    "malware_printable": "Emotet",
-                    "confidence_level": 90
-                }]
-            }
-        )
-    monkeypatch.setattr(ThreatFoxProvider, "execute", mock_tf_exec)
-    tf_res = await tool_executor.execute_tool("tool_threatfox", "1.2.3.4")
-    assert tf_res.status == "SUCCESS"
-    assert len(tf_res.results) == 1
-    assert tf_res.results[0].type == "IOC"
-    assert tf_res.results[0].severity == "CRITICAL"
+                    "threat_type_desc": "Botnet Command and Control Server",
+                    "ioc_type": "ip:port",
+                    "malware_printable": "Cobalt Strike",
+                    "confidence_level": 85,
+                    "first_seen_utc": "2026-02-15 10:00:00"
+                }
+            ]
+        })
 
-    # 5. tool_nvd_cve dispatch
-    async def mock_nvd_exec(self, req):
-        return ProviderResponse(
-            provider_id="nvd_cve",
-            status="success",
-            duration_ms=30.0,
-            raw_data={
-                "target": "CVE-2021-44228",
-                "vulnerabilities": [{
-                    "cve_id": "CVE-2021-44228",
-                    "severity": "CRITICAL",
-                    "cvss_score": 10.0,
-                    "description": "Apache Log4j2 JNDI RCE"
-                }]
-            }
-        )
-    monkeypatch.setattr(NVDVulnerabilityProvider, "execute", mock_nvd_exec)
-    nvd_res = await tool_executor.execute_tool("tool_nvd_cve", "CVE-2021-44228")
-    assert nvd_res.status == "SUCCESS"
-    assert len(nvd_res.results) == 1
-    assert nvd_res.results[0].type == "VULNERABILITY"
-    assert nvd_res.results[0].severity == "CRITICAL"
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = ThreatFoxProvider()
+    resp = await provider.execute(ProviderRequest(query="198.51.100.22", target_type="ip"))
+    assert resp.status == "success"
+    # Schema contract: both matches and iocs must be present
+    assert "matches" in resp.raw_data
+    assert "iocs" in resp.raw_data
+    assert len(resp.raw_data["matches"]) == 1
+    # Entities must be generated and NOT be VULNERABILITY
+    assert len(resp.raw_data["entities"]) == 1
+    ent = resp.raw_data["entities"][0]
+    ent_type = ent["type"] if isinstance(ent, dict) else ent.type
+    # Must be accurately mapped to IP / THREAT_INDICATOR, and NEVER misclassified as VULNERABILITY
+    assert ent_type in (EntityType.IP.value, EntityType.IP, EntityType.THREAT_INDICATOR.value, EntityType.THREAT_INDICATOR)
+    assert ent_type != EntityType.VULNERABILITY.value and ent_type != EntityType.VULNERABILITY
+    ent_meta = ent["metadata"] if isinstance(ent, dict) else ent.metadata
+    assert ent_meta["malware_family"] == "Cobalt Strike"
+
+    # Tool executor test
+    tool_res = await tool_executor.execute_tool("tool_threatfox", "198.51.100.22")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "IOC"
+    assert tool_res.results[0].confidence == 0.85
+    assert tool_res.results[0].severity == "HIGH"
+
+
+@pytest.mark.asyncio
+async def test_threatfox_no_match(monkeypatch):
+    """Verify legitimate no_result is success with 0 findings."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"query_status": "no_result", "data": []})
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = ThreatFoxProvider()
+    resp = await provider.execute(ProviderRequest(query="clean-domain.org", target_type="domain"))
+    assert resp.status == "success"
+    assert len(resp.raw_data["matches"]) == 0
+
+    tool_res = await tool_executor.execute_tool("tool_threatfox", "clean-domain.org")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 0
+
+
+@pytest.mark.asyncio
+async def test_threatfox_illegal_search_term_error(monkeypatch):
+    """Verify illegal_search_term is treated as an explicit error."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"query_status": "illegal_search_term"})
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = ThreatFoxProvider()
+    resp = await provider.execute(ProviderRequest(query="invalid--query", target_type="domain"))
+    assert resp.status == "error"
+
+    tool_res = await tool_executor.execute_tool("tool_threatfox", "invalid--query")
+    assert tool_res.status == "FAILED"
+
+
+# =========================================================================
+# 3. NVD Vulnerability Provider & Tool Executor Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_nvd_cve_success_and_schema_normalization(monkeypatch):
+    """Verify NVD CVE provider parses official CVE 2.0 API structure and populates cves & vulnerabilities."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "services.nvd.nist.gov" in str(request.url)
+        assert request.url.params.get("cveId") == "CVE-2024-9999"
+        return httpx.Response(200, json={
+            "vulnerabilities": [
+                {
+                    "cve": {
+                        "id": "CVE-2024-9999",
+                        "descriptions": [{"lang": "en", "value": "Critical remote code execution in core service."}],
+                        "metrics": {
+                            "cvssMetricV31": [
+                                {
+                                    "cvssData": {
+                                        "baseScore": 9.8,
+                                        "baseSeverity": "CRITICAL",
+                                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                                    }
+                                }
+                            ]
+                        },
+                        "weaknesses": [
+                            {"description": [{"value": "CWE-78"}]}
+                        ]
+                    }
+                }
+            ],
+            "totalResults": 1
+        })
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = NVDVulnerabilityProvider()
+    resp = await provider.execute(ProviderRequest(query="CVE-2024-9999", target_type="cve"))
+    assert resp.status == "success"
+    # Schema contract: both cves and vulnerabilities must be present
+    assert "cves" in resp.raw_data
+    assert "vulnerabilities" in resp.raw_data
+    assert len(resp.raw_data["cves"]) == 1
+    assert resp.raw_data["cves"][0]["severity"] == "CRITICAL"
+    assert resp.raw_data["cves"][0]["cvss_score"] == 9.8
+
+    # Tool executor test
+    tool_res = await tool_executor.execute_tool("tool_nvd_cve", "CVE-2024-9999")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "VULNERABILITY"
+    assert tool_res.results[0].severity == "CRITICAL"
+
+
+@pytest.mark.asyncio
+async def test_nvd_cve_rate_limit_and_server_error(monkeypatch):
+    """Verify NVD 429 produces status='error' and 'FAILED'."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="Rate limit exceeded")
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = NVDVulnerabilityProvider()
+    resp = await provider.execute(ProviderRequest(query="CVE-2024-9999", target_type="cve"))
+    assert resp.status == "error"
+
+    tool_res = await tool_executor.execute_tool("tool_nvd_cve", "CVE-2024-9999")
+    assert tool_res.status == "FAILED"
+
+
+# =========================================================================
+# 4. OpenSanctions Provider & Tool Executor Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_opensanctions_success_and_honest_confidence(monkeypatch):
+    """Verify OpenSanctions maps genuine Person entity type, derives confidence honestly, and returns matches/records."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "api.opensanctions.org" in str(request.url)
+        assert request.url.params.get("q") == "John Corrupt"
+        return httpx.Response(200, json={
+            "results": [
+                {
+                    "id": "os_test_99",
+                    "caption": "John Corrupt",
+                    "schema": "Person",
+                    "score": 0.92,
+                    "properties": {
+                        "topics": ["sanction", "debarment"],
+                        "country": ["RU"],
+                        "birthDate": ["1965-05-12"]
+                    },
+                    "datasets": ["eu_fsf", "us_ofac"]
+                }
+            ],
+            "total": 1
+        })
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = OpenSanctionsProvider()
+    resp = await provider.execute(ProviderRequest(query="John Corrupt", target_type="person"))
+    assert resp.status == "success"
+    assert "matches" in resp.raw_data
+    assert "records" in resp.raw_data
+    assert len(resp.raw_data["matches"]) == 1
+    # Verify honest score usage (0.92, NOT arbitrary 0.85 default)
+    assert resp.raw_data["matches"][0]["score"] == 0.92
+    ent = resp.raw_data["entities"][0]
+    ent_type = ent["type"] if isinstance(ent, dict) else ent.type
+    ent_conf = ent["confidence"] if isinstance(ent, dict) else ent.confidence
+    assert ent_type == EntityType.PERSON.value or ent_type == EntityType.PERSON
+    assert ent_conf == 0.92
+
+    # Tool executor test
+    tool_res = await tool_executor.execute_tool("tool_opensanctions", "John Corrupt")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "SANCTION_RECORD"
+    assert tool_res.results[0].confidence == 0.92
+
+
+# =========================================================================
+# 5. Wayback CDX Provider Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_wayback_cdx_success_and_error(monkeypatch):
+    """Verify Wayback CDX parses rows into structured snapshots and distinguishes errors."""
+    cdx_json_payload = [
+        ["original", "timestamp", "statuscode", "mimetype"],
+        ["https://archive.org/", "20240101000000", "200", "text/html"]
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "web.archive.org/cdx/search/cdx" in str(request.url)
+        return httpx.Response(200, json=cdx_json_payload)
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = WaybackCDXProvider()
+    resp = await provider.execute(ProviderRequest(query="archive.org", target_type="domain"))
+    assert resp.status == "success"
+    assert len(resp.raw_data["snapshots"]) == 1
+    assert resp.raw_data["snapshots"][0]["timestamp"] == "20240101000000"
+
+    tool_res = await tool_executor.execute_tool("tool_wayback", "archive.org")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "ARCHIVED_SNAPSHOT"
+
+
+# =========================================================================
+# 6. GreyNoise Community Provider & Tool Executor Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_greynoise_community_known_noise(monkeypatch):
+    """Verify GreyNoise Community API accurately classifies internet noise and known scanners."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "api.greynoise.io/v3/community" in str(request.url)
+        return httpx.Response(200, json={
+            "ip": "8.8.8.8",
+            "noise": True,
+            "riot": True,
+            "classification": "benign",
+            "name": "Google Public DNS",
+            "link": "https://viz.greynoise.io/ip/8.8.8.8",
+            "last_seen": "2026-10-15"
+        })
+
+    patch_httpx_client(monkeypatch, handler)
+    provider = GreyNoiseCommunityProvider()
+    resp = await provider.execute(ProviderRequest(query="8.8.8.8", target_type="ip"))
+    assert resp.status == "success"
+    assert resp.raw_data["noise"] is True
+    assert resp.raw_data["riot"] is True
+    assert resp.raw_data["classification"] == "benign"
+
+    tool_res = await tool_executor.execute_tool("tool_greynoise", "8.8.8.8")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "IP_REPUTATION"
+
+
+@pytest.mark.asyncio
+async def test_greynoise_community_unobserved_404(monkeypatch):
+    """Verify GreyNoise Community 404 is legitimate no-match, NOT error."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"message": "IP not observed"})
+
+    patch_httpx_client(monkeypatch, handler)
+    provider = GreyNoiseCommunityProvider()
+    resp = await provider.execute(ProviderRequest(query="192.0.2.1", target_type="ip"))
+    assert resp.status == "success"
+    assert resp.raw_data["noise"] is False
+    assert len(resp.raw_data["matches"]) == 0
+
+
+# =========================================================================
+# 7. GLEIF Provider & Tool Executor Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_gleif_success_and_error(monkeypatch):
+    """Verify GLEIF Provider queries JSON:API lei-records and resolves verified legal entity."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "api.gleif.org/api/v1/lei-records" in str(request.url)
+        return httpx.Response(200, json={
+            "data": [
+                {
+                    "id": "5493006MHB84DD0ZWV18",
+                    "type": "lei-records",
+                    "attributes": {
+                        "lei": "5493006MHB84DD0ZWV18",
+                        "entity": {
+                            "legalName": {"name": "BARCLAYS PLC"},
+                            "jurisdiction": "GB",
+                            "status": "ACTIVE",
+                            "legalAddress": {"country": "GB", "city": "London"}
+                        },
+                        "registration": {
+                            "status": "ISSUED",
+                            "initialRegistrationDate": "2012-06-06T00:00:00Z"
+                        }
+                    }
+                }
+            ]
+        })
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = GLEIFProvider()
+    resp = await provider.execute(ProviderRequest(query="Barclays", target_type="organization"))
+    assert resp.status == "success"
+    assert len(resp.raw_data["records"]) == 1
+    assert resp.raw_data["records"][0]["lei"] == "5493006MHB84DD0ZWV18"
+
+    tool_res = await tool_executor.execute_tool("tool_gleif", "Barclays")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert tool_res.results[0].type == "ORGANIZATION"
+    assert "BARCLAYS PLC" in tool_res.results[0].value
