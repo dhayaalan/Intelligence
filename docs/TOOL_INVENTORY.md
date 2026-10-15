@@ -1,15 +1,24 @@
 # Sential Platform — Comprehensive Tool & Provider Inventory
 
-This document is the verified migration and live inventory of all **339 OSINT tools/platforms** and **36 Threat Intelligence engines/providers** operational in Sential.
+This document is the verified migration inventory of all **353 OSINT tools/platforms** and **39 Threat Intelligence engines** active and operational in Sential.
 
 ## Summary Metrics
 
-- **Total Integrated Tools / Providers**: 375
-- **OSINT Capabilities / Providers**: 339 (329 public platform probes + 10 core deep engines: SpiderFoot, Shodan, Maltego, theHarvester, Google Dork, Image Engine, Wayback CDX, urlscan.io, OpenSanctions, GLEIF LEI)
-- **Threat Intelligence Capabilities / Providers**: 36 (33 Specialized Scanning Engines + ThreatFox, NIST NVD CVE 2.0, GreyNoise Community)
+- **Total Integrated Tools / Providers**: 392
+- **OSINT Capabilities / Providers**: 353 (Requirement: 300+)
+- **Threat Intelligence Capabilities / Providers**: 39 (Requirement: 33)
+- **Operational States**: 35 Operational | 338 Registered (Probers) | 17 Not Installed (Optional CLI Scanners) | 2 Config Required
 - **Primary Database**: MongoDB (`sential_db`)
-- **Architecture**: Pluggable Provider Registry with Strict Disabled-Module Boundary Enforcement
+- **Architecture**: Pluggable Provider Registry with Zero Core Coupling
 
+### Operational Status Breakdown
+
+| Operational State | Provider Count | Description |
+| :--- | :--- | :--- |
+| **`REGISTERED`** | 338 | Tracked via live registry telemetry |
+| **`OPERATIONAL`** | 35 | Tracked via live registry telemetry |
+| **`NOT_INSTALLED`** | 17 | Tracked via live registry telemetry |
+| **`NOT_CONFIGURED`** | 2 | Tracked via live registry telemetry |
 
 ---
 
@@ -35,7 +44,7 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
 ### 2. ASNMap Network Boundary Engine
@@ -58,7 +67,7 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `20.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
 ### 3. CDN & WAF Edge Inspection Engine
@@ -81,10 +90,33 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 4. DNSx Resolution & CDNCheck Engine
+### 4. Certificate Transparency CT-Log Engine
+
+- **Tool Name**: Certificate Transparency CT-Log Engine
+- **Tool ID**: `crtsh`
+- **Category**: ATTACK_SURFACE
+- **Module**: `threat_intelligence`
+- **Provider Type**: SCANNER_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/crtsh_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `domain, url`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `ct_log_search, subdomain_discovery, cert_issuer_analysis, wildcard_detection`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `20.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 5. DNSx Resolution & CDNCheck Engine
 
 - **Tool Name**: DNSx Resolution & CDNCheck Engine
 - **Tool ID**: `dnsx`
@@ -104,10 +136,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 5. OWASP Amass Attack Surface Engine
+### 6. OWASP Amass Attack Surface Engine
 
 - **Tool Name**: OWASP Amass Attack Surface Engine
 - **Tool ID**: `amass`
@@ -127,10 +159,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `45.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 6. Subfinder Passive Subdomain Engine
+### 7. Subfinder Passive Subdomain Engine
 
 - **Tool Name**: Subfinder Passive Subdomain Engine
 - **Tool ID**: `subfinder`
@@ -150,10 +182,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `20.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 7. Uncover Exposure Search Aggregator
+### 8. Uncover Exposure Search Aggregator
 
 - **Tool Name**: Uncover Exposure Search Aggregator
 - **Tool ID**: `uncover`
@@ -173,10 +205,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 8. Prowler Cloud Security Posture Engine
+### 9. Prowler Cloud Security Posture Engine
 
 - **Tool Name**: Prowler Cloud Security Posture Engine
 - **Tool ID**: `prowler`
@@ -196,10 +228,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `45.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 9. ScoutSuite Cloud Auditor
+### 10. ScoutSuite Cloud Auditor
 
 - **Tool Name**: ScoutSuite Cloud Auditor
 - **Tool ID**: `scoutsuite`
@@ -219,10 +251,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `40.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 10. Semgrep SAST Code Security Engine
+### 11. Semgrep SAST Code Security Engine
 
 - **Tool Name**: Semgrep SAST Code Security Engine
 - **Tool ID**: `semgrep`
@@ -242,10 +274,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `45.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 11. Trivy Container & IaC Security Engine
+### 12. Trivy Container & IaC Security Engine
 
 - **Tool Name**: Trivy Container & IaC Security Engine
 - **Tool ID**: `trivy`
@@ -265,10 +297,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `40.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 12. Katana Next-Gen Web Crawler
+### 13. Katana Next-Gen Web Crawler
 
 - **Tool Name**: Katana Next-Gen Web Crawler
 - **Tool ID**: `katana`
@@ -288,12 +320,12 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `20.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 13. OWASP ZAP Spider & AJAX Crawler Engine
+### 14. OWASP ZAP Spider & Application Crawler
 
-- **Tool Name**: OWASP ZAP Spider & AJAX Crawler Engine
+- **Tool Name**: OWASP ZAP Spider & Application Crawler
 - **Tool ID**: `zap_spider`
 - **Category**: CRAWLER
 - **Module**: `threat_intelligence`
@@ -311,10 +343,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 14. Web Application Crawler & Spider Engine
+### 15. Web Application Crawler & Spider Engine
 
 - **Tool Name**: Web Application Crawler & Spider Engine
 - **Tool ID**: `web_crawler`
@@ -334,10 +366,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 15. DNS Intelligence & Enumeration Engine
+### 16. DNS Intelligence & Enumeration Engine
 
 - **Tool Name**: DNS Intelligence & Enumeration Engine
 - **Tool ID**: `dns_intelligence`
@@ -357,10 +389,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 16. Wazuh Endpoint CTI & Vulnerability Engine
+### 17. Wazuh Endpoint CTI & Vulnerability Engine
 
 - **Tool Name**: Wazuh Endpoint CTI & Vulnerability Engine
 - **Tool ID**: `wazuh`
@@ -380,10 +412,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `25.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 17. HTTP / HTTPS Web Discovery Engine
+### 18. HTTP / HTTPS Web Discovery Engine
 
 - **Tool Name**: HTTP / HTTPS Web Discovery Engine
 - **Tool ID**: `http_discovery`
@@ -403,10 +435,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 18. HTTPX Web Surface Prober
+### 19. HTTPX Web Surface Prober
 
 - **Tool Name**: HTTPX Web Surface Prober
 - **Tool ID**: `httpx`
@@ -426,10 +458,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `12.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 19. Host Discovery & Network Reachability Engine
+### 20. Host Discovery & Network Reachability Engine
 
 - **Tool Name**: Host Discovery & Network Reachability Engine
 - **Tool ID**: `host_discovery`
@@ -449,10 +481,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 20. Masscan Enterprise High-Speed Engine
+### 21. Masscan Enterprise High-Speed Engine
 
 - **Tool Name**: Masscan Enterprise High-Speed Engine
 - **Tool ID**: `masscan`
@@ -472,10 +504,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 21. Naabu Fast Port Discovery Engine
+### 22. Naabu Fast Port Discovery Engine
 
 - **Tool Name**: Naabu Fast Port Discovery Engine
 - **Tool ID**: `naabu`
@@ -495,10 +527,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 22. Port & Service Fingerprinting Engine
+### 23. Port & Service Fingerprinting Engine
 
 - **Tool Name**: Port & Service Fingerprinting Engine
 - **Tool ID**: `port_service_discovery`
@@ -518,10 +550,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 23. Gitleaks Secret & Token Scanner
+### 24. Gitleaks Secret & Token Scanner
 
 - **Tool Name**: Gitleaks Secret & Token Scanner
 - **Tool ID**: `gitleaks`
@@ -541,10 +573,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 24. Application & Technology Fingerprinting Engine
+### 25. Application & Technology Fingerprinting Engine
 
 - **Tool Name**: Application & Technology Fingerprinting Engine
 - **Tool ID**: `tech_detection`
@@ -564,10 +596,56 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 25. Threat Intelligence & CVE Correlation Engine
+### 26. Global IOC & Threat Intelligence Feed (AlienVault OTX / URLhaus / AbuseIPDB)
+
+- **Tool Name**: Global IOC & Threat Intelligence Feed (AlienVault OTX / URLhaus / AbuseIPDB)
+- **Tool ID**: `ioc_feed`
+- **Category**: THREAT_INTEL
+- **Module**: `threat_intelligence`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/ioc_feed_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `ip, domain, hash, url`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `alienvault_otx, urlhaus, abuseipdb`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 27. GreyNoise Community
+
+- **Tool Name**: GreyNoise Community
+- **Tool ID**: `greynoise_community`
+- **Category**: THREAT_INTEL
+- **Module**: `threat_intelligence`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/greynoise_community_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `ip, ipv4`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `ip_reputation, internet_noise, scanner_detection, riot_validation`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `8.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 28. Threat Intelligence & CVE Correlation Engine
 
 - **Tool Name**: Threat Intelligence & CVE Correlation Engine
 - **Tool ID**: `threat_intelligence_correlation`
@@ -587,10 +665,33 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 26. TLS & Certificate Intelligence Engine
+### 29. abuse.ch ThreatFox IOC Intelligence
+
+- **Tool Name**: abuse.ch ThreatFox IOC Intelligence
+- **Tool ID**: `threatfox`
+- **Category**: THREAT_INTEL
+- **Module**: `threat_intelligence`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/threatfox_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `ip, domain, url, hash, ioc`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `ioc_search, malware_family, confidence`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `8.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 30. TLS & Certificate Intelligence Engine
 
 - **Tool Name**: TLS & Certificate Intelligence Engine
 - **Tool ID**: `tls_certificate`
@@ -610,10 +711,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 27. testssl.sh Cryptographic Security Engine
+### 31. testssl.sh Cryptographic Security Engine
 
 - **Tool Name**: testssl.sh Cryptographic Security Engine
 - **Tool ID**: `testssl`
@@ -633,10 +734,56 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `35.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 28. Nuclei Vulnerability & Exposure Scanner
+### 32. CVE, EPSS & CISA KEV Vulnerability Intelligence
+
+- **Tool Name**: CVE, EPSS & CISA KEV Vulnerability Intelligence
+- **Tool ID**: `vulnerability_intel`
+- **Category**: VULNERABILITY
+- **Module**: `threat_intelligence`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/vulnerability_intel_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `cve, domain, ip`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `epss, cisa_kev`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 33. NIST National Vulnerability Database (NVD) CVE API 2.0
+
+- **Tool Name**: NIST National Vulnerability Database (NVD) CVE API 2.0
+- **Tool ID**: `nvd_cve`
+- **Category**: VULNERABILITY
+- **Module**: `threat_intelligence`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/threat_intelligence/engines/engines/nvd_cve_engine.py`
+- **Backend Service**: `ThreatIntelligenceModule` -> `ThreatIntelEngineAdapter`
+- **Frontend Component**: Registered via Provider Registry API (`/api/v1/providers`)
+- **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
+- **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
+- **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
+- **Input Types**: `cve, keyword, software`
+- **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
+- **Capabilities**: `cve_authoritative, cvss_v31, cwes`
+- **Health Check**: Dynamic runtime via `health_check()`
+- **Rate Limits**: `60/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Exponential backoff (2 attempts)`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 34. Nuclei Vulnerability & Exposure Scanner
 
 - **Tool Name**: Nuclei Vulnerability & Exposure Scanner
 - **Tool ID**: `nuclei`
@@ -656,10 +803,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `25.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 29. OWASP ZAP Active Vulnerability Assessment Engine
+### 35. OWASP ZAP Active Vulnerability Assessment Engine
 
 - **Tool Name**: OWASP ZAP Active Vulnerability Assessment Engine
 - **Tool ID**: `zap_active_scan`
@@ -672,17 +819,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: Hybrid (Native Python Async + CLI Subprocess Preflight)
 - **Authentication Required**: `False` (Public Feeds / Local Scanners / Configurable API Keys)
 - **Environment Variables**: `None required for core; ZAP_API_ENDPOINT, OPENAI_API_KEY optional`
-- **Input Types**: `url, domain, subdomain`
+- **Input Types**: `url, domain, subdomain, hostname, ip`
 - **Output Types**: `NormalizedFinding`, `DiscoveredService`, `DiscoveredEndpoint`, `DiscoveredTechnology`, `Evidence`
-- **Capabilities**: `owasp_top_10, xss_testing, sqli_detection, path_traversal, security_headers_audit, zap_active_rules`
+- **Capabilities**: `owasp_top_10, security_headers_audit, cors_misconfiguration, cookie_security_audit, information_disclosure, sensitive_endpoint_audit, zap_active_rules`
 - **Health Check**: Dynamic runtime via `health_check()`
 - **Rate Limits**: `60/min`
 - **Timeout**: `60.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 30. OpenVAS / Greenbone Infrastructure Vulnerability Engine
+### 36. OpenVAS / Greenbone Infrastructure Vulnerability Engine
 
 - **Tool Name**: OpenVAS / Greenbone Infrastructure Vulnerability Engine
 - **Tool ID**: `openvas`
@@ -702,10 +849,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `60.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 31. Wapiti Web Vulnerability Scanner
+### 37. Wapiti Web Vulnerability Scanner
 
 - **Tool Name**: Wapiti Web Vulnerability Scanner
 - **Tool ID**: `wapiti`
@@ -725,10 +872,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `40.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 32. Dalfox Parameter & XSS Analyzer
+### 38. Dalfox Parameter & XSS Analyzer
 
 - **Tool Name**: Dalfox Parameter & XSS Analyzer
 - **Tool ID**: `dalfox`
@@ -748,10 +895,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `20.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 33. Nikto Web Server Security Scanner
+### 39. Nikto Web Server Security Scanner
 
 - **Tool Name**: Nikto Web Server Security Scanner
 - **Tool ID**: `nikto`
@@ -771,14 +918,37 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `60/min`
 - **Timeout**: `30.0s`
 - **Retry**: `Exponential backoff (2 attempts)`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_INSTALLED`
 - **Migration Status**: `FULLY_MIGRATED`
 
 ---
 
-## 2. OSINT Public Platform Probers & Deep Engines (335 Providers)
+## 2. OSINT Public Platform Probers & Deep Engines (353 Providers)
 
-### 1. SpiderFoot Recon
+### 1. Internet Archive Wayback Machine CDX API
+
+- **Tool Name**: Internet Archive Wayback Machine CDX API
+- **Tool ID**: `wayback_cdx`
+- **Category**: ARCHIVE_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/wayback_cdx.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `domain, url, hostname`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `snapshots, historical_urls, archives`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `8.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 2. SpiderFoot Recon
 
 - **Tool Name**: SpiderFoot Recon
 - **Tool ID**: `spiderfoot`
@@ -798,10 +968,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 2. AniDB Anime Database
+### 3. AniDB Anime Database
 
 - **Tool Name**: AniDB Anime Database
 - **Tool ID**: `osint_anidb_net`
@@ -816,15 +986,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 3. AniList Anime & Manga
+### 4. AniList Anime & Manga
 
 - **Tool Name**: AniList Anime & Manga
 - **Tool ID**: `osint_anilist`
@@ -839,15 +1009,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 4. AniList Community Activity
+### 5. AniList Community Activity
 
 - **Tool Name**: AniList Community Activity
 - **Tool ID**: `osint_anilist_activity`
@@ -862,15 +1032,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 5. Anime-Planet Otaku Tracker
+### 6. Anime-Planet Otaku Tracker
 
 - **Tool Name**: Anime-Planet Otaku Tracker
 - **Tool ID**: `osint_anime_planet_tracker`
@@ -885,15 +1055,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 6. Kitsu Anime Tracker
+### 7. Kitsu Anime Tracker
 
 - **Tool Name**: Kitsu Anime Tracker
 - **Tool ID**: `osint_kitsu`
@@ -908,15 +1078,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 7. MangaUpdates (Baka-Updates)
+### 8. MangaUpdates (Baka-Updates)
 
 - **Tool Name**: MangaUpdates (Baka-Updates)
 - **Tool ID**: `osint_mangaupdates`
@@ -931,15 +1101,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 8. MyAnimeList
+### 9. MyAnimeList
 
 - **Tool Name**: MyAnimeList
 - **Tool ID**: `osint_myanimelist`
@@ -954,15 +1124,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 9. MyAnimeList Favorites
+### 10. MyAnimeList Favorites
 
 - **Tool Name**: MyAnimeList Favorites
 - **Tool ID**: `osint_myanimelist_favorites`
@@ -977,15 +1147,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 10. VNDB Visual Novel Database
+### 11. VNDB Visual Novel Database
 
 - **Tool Name**: VNDB Visual Novel Database
 - **Tool ID**: `osint_vndb_org`
@@ -1000,15 +1170,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 11. Bear Blog Minimalist
+### 12. Bear Blog Minimalist
 
 - **Tool Name**: Bear Blog Minimalist
 - **Tool ID**: `osint_bear_blog`
@@ -1023,15 +1193,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 12. Mataroa Minimalist Blog
+### 13. Mataroa Minimalist Blog
 
 - **Tool Name**: Mataroa Minimalist Blog
 - **Tool ID**: `osint_mataroa_blog`
@@ -1046,15 +1216,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 13. AO3 Published Works
+### 14. AO3 Published Works
 
 - **Tool Name**: AO3 Published Works
 - **Tool ID**: `osint_archiveofourown_works`
@@ -1069,15 +1239,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 14. Archive of Our Own (AO3)
+### 15. Archive of Our Own (AO3)
 
 - **Tool Name**: Archive of Our Own (AO3)
 - **Tool ID**: `osint_archiveofourown`
@@ -1092,15 +1262,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 15. BookCrossing Book Tracker
+### 16. BookCrossing Book Tracker
 
 - **Tool Name**: BookCrossing Book Tracker
 - **Tool ID**: `osint_bookcrossing_books`
@@ -1115,15 +1285,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 16. BookWyrm (Fediverse Books)
+### 17. BookWyrm (Fediverse Books)
 
 - **Tool Name**: BookWyrm (Fediverse Books)
 - **Tool ID**: `osint_bookwyrm_fediverse`
@@ -1138,15 +1308,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 17. FanFiction.Net Stories
+### 18. FanFiction.Net Stories
 
 - **Tool Name**: FanFiction.Net Stories
 - **Tool ID**: `osint_fanfiction_net`
@@ -1161,15 +1331,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 18. Goodreads Book Catalog
+### 19. Goodreads Book Catalog
 
 - **Tool Name**: Goodreads Book Catalog
 - **Tool ID**: `osint_goodreads`
@@ -1184,15 +1354,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 19. Hardcover Book Tracker
+### 20. Hardcover Book Tracker
 
 - **Tool Name**: Hardcover Book Tracker
 - **Tool ID**: `osint_hardcover_books`
@@ -1207,15 +1377,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 20. LibraryThing
+### 21. LibraryThing
 
 - **Tool Name**: LibraryThing
 - **Tool ID**: `osint_librarything`
@@ -1230,15 +1400,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 21. Open Library (Internet Archive)
+### 22. Open Library (Internet Archive)
 
 - **Tool Name**: Open Library (Internet Archive)
 - **Tool ID**: `osint_openlibrary`
@@ -1253,15 +1423,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 22. Royal Road Web Fiction
+### 23. Royal Road Web Fiction
 
 - **Tool Name**: Royal Road Web Fiction
 - **Tool ID**: `osint_royalroad`
@@ -1276,15 +1446,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 23. The StoryGraph Books
+### 24. The StoryGraph Books
 
 - **Tool Name**: The StoryGraph Books
 - **Tool ID**: `osint_storygraph`
@@ -1299,15 +1469,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 24. Wattpad Stories & Books
+### 25. Wattpad Stories & Books
 
 - **Tool Name**: Wattpad Stories & Books
 - **Tool ID**: `osint_wattpad`
@@ -1322,15 +1492,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 25. Webtoon Comics & Creators
+### 26. Webtoon Comics & Creators
 
 - **Tool Name**: Webtoon Comics & Creators
 - **Tool ID**: `osint_webtoons`
@@ -1345,15 +1515,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 26. Webtoons Comic Series
+### 27. Webtoons Comic Series
 
 - **Tool Name**: Webtoons Comic Series
 - **Tool ID**: `osint_webtoons_series`
@@ -1368,15 +1538,38 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 27. 365Chess
+### 28. OpenSanctions Global Watchlists & PEP Screening
+
+- **Tool Name**: OpenSanctions Global Watchlists & PEP Screening
+- **Tool ID**: `opensanctions`
+- **Category**: COMPLIANCE_WATCHLIST
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/opensanctions.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `person, organization, company, keyword, username`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `sanctions, pep, debarment, crime`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `8.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 29. 365Chess
 
 - **Tool Name**: 365Chess
 - **Tool ID**: `osint_365chess`
@@ -1391,15 +1584,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 28. Chess Tempo
+### 30. Chess Tempo
 
 - **Tool Name**: Chess Tempo
 - **Tool ID**: `osint_chesstempo`
@@ -1414,15 +1607,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 29. Chess.com
+### 31. Chess.com
 
 - **Tool Name**: Chess.com
 - **Tool ID**: `osint_chess_com`
@@ -1437,15 +1630,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 30. Chess.com Tournament History
+### 32. Chess.com Tournament History
 
 - **Tool Name**: Chess.com Tournament History
 - **Tool ID**: `osint_chess_com_tournaments`
@@ -1460,15 +1653,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 31. Chessable
+### 33. Chessable
 
 - **Tool Name**: Chessable
 - **Tool ID**: `osint_chessable`
@@ -1483,15 +1676,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 32. English Chess Federation (ECF)
+### 34. English Chess Federation (ECF)
 
 - **Tool Name**: English Chess Federation (ECF)
 - **Tool ID**: `osint_ecf_chess_ratings`
@@ -1506,15 +1699,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 33. FIDE International Chess Federation
+### 35. FIDE International Chess Federation
 
 - **Tool Name**: FIDE International Chess Federation
 - **Tool ID**: `osint_fide_profile`
@@ -1529,15 +1722,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 34. GameKnot Chess
+### 36. GameKnot Chess
 
 - **Tool Name**: GameKnot Chess
 - **Tool ID**: `osint_gameknot`
@@ -1552,15 +1745,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 35. Lichess
+### 37. Lichess
 
 - **Tool Name**: Lichess
 - **Tool ID**: `osint_lichess`
@@ -1575,15 +1768,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 36. Lichess Games & Puzzles
+### 38. Lichess Games & Puzzles
 
 - **Tool Name**: Lichess Games & Puzzles
 - **Tool ID**: `osint_lichess_activity`
@@ -1598,15 +1791,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 37. RedHotPawn Chess
+### 39. RedHotPawn Chess
 
 - **Tool Name**: RedHotPawn Chess
 - **Tool ID**: `osint_redhotpawn`
@@ -1621,15 +1814,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 38. US Chess Federation (USCF)
+### 40. US Chess Federation (USCF)
 
 - **Tool Name**: US Chess Federation (USCF)
 - **Tool ID**: `osint_uschess_ratings`
@@ -1644,15 +1837,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 39. Buy Me a Coffee
+### 41. Buy Me a Coffee
 
 - **Tool Name**: Buy Me a Coffee
 - **Tool ID**: `osint_buymeacoffee`
@@ -1667,15 +1860,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 40. Dailymotion
+### 42. Dailymotion
 
 - **Tool Name**: Dailymotion
 - **Tool ID**: `osint_dailymotion`
@@ -1690,15 +1883,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 41. Ko-fi Support Creators
+### 43. Ko-fi Support Creators
 
 - **Tool Name**: Ko-fi Support Creators
 - **Tool ID**: `osint_kofi`
@@ -1713,15 +1906,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 42. Patreon Creator
+### 44. Patreon Creator
 
 - **Tool Name**: Patreon Creator
 - **Tool ID**: `osint_patreon`
@@ -1736,15 +1929,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 43. Patreon Membership Tiers
+### 45. Patreon Membership Tiers
 
 - **Tool Name**: Patreon Membership Tiers
 - **Tool ID**: `osint_patreon_tiers`
@@ -1759,15 +1952,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 44. Rumble Video
+### 46. Rumble Video
 
 - **Tool Name**: Rumble Video
 - **Tool ID**: `osint_rumble`
@@ -1782,15 +1975,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 45. Vimeo Cinema Portfolio
+### 47. Vimeo Cinema Portfolio
 
 - **Tool Name**: Vimeo Cinema Portfolio
 - **Tool ID**: `osint_vimeo_portfolio_showcase`
@@ -1805,15 +1998,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 46. Vimeo Video Showcase
+### 48. Vimeo Video Showcase
 
 - **Tool Name**: Vimeo Video Showcase
 - **Tool ID**: `osint_vimeo`
@@ -1828,15 +2021,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 47. YouTube Channel
+### 49. YouTube Channel
 
 - **Tool Name**: YouTube Channel
 - **Tool ID**: `osint_youtube`
@@ -1851,15 +2044,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 48. YouTube Creator Posts
+### 50. YouTube Creator Posts
 
 - **Tool Name**: YouTube Creator Posts
 - **Tool ID**: `osint_youtube_community_tab`
@@ -1874,15 +2067,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 49. Etherscan ENS Name / Account
+### 51. Etherscan ENS Name / Account
 
 - **Tool Name**: Etherscan ENS Name / Account
 - **Tool ID**: `osint_etherscan_name`
@@ -1897,15 +2090,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 50. Farcaster Warpcast Web3
+### 52. Farcaster Warpcast Web3
 
 - **Tool Name**: Farcaster Warpcast Web3
 - **Tool ID**: `osint_farcaster_warpcast`
@@ -1920,15 +2113,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 51. Foundation Web3 Creator
+### 53. Foundation Web3 Creator
 
 - **Tool Name**: Foundation Web3 Creator
 - **Tool ID**: `osint_foundation_app_art`
@@ -1943,15 +2136,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 52. Magic Eden Solana NFT
+### 54. Magic Eden Solana NFT
 
 - **Tool Name**: Magic Eden Solana NFT
 - **Tool ID**: `osint_magic_eden_solana`
@@ -1966,15 +2159,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 53. Mirror.xyz Web3 Publishing
+### 55. Mirror.xyz Web3 Publishing
 
 - **Tool Name**: Mirror.xyz Web3 Publishing
 - **Tool ID**: `osint_mirror_xyz`
@@ -1989,15 +2182,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 54. OpenSea NFT Marketplace
+### 56. OpenSea NFT Marketplace
 
 - **Tool Name**: OpenSea NFT Marketplace
 - **Tool ID**: `osint_opensea`
@@ -2012,15 +2205,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 55. Rarible Community NFT
+### 57. Rarible Community NFT
 
 - **Tool Name**: Rarible Community NFT
 - **Tool ID**: `osint_rarible`
@@ -2035,15 +2228,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 56. SuperRare Curated Digital Art
+### 58. SuperRare Curated Digital Art
 
 - **Tool Name**: SuperRare Curated Digital Art
 - **Tool ID**: `osint_superrare_nft`
@@ -2058,15 +2251,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 57. Zora Web3 Network
+### 59. Zora Web3 Network
 
 - **Tool Name**: Zora Web3 Network
 - **Tool ID**: `osint_zora_creator`
@@ -2081,15 +2274,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 58. ArtStation Portfolio
+### 60. ArtStation Portfolio
 
 - **Tool Name**: ArtStation Portfolio
 - **Tool ID**: `osint_artstation`
@@ -2104,15 +2297,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 59. Behance Portfolio (Adobe)
+### 61. Behance Portfolio (Adobe)
 
 - **Tool Name**: Behance Portfolio (Adobe)
 - **Tool ID**: `osint_behance`
@@ -2127,15 +2320,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 60. Cara Art & Portfolio
+### 62. Cara Art & Portfolio
 
 - **Tool Name**: Cara Art & Portfolio
 - **Tool ID**: `osint_cara_artists`
@@ -2150,15 +2343,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 61. Cara Creator Gallery
+### 63. Cara Creator Gallery
 
 - **Tool Name**: Cara Creator Gallery
 - **Tool ID**: `osint_cara_app_gallery`
@@ -2173,15 +2366,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 62. DeviantArt Studio
+### 64. DeviantArt Studio
 
 - **Tool Name**: DeviantArt Studio
 - **Tool ID**: `osint_deviantart`
@@ -2196,15 +2389,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 63. Dribbble Designers
+### 65. Dribbble Designers
 
 - **Tool Name**: Dribbble Designers
 - **Tool ID**: `osint_dribbble`
@@ -2219,15 +2412,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 64. Ello Art Community
+### 66. Ello Art Community
 
 - **Tool Name**: Ello Art Community
 - **Tool ID**: `osint_ello_co`
@@ -2242,15 +2435,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 65. Mastodon Art Community
+### 67. Mastodon Art Community
 
 - **Tool Name**: Mastodon Art Community
 - **Tool ID**: `osint_mastodon_art_gallery`
@@ -2265,15 +2458,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 66. AtCoder
+### 68. AtCoder
 
 - **Tool Name**: AtCoder
 - **Tool ID**: `osint_atcoder`
@@ -2286,17 +2479,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 67. Bitbucket Cloud
+### 69. Bitbucket Cloud
 
 - **Tool Name**: Bitbucket Cloud
 - **Tool ID**: `osint_bitbucket`
@@ -2309,17 +2502,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 68. Bugcrowd Hall of Fame
+### 70. Bugcrowd Hall of Fame
 
 - **Tool Name**: Bugcrowd Hall of Fame
 - **Tool ID**: `osint_bugcrowd_hall_of_fame`
@@ -2332,17 +2525,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 69. Bugcrowd Security Researcher
+### 71. Bugcrowd Security Researcher
 
 - **Tool Name**: Bugcrowd Security Researcher
 - **Tool ID**: `osint_bugcrowd`
@@ -2355,17 +2548,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 70. CTFtime Competitive Security
+### 72. CTFtime Competitive Security
 
 - **Tool Name**: CTFtime Competitive Security
 - **Tool ID**: `osint_ctftime`
@@ -2378,17 +2571,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 71. CTFtime Team Association
+### 73. CTFtime Team Association
 
 - **Tool Name**: CTFtime Team Association
 - **Tool ID**: `osint_ctftime_teams`
@@ -2401,17 +2594,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 72. CodePen
+### 74. CodePen
 
 - **Tool Name**: CodePen
 - **Tool ID**: `osint_codepen`
@@ -2424,17 +2617,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 73. Codeberg Git
+### 75. Codeberg Git
 
 - **Tool Name**: Codeberg Git
 - **Tool ID**: `osint_codeberg`
@@ -2447,17 +2640,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 74. Codeforces
+### 76. Codeforces
 
 - **Tool Name**: Codeforces
 - **Tool ID**: `osint_codeforces`
@@ -2470,17 +2663,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 75. Coderwall
+### 77. Coderwall
 
 - **Tool Name**: Coderwall
 - **Tool ID**: `osint_coderwall`
@@ -2493,17 +2686,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 76. Codewars
+### 78. Codewars
 
 - **Tool Name**: Codewars
 - **Tool ID**: `osint_codewars`
@@ -2516,17 +2709,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 77. DataCamp Data Scientist
+### 79. DataCamp Data Scientist
 
 - **Tool Name**: DataCamp Data Scientist
 - **Tool ID**: `osint_datacamp_learn`
@@ -2539,17 +2732,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 78. Dev.to Community
+### 80. Dev.to Community
 
 - **Tool Name**: Dev.to Community
 - **Tool ID**: `osint_devto`
@@ -2562,17 +2755,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 79. DockerHub
+### 81. DockerHub
 
 - **Tool Name**: DockerHub
 - **Tool ID**: `osint_dockerhub`
@@ -2585,17 +2778,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 80. Exercism
+### 82. Exercism
 
 - **Tool Name**: Exercism
 - **Tool ID**: `osint_exercism`
@@ -2608,17 +2801,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 81. GitHub
+### 83. GitHub
 
 - **Tool Name**: GitHub
 - **Tool ID**: `osint_github`
@@ -2631,17 +2824,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 82. GitHub Repositories Showcase
+### 84. GitHub Repositories Showcase
 
 - **Tool Name**: GitHub Repositories Showcase
 - **Tool ID**: `osint_github_repositories`
@@ -2654,17 +2847,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 83. GitLab
+### 85. GitLab
 
 - **Tool Name**: GitLab
 - **Tool ID**: `osint_gitlab`
@@ -2677,17 +2870,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 84. GitLab Public Projects
+### 86. GitLab Public Projects
 
 - **Tool Name**: GitLab Public Projects
 - **Tool ID**: `osint_gitlab_projects`
@@ -2700,17 +2893,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 85. Glitch Coding
+### 87. Glitch Coding
 
 - **Tool Name**: Glitch Coding
 - **Tool ID**: `osint_glitch`
@@ -2723,17 +2916,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 86. Hack The Box
+### 88. Hack The Box
 
 - **Tool Name**: Hack The Box
 - **Tool ID**: `osint_hackthebox`
@@ -2746,17 +2939,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 87. HackerEarth Developer
+### 89. HackerEarth Developer
 
 - **Tool Name**: HackerEarth Developer
 - **Tool ID**: `osint_hackerearth`
@@ -2769,17 +2962,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 88. HackerNews
+### 90. HackerNews
 
 - **Tool Name**: HackerNews
 - **Tool ID**: `osint_hackernews`
@@ -2792,17 +2985,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 89. HackerOne Bug Bounty
+### 91. HackerOne Bug Bounty
 
 - **Tool Name**: HackerOne Bug Bounty
 - **Tool ID**: `osint_hackerone`
@@ -2815,17 +3008,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 90. HackerOne Public Directory
+### 92. HackerOne Public Directory
 
 - **Tool Name**: HackerOne Public Directory
 - **Tool ID**: `osint_hackerone_hackers`
@@ -2838,17 +3031,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 91. HackerRank
+### 93. HackerRank
 
 - **Tool Name**: HackerRank
 - **Tool ID**: `osint_hackerrank`
@@ -2861,17 +3054,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 92. Hashnode Tech Blog
+### 94. Hashnode Tech Blog
 
 - **Tool Name**: Hashnode Tech Blog
 - **Tool ID**: `osint_hashnode`
@@ -2884,17 +3077,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 93. Hugging Face AI
+### 95. Hugging Face AI
 
 - **Tool Name**: Hugging Face AI
 - **Tool ID**: `osint_huggingface`
@@ -2907,17 +3100,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 94. Intigriti Ethical Hackers
+### 96. Intigriti Ethical Hackers
 
 - **Tool Name**: Intigriti Ethical Hackers
 - **Tool ID**: `osint_intigriti`
@@ -2930,17 +3123,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 95. Intigriti Leaderboard Rank
+### 97. Intigriti Leaderboard Rank
 
 - **Tool Name**: Intigriti Leaderboard Rank
 - **Tool ID**: `osint_intigriti_leaderboard`
@@ -2953,17 +3146,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 96. JSFiddle
+### 98. JSFiddle
 
 - **Tool Name**: JSFiddle
 - **Tool ID**: `osint_jsfiddle`
@@ -2976,17 +3169,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 97. Kaggle AI & Data
+### 99. Kaggle AI & Data
 
 - **Tool Name**: Kaggle AI & Data
 - **Tool ID**: `osint_kaggle`
@@ -2999,17 +3192,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 98. LeetCode
+### 100. LeetCode
 
 - **Tool Name**: LeetCode
 - **Tool ID**: `osint_leetcode`
@@ -3022,17 +3215,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 99. Observable HQ
+### 101. Observable HQ
 
 - **Tool Name**: Observable HQ
 - **Tool ID**: `osint_observable`
@@ -3045,17 +3238,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 100. Open Hub (Black Duck)
+### 102. Open Hub (Black Duck)
 
 - **Tool Name**: Open Hub (Black Duck)
 - **Tool ID**: `osint_openhub`
@@ -3068,17 +3261,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 101. Pastebin
+### 103. Pastebin
 
 - **Tool Name**: Pastebin
 - **Tool ID**: `osint_pastebin`
@@ -3091,17 +3284,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 102. Replit
+### 104. Replit
 
 - **Tool Name**: Replit
 - **Tool ID**: `osint_replit`
@@ -3114,17 +3307,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 103. Root-Me Challenges Solved
+### 105. Root-Me Challenges Solved
 
 - **Tool Name**: Root-Me Challenges Solved
 - **Tool ID**: `osint_root_me_stats`
@@ -3137,17 +3330,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 104. Root-Me Hacking Challenges
+### 106. Root-Me Hacking Challenges
 
 - **Tool Name**: Root-Me Hacking Challenges
 - **Tool ID**: `osint_root_me`
@@ -3160,17 +3353,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 105. Scrimba Coding
+### 107. Scrimba Coding
 
 - **Tool Name**: Scrimba Coding
 - **Tool ID**: `osint_scrimba`
@@ -3183,17 +3376,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 106. SourceForge
+### 108. SourceForge
 
 - **Tool Name**: SourceForge
 - **Tool ID**: `osint_sourceforge`
@@ -3206,17 +3399,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 107. SourceHut Software Forge
+### 109. SourceHut Software Forge
 
 - **Tool Name**: SourceHut Software Forge
 - **Tool ID**: `osint_sourcehut`
@@ -3229,17 +3422,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 108. Stack Exchange Network
+### 110. Stack Exchange Network
 
 - **Tool Name**: Stack Exchange Network
 - **Tool ID**: `osint_stackexchange`
@@ -3252,17 +3445,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 109. Topcoder
+### 111. Topcoder
 
 - **Tool Name**: Topcoder
 - **Tool ID**: `osint_topcoder`
@@ -3275,17 +3468,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 110. TryHackMe Cyber Labs
+### 112. TryHackMe Cyber Labs
 
 - **Tool Name**: TryHackMe Cyber Labs
 - **Tool ID**: `osint_tryhackme`
@@ -3298,17 +3491,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 111. Ubuntu Launchpad
+### 113. Ubuntu Launchpad
 
 - **Tool Name**: Ubuntu Launchpad
 - **Tool ID**: `osint_launchpad`
@@ -3321,17 +3514,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 112. WeChall Challenge Profiles
+### 114. WeChall Challenge Profiles
 
 - **Tool Name**: WeChall Challenge Profiles
 - **Tool ID**: `osint_wechall_profiles`
@@ -3344,17 +3537,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 113. WeChall Challenge Sites
+### 115. WeChall Challenge Sites
 
 - **Tool Name**: WeChall Challenge Sites
 - **Tool ID**: `osint_wechall`
@@ -3367,17 +3560,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 114. freeCodeCamp
+### 116. freeCodeCamp
 
 - **Tool Name**: freeCodeCamp
 - **Tool ID**: `osint_freecodecamp`
@@ -3390,17 +3583,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 115. picoCTF Learning Platform
+### 117. picoCTF Learning Platform
 
 - **Tool Name**: picoCTF Learning Platform
 - **Tool ID**: `osint_picoctf`
@@ -3413,17 +3606,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 116. Brilliant.org STEM
+### 118. Brilliant.org STEM
 
 - **Tool Name**: Brilliant.org STEM
 - **Tool ID**: `osint_brilliant_org`
@@ -3438,15 +3631,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 117. Codecademy Learner
+### 119. Codecademy Learner
 
 - **Tool Name**: Codecademy Learner
 - **Tool ID**: `osint_codecademy`
@@ -3461,15 +3654,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 118. Khan Academy
+### 120. Khan Academy
 
 - **Tool Name**: Khan Academy
 - **Tool ID**: `osint_khan_academy`
@@ -3484,15 +3677,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 119. Quizlet Flashcards
+### 121. Quizlet Flashcards
 
 - **Tool Name**: Quizlet Flashcards
 - **Tool ID**: `osint_quizlet`
@@ -3507,15 +3700,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 120. Scratch (MIT Media Lab)
+### 122. Scratch (MIT Media Lab)
 
 - **Tool Name**: Scratch (MIT Media Lab)
 - **Tool ID**: `osint_scratch_mit`
@@ -3530,15 +3723,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 121. SoloLearn Mobile Coding
+### 123. SoloLearn Mobile Coding
 
 - **Tool Name**: SoloLearn Mobile Coding
 - **Tool ID**: `osint_sololearn`
@@ -3553,15 +3746,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 122. Team Treehouse Coding
+### 124. Team Treehouse Coding
 
 - **Tool Name**: Team Treehouse Coding
 - **Tool ID**: `osint_treehouse_team`
@@ -3576,15 +3769,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 123. TypeRacer Typist
+### 125. TypeRacer Typist
 
 - **Tool Name**: TypeRacer Typist
 - **Tool ID**: `osint_typeracer`
@@ -3599,15 +3792,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 124. edX Online Courses
+### 126. edX Online Courses
 
 - **Tool Name**: edX Online Courses
 - **Tool ID**: `osint_edx_org`
@@ -3622,15 +3815,84 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 125. Criticker Movie Ratings
+### 127. Corporate, Banking & Financial OSINT (GLEIF / SEC EDGAR)
+
+- **Tool Name**: Corporate, Banking & Financial OSINT (GLEIF / SEC EDGAR)
+- **Tool ID**: `financial_intel`
+- **Category**: FINANCIAL_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/financial_intel.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `organization, company, bank, lei, cik, domain`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `company, organization, bank, lei, cik`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `12.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 128. GLEIF Legal Entity Identifier
+
+- **Tool Name**: GLEIF Legal Entity Identifier
+- **Tool ID**: `gleif_lei`
+- **Category**: FINANCIAL_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/gleif_lei.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `organization, company, lei, domain`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `legal_entity_identifier, corporate_ownership, regulatory_records, lei_lookup`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 129. US SEC EDGAR Official Corporate Filings & CIK API
+
+- **Tool Name**: US SEC EDGAR Official Corporate Filings & CIK API
+- **Tool ID**: `sec_edgar`
+- **Category**: FINANCIAL_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/sec_edgar.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `organization, company, cik, ticker, domain`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `corporate_filings, cik_resolution, 10k_annual_reports, 8k_current_reports, xbrl_facts`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 130. Criticker Movie Ratings
 
 - **Tool Name**: Criticker Movie Ratings
 - **Tool ID**: `osint_criticker_films`
@@ -3645,15 +3907,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 126. Letterboxd Film Diary
+### 131. Letterboxd Film Diary
 
 - **Tool Name**: Letterboxd Film Diary
 - **Tool ID**: `osint_letterboxd`
@@ -3668,15 +3930,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 127. Letterboxd Film Lists
+### 132. Letterboxd Film Lists
 
 - **Tool Name**: Letterboxd Film Lists
 - **Tool ID**: `osint_letterboxd_lists`
@@ -3691,15 +3953,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 128. Serializd TV Series Diary
+### 133. Serializd TV Series Diary
 
 - **Tool Name**: Serializd TV Series Diary
 - **Tool ID**: `osint_serializd_tv`
@@ -3714,15 +3976,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 129. TV Time Series Tracker
+### 134. TV Time Series Tracker
 
 - **Tool Name**: TV Time Series Tracker
 - **Tool ID**: `osint_tv_time_watch`
@@ -3737,15 +3999,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 130. TheMovieDB (TMDB)
+### 135. TheMovieDB (TMDB)
 
 - **Tool Name**: TheMovieDB (TMDB)
 - **Tool ID**: `osint_tmdb_movies`
@@ -3760,15 +4022,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 131. Trakt.tv History Stream
+### 136. Trakt.tv History Stream
 
 - **Tool Name**: Trakt.tv History Stream
 - **Tool ID**: `osint_trakt_history_user`
@@ -3783,15 +4045,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 132. Trakt.tv TV & Movie Tracker
+### 137. Trakt.tv TV & Movie Tracker
 
 - **Tool Name**: Trakt.tv TV & Movie Tracker
 - **Tool ID**: `osint_trakt_tv`
@@ -3806,15 +4068,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 133. AVS Forum Home Theater
+### 138. AVS Forum Home Theater
 
 - **Tool Name**: AVS Forum Home Theater
 - **Tool ID**: `osint_avsforum_hometheater`
@@ -3829,15 +4091,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 134. Amino Communities
+### 139. Amino Communities
 
 - **Tool Name**: Amino Communities
 - **Tool ID**: `osint_amino_apps`
@@ -3852,15 +4114,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 135. Bogleheads Financial Forum
+### 140. Bogleheads Financial Forum
 
 - **Tool Name**: Bogleheads Financial Forum
 - **Tool ID**: `osint_bogleheads_invest`
@@ -3875,15 +4137,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 136. Discourse Foundation
+### 141. Discourse Foundation
 
 - **Tool Name**: Discourse Foundation
 - **Tool ID**: `osint_discourse_org_community`
@@ -3898,15 +4160,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 137. Discourse Meta Community
+### 142. Discourse Meta Community
 
 - **Tool Name**: Discourse Meta Community
 - **Tool ID**: `osint_discourse_meta`
@@ -3921,15 +4183,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 138. Lemmy.ml Open Discussion
+### 143. Lemmy.ml Open Discussion
 
 - **Tool Name**: Lemmy.ml Open Discussion
 - **Tool ID**: `osint_lemmy_ml_community`
@@ -3944,15 +4206,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 139. Lemmy.world Fediverse Forum
+### 144. Lemmy.world Fediverse Forum
 
 - **Tool Name**: Lemmy.world Fediverse Forum
 - **Tool ID**: `osint_lemmy_world`
@@ -3967,15 +4229,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 140. Linus Tech Tips Forum
+### 145. Linus Tech Tips Forum
 
 - **Tool Name**: Linus Tech Tips Forum
 - **Tool ID**: `osint_linustech_community`
@@ -3990,15 +4252,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 141. Lobste.rs Computing
+### 146. Lobste.rs Computing
 
 - **Tool Name**: Lobste.rs Computing
 - **Tool ID**: `osint_lobsters`
@@ -4013,15 +4275,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 142. Overclock.net Hardware PC
+### 147. Overclock.net Hardware PC
 
 - **Tool Name**: Overclock.net Hardware PC
 - **Tool ID**: `osint_overclock_hardware`
@@ -4036,15 +4298,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 143. Product Hunt
+### 148. Product Hunt
 
 - **Tool Name**: Product Hunt
 - **Tool ID**: `osint_producthunt`
@@ -4059,15 +4321,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 144. Quora Q&A
+### 149. Quora Q&A
 
 - **Tool Name**: Quora Q&A
 - **Tool ID**: `osint_quora`
@@ -4082,15 +4344,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 145. Slashdot
+### 150. Slashdot
 
 - **Tool Name**: Slashdot
 - **Tool ID**: `osint_slashdot`
@@ -4105,15 +4367,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 146. Tom's Hardware PC Builder
+### 151. Tom's Hardware PC Builder
 
 - **Tool Name**: Tom's Hardware PC Builder
 - **Tool ID**: `osint_tomshardware_pc`
@@ -4128,15 +4390,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 147. XDA Developers Forum
+### 152. XDA Developers Forum
 
 - **Tool Name**: XDA Developers Forum
 - **Tool ID**: `osint_xda_developers`
@@ -4151,15 +4413,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 148. Apex Legends Tracker
+### 153. Apex Legends Tracker
 
 - **Tool Name**: Apex Legends Tracker
 - **Tool ID**: `osint_apex_tracker_stats`
@@ -4174,15 +4436,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 149. Armor Games
+### 154. Armor Games
 
 - **Tool Name**: Armor Games
 - **Tool ID**: `osint_armorgames`
@@ -4197,15 +4459,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 150. BoardGameGeek
+### 155. BoardGameGeek
 
 - **Tool Name**: BoardGameGeek
 - **Tool ID**: `osint_boardgamegeek`
@@ -4220,15 +4482,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 151. BoardGameGeek Collection
+### 156. BoardGameGeek Collection
 
 - **Tool Name**: BoardGameGeek Collection
 - **Tool ID**: `osint_boardgamegeek_collection_user`
@@ -4243,15 +4505,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 152. CurseForge Creator Studio
+### 157. CurseForge Creator Studio
 
 - **Tool Name**: CurseForge Creator Studio
 - **Tool ID**: `osint_curseforge_creators`
@@ -4266,15 +4528,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 153. CurseForge Mods & Addons
+### 158. CurseForge Mods & Addons
 
 - **Tool Name**: CurseForge Mods & Addons
 - **Tool ID**: `osint_curseforge`
@@ -4289,15 +4551,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 154. Destiny Tracker Guardian
+### 159. Destiny Tracker Guardian
 
 - **Tool Name**: Destiny Tracker Guardian
 - **Tool ID**: `osint_destiny_tracker`
@@ -4312,15 +4574,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 155. Dotabuff
+### 160. Dotabuff
 
 - **Tool Name**: Dotabuff
 - **Tool ID**: `osint_dotabuff`
@@ -4335,15 +4597,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 156. FACEIT Esports
+### 161. FACEIT Esports
 
 - **Tool Name**: FACEIT Esports
 - **Tool ID**: `osint_faceit`
@@ -4358,15 +4620,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 157. Fortnite Tracker Player
+### 162. Fortnite Tracker Player
 
 - **Tool Name**: Fortnite Tracker Player
 - **Tool ID**: `osint_fortnite_tracker_stats`
@@ -4381,15 +4643,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 158. GOG Galaxy
+### 163. GOG Galaxy
 
 - **Tool Name**: GOG Galaxy
 - **Tool ID**: `osint_gog`
@@ -4404,15 +4666,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 159. Game Jolt
+### 164. Game Jolt
 
 - **Tool Name**: Game Jolt
 - **Tool ID**: `osint_gamejolt`
@@ -4427,15 +4689,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 160. GameFAQs Walkthroughs & Boards
+### 165. GameFAQs Walkthroughs & Boards
 
 - **Tool Name**: GameFAQs Walkthroughs & Boards
 - **Tool ID**: `osint_gamefaqs_guides`
@@ -4450,15 +4712,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 161. GeoGuessr Explorer
+### 166. GeoGuessr Explorer
 
 - **Tool Name**: GeoGuessr Explorer
 - **Tool ID**: `osint_geoguessr`
@@ -4473,15 +4735,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 162. HLTV Counter-Strike Hub
+### 167. HLTV Counter-Strike Hub
 
 - **Tool Name**: HLTV Counter-Strike Hub
 - **Tool ID**: `osint_hltv_esports`
@@ -4496,15 +4758,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 163. Habbo Hotel Community
+### 168. Habbo Hotel Community
 
 - **Tool Name**: Habbo Hotel Community
 - **Tool ID**: `osint_habbo_hotel`
@@ -4519,15 +4781,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 164. Hypixel Minecraft Network
+### 169. Hypixel Minecraft Network
 
 - **Tool Name**: Hypixel Minecraft Network
 - **Tool ID**: `osint_hypixel_player`
@@ -4542,15 +4804,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 165. IGN Boards Gamers
+### 170. IGN Boards Gamers
 
 - **Tool Name**: IGN Boards Gamers
 - **Tool ID**: `osint_ign_boards_gamer`
@@ -4565,15 +4827,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 166. Itch.io Developer Logs
+### 171. Itch.io Developer Logs
 
 - **Tool Name**: Itch.io Developer Logs
 - **Tool ID**: `osint_itch_io_devlog`
@@ -4588,15 +4850,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 167. Itch.io Indie Games
+### 172. Itch.io Indie Games
 
 - **Tool Name**: Itch.io Indie Games
 - **Tool ID**: `osint_itch_io`
@@ -4611,15 +4873,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 168. Kongregate
+### 173. Kongregate
 
 - **Tool Name**: Kongregate
 - **Tool ID**: `osint_kongregate`
@@ -4634,15 +4896,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 169. ModDB
+### 174. ModDB
 
 - **Tool Name**: ModDB
 - **Tool ID**: `osint_moddb`
@@ -4657,15 +4919,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 170. Modrinth Open Source Mods
+### 175. Modrinth Open Source Mods
 
 - **Tool Name**: Modrinth Open Source Mods
 - **Tool ID**: `osint_modrinth`
@@ -4680,15 +4942,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 171. Modrinth Released Mods
+### 176. Modrinth Released Mods
 
 - **Tool Name**: Modrinth Released Mods
 - **Tool ID**: `osint_modrinth_author_mods`
@@ -4703,15 +4965,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 172. NameMC Minecraft
+### 177. NameMC Minecraft
 
 - **Tool Name**: NameMC Minecraft
 - **Tool ID**: `osint_namemc_minecraft`
@@ -4726,15 +4988,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 173. NameMC Server Profile
+### 178. NameMC Server Profile
 
 - **Tool Name**: NameMC Server Profile
 - **Tool ID**: `osint_namemc_server_staff`
@@ -4749,15 +5011,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 174. Newgrounds Creator
+### 179. Newgrounds Creator
 
 - **Tool Name**: Newgrounds Creator
 - **Tool ID**: `osint_newgrounds`
@@ -4772,15 +5034,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 175. Nexus Mods
+### 180. Nexus Mods
 
 - **Tool Name**: Nexus Mods
 - **Tool ID**: `osint_nexusmods`
@@ -4795,15 +5057,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 176. OP.GG League of Legends
+### 181. OP.GG League of Legends
 
 - **Tool Name**: OP.GG League of Legends
 - **Tool ID**: `osint_op_gg`
@@ -4818,15 +5080,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 177. Old School RuneScape Hiscores
+### 182. Old School RuneScape Hiscores
 
 - **Tool Name**: Old School RuneScape Hiscores
 - **Tool ID**: `osint_runescape_hiscores`
@@ -4841,15 +5103,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 178. Planet Minecraft
+### 183. Planet Minecraft
 
 - **Tool Name**: Planet Minecraft
 - **Tool ID**: `osint_planetminecraft`
@@ -4864,15 +5126,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 179. Planet Minecraft World Maps
+### 184. Planet Minecraft World Maps
 
 - **Tool Name**: Planet Minecraft World Maps
 - **Tool ID**: `osint_planetminecraft_maps`
@@ -4887,15 +5149,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 180. Pokemon Showdown
+### 185. Pokemon Showdown
 
 - **Tool Name**: Pokemon Showdown
 - **Tool ID**: `osint_pokemon_showdown`
@@ -4910,15 +5172,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 181. Rainbow Six Siege Tracker
+### 186. Rainbow Six Siege Tracker
 
 - **Tool Name**: Rainbow Six Siege Tracker
 - **Tool ID**: `osint_r6tracker_stats`
@@ -4933,15 +5195,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 182. Retro Gamer Zone
+### 187. Retro Gamer Zone
 
 - **Tool Name**: Retro Gamer Zone
 - **Tool ID**: `osint_retro_achieve_forum`
@@ -4956,15 +5218,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 183. RetroAchievements
+### 188. RetroAchievements
 
 - **Tool Name**: RetroAchievements
 - **Tool ID**: `osint_retroachievements`
@@ -4979,15 +5241,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 184. Roblox Player
+### 189. Roblox Player
 
 - **Tool Name**: Roblox Player
 - **Tool ID**: `osint_roblox`
@@ -5002,15 +5264,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 185. Rocket League Tracker
+### 190. Rocket League Tracker
 
 - **Tool Name**: Rocket League Tracker
 - **Tool ID**: `osint_rocketleague_stats`
@@ -5025,15 +5287,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 186. Rolimons Roblox Trader
+### 191. Rolimons Roblox Trader
 
 - **Tool Name**: Rolimons Roblox Trader
 - **Tool ID**: `osint_roblox_trade`
@@ -5048,15 +5310,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 187. Speedrun Game Guides
+### 192. Speedrun Game Guides
 
 - **Tool Name**: Speedrun Game Guides
 - **Tool ID**: `osint_speedrun_guides_author`
@@ -5071,15 +5333,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 188. Speedrun.com
+### 193. Speedrun.com
 
 - **Tool Name**: Speedrun.com
 - **Tool ID**: `osint_speedrun_com`
@@ -5094,15 +5356,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 189. SpigotMC Minecraft Dev
+### 194. SpigotMC Minecraft Dev
 
 - **Tool Name**: SpigotMC Minecraft Dev
 - **Tool ID**: `osint_spigotmc`
@@ -5117,15 +5379,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 190. SpigotMC Plugin Author
+### 195. SpigotMC Plugin Author
 
 - **Tool Name**: SpigotMC Plugin Author
 - **Tool ID**: `osint_spigotmc_plugins`
@@ -5140,15 +5402,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 191. Start.gg Esports Tournaments
+### 196. Start.gg Esports Tournaments
 
 - **Tool Name**: Start.gg Esports Tournaments
 - **Tool ID**: `osint_smash_gg_start`
@@ -5163,15 +5425,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 192. Steam Badges & Level
+### 197. Steam Badges & Level
 
 - **Tool Name**: Steam Badges & Level
 - **Tool ID**: `osint_steam_badges_showcase`
@@ -5186,15 +5448,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 193. Steam Community
+### 198. Steam Community
 
 - **Tool Name**: Steam Community
 - **Tool ID**: `osint_steam`
@@ -5209,15 +5471,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 194. Steam Inventory Showcase
+### 199. Steam Inventory Showcase
 
 - **Tool Name**: Steam Inventory Showcase
 - **Tool ID**: `osint_steam_inventory_showcase`
@@ -5232,15 +5494,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 195. Tibia MMORPG
+### 200. Tibia MMORPG
 
 - **Tool Name**: Tibia MMORPG
 - **Tool ID**: `osint_tibia_char`
@@ -5255,15 +5517,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 196. Tracker Network (Tracker.gg)
+### 201. Tracker Network (Tracker.gg)
 
 - **Tool Name**: Tracker Network (Tracker.gg)
 - **Tool ID**: `osint_tracker_gg`
@@ -5278,15 +5540,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 197. Valorant Tracker Agent
+### 202. Valorant Tracker Agent
 
 - **Tool Name**: Valorant Tracker Agent
 - **Tool ID**: `osint_valorant_tracker_stats`
@@ -5301,15 +5563,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 198. Vimm's Lair Gaming
+### 203. Vimm's Lair Gaming
 
 - **Tool Name**: Vimm's Lair Gaming
 - **Tool ID**: `osint_vimm_lair`
@@ -5324,15 +5586,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 199. Warframe Market Trader
+### 204. Warframe Market Trader
 
 - **Tool Name**: Warframe Market Trader
 - **Tool ID**: `osint_warframe_market_trader`
@@ -5347,15 +5609,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 200. osu! Beatmap Mapper
+### 205. osu! Beatmap Mapper
 
 - **Tool Name**: osu! Beatmap Mapper
 - **Tool ID**: `osint_osu_beatmap_creators`
@@ -5370,15 +5632,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 201. osu! Rhythm Game
+### 206. osu! Rhythm Game
 
 - **Tool Name**: osu! Rhythm Game
 - **Tool ID**: `osint_osu_game`
@@ -5393,15 +5655,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 202. Couchsurfing Travel
+### 207. Couchsurfing Travel
 
 - **Tool Name**: Couchsurfing Travel
 - **Tool ID**: `osint_couchsurfing`
@@ -5416,15 +5678,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 203. FlightAware Aviation
+### 208. FlightAware Aviation
 
 - **Tool Name**: FlightAware Aviation
 - **Tool ID**: `osint_flightaware`
@@ -5439,15 +5701,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 204. Flightradar24 Aviation Feeders
+### 209. Flightradar24 Aviation Feeders
 
 - **Tool Name**: Flightradar24 Aviation Feeders
 - **Tool ID**: `osint_flightradar24`
@@ -5462,15 +5724,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 205. FlyerTalk Frequent Flyer
+### 210. FlyerTalk Frequent Flyer
 
 - **Tool Name**: FlyerTalk Frequent Flyer
 - **Tool ID**: `osint_flyertalk_travel`
@@ -5485,15 +5747,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 206. Geocaching Global GPS Hunt
+### 211. Geocaching Global GPS Hunt
 
 - **Tool Name**: Geocaching Global GPS Hunt
 - **Tool ID**: `osint_geocaching`
@@ -5508,15 +5770,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 207. Hackaday Hardware & Engineering
+### 212. Hackaday Hardware & Engineering
 
 - **Tool Name**: Hackaday Hardware & Engineering
 - **Tool ID**: `osint_hackaday`
@@ -5531,15 +5793,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 208. Hackster.io Hardware Projects
+### 213. Hackster.io Hardware Projects
 
 - **Tool Name**: Hackster.io Hardware Projects
 - **Tool ID**: `osint_hackster_io`
@@ -5554,15 +5816,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 209. Instructables DIY
+### 214. Instructables DIY
 
 - **Tool Name**: Instructables DIY
 - **Tool ID**: `osint_instructables`
@@ -5577,15 +5839,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 210. Instructables Makers Contest
+### 215. Instructables Makers Contest
 
 - **Tool Name**: Instructables Makers Contest
 - **Tool ID**: `osint_instructables_makers`
@@ -5600,15 +5862,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 211. Printables (Prusa Research)
+### 216. Printables (Prusa Research)
 
 - **Tool Name**: Printables (Prusa Research)
 - **Tool ID**: `osint_printables`
@@ -5623,15 +5885,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 212. Ravelry Fiber Arts
+### 217. Ravelry Fiber Arts
 
 - **Tool Name**: Ravelry Fiber Arts
 - **Tool ID**: `osint_ravelry_knitting`
@@ -5646,15 +5908,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 213. Thingiverse 3D Models
+### 218. Thingiverse 3D Models
 
 - **Tool Name**: Thingiverse 3D Models
 - **Tool ID**: `osint_thingiverse`
@@ -5669,15 +5931,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 214. Thingiverse Maker Collections
+### 219. Thingiverse Maker Collections
 
 - **Tool Name**: Thingiverse Maker Collections
 - **Tool ID**: `osint_thingiverse_collections`
@@ -5692,15 +5954,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 215. TripAdvisor Traveler
+### 220. TripAdvisor Traveler
 
 - **Tool Name**: TripAdvisor Traveler
 - **Tool ID**: `osint_tripadvisor_reviews`
@@ -5715,15 +5977,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 216. Untappd Craft Beer Social
+### 221. Untappd Craft Beer Social
 
 - **Tool Name**: Untappd Craft Beer Social
 - **Tool ID**: `osint_untappd`
@@ -5738,15 +6000,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 217. Vivino Wine Community
+### 222. Vivino Wine Community
 
 - **Tool Name**: Vivino Wine Community
 - **Tool ID**: `osint_vivino`
@@ -5761,15 +6023,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 218. theHarvester OSINT Engine
+### 223. theHarvester OSINT Engine
 
 - **Tool Name**: theHarvester OSINT Engine
 - **Tool ID**: `theharvester`
@@ -5789,10 +6051,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 219. Visual Intelligence & EXIF Engine
+### 224. Visual Intelligence & EXIF Engine
 
 - **Tool Name**: Visual Intelligence & EXIF Engine
 - **Tool ID**: `image_osint`
@@ -5812,10 +6074,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 220. Duolingo Language Learner
+### 225. Duolingo Language Learner
 
 - **Tool Name**: Duolingo Language Learner
 - **Tool ID**: `osint_duolingo`
@@ -5830,15 +6092,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 221. Memrise Vocabulary
+### 226. Memrise Vocabulary
 
 - **Tool Name**: Memrise Vocabulary
 - **Tool ID**: `osint_memrise`
@@ -5853,15 +6115,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 222. Beacons.ai Creator Bio
+### 227. Beacons.ai Creator Bio
 
 - **Tool Name**: Beacons.ai Creator Bio
 - **Tool ID**: `osint_beacons_ai`
@@ -5876,15 +6138,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 223. Bento.me Personal Bio
+### 228. Bento.me Personal Bio
 
 - **Tool Name**: Bento.me Personal Bio
 - **Tool ID**: `osint_bento_me`
@@ -5899,15 +6161,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 224. Bio.link Creator Page
+### 229. Bio.link Creator Page
 
 - **Tool Name**: Bio.link Creator Page
 - **Tool ID**: `osint_bio_link`
@@ -5922,15 +6184,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 225. Linktree External Destinations
+### 230. Linktree External Destinations
 
 - **Tool Name**: Linktree External Destinations
 - **Tool ID**: `osint_linktree_socials`
@@ -5945,15 +6207,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 226. Linktree Link-in-Bio
+### 231. Linktree Link-in-Bio
 
 - **Tool Name**: Linktree Link-in-Bio
 - **Tool ID**: `osint_linktree`
@@ -5968,15 +6230,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 227. Snipfeed Monetization
+### 232. Snipfeed Monetization
 
 - **Tool Name**: Snipfeed Monetization
 - **Tool ID**: `osint_snipfeed`
@@ -5991,15 +6253,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 228. Taplink Bio Links
+### 233. Taplink Bio Links
 
 - **Tool Name**: Taplink Bio Links
 - **Tool ID**: `osint_taplink_cc`
@@ -6014,15 +6276,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 229. Kick Live Streaming
+### 234. Kick Live Streaming
 
 - **Tool Name**: Kick Live Streaming
 - **Tool ID**: `osint_kick_streaming`
@@ -6037,15 +6299,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 230. Kick VOD Recordings
+### 235. Kick VOD Recordings
 
 - **Tool Name**: Kick VOD Recordings
 - **Tool ID**: `osint_kick_vods`
@@ -6060,15 +6322,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 231. Twitch Interactive
+### 236. Twitch Interactive
 
 - **Tool Name**: Twitch Interactive
 - **Tool ID**: `osint_twitch`
@@ -6083,15 +6345,38 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 232. Creative Market Assets
+### 237. Regional Marketplace Intelligence (Amazon IN / US)
+
+- **Tool Name**: Regional Marketplace Intelligence (Amazon IN / US)
+- **Tool ID**: `marketplace_recon`
+- **Category**: MARKETPLACE_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/marketplace_recon.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `product, url, asin`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `product, asin, marketplace, url`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `15.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 238. Creative Market Assets
 
 - **Tool Name**: Creative Market Assets
 - **Tool ID**: `osint_creative_market`
@@ -6106,15 +6391,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 233. Envato Market (ThemeForest)
+### 239. Envato Market (ThemeForest)
 
 - **Tool Name**: Envato Market (ThemeForest)
 - **Tool ID**: `osint_envato_market`
@@ -6129,15 +6414,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 234. Etsy Handmade Marketplace
+### 240. Etsy Handmade Marketplace
 
 - **Tool Name**: Etsy Handmade Marketplace
 - **Tool ID**: `osint_etsy_shop`
@@ -6152,15 +6437,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 235. Fiverr Freelance Services
+### 241. Fiverr Freelance Services
 
 - **Tool Name**: Fiverr Freelance Services
 - **Tool ID**: `osint_fiverr`
@@ -6175,15 +6460,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 236. Freelancer.com Talent
+### 242. Freelancer.com Talent
 
 - **Tool Name**: Freelancer.com Talent
 - **Tool ID**: `osint_freelancer_pro`
@@ -6198,15 +6483,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 237. Gumroad Digital Store
+### 243. Gumroad Digital Store
 
 - **Tool Name**: Gumroad Digital Store
 - **Tool ID**: `osint_gumroad`
@@ -6221,15 +6506,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 238. Redbubble Independent Artists
+### 244. Redbubble Independent Artists
 
 - **Tool Name**: Redbubble Independent Artists
 - **Tool ID**: `osint_redbubble_shop`
@@ -6244,15 +6529,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 239. Society6 Art & Decor
+### 245. Society6 Art & Decor
 
 - **Tool Name**: Society6 Art & Decor
 - **Tool ID**: `osint_society6_home`
@@ -6267,15 +6552,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 240. Stan Store Creator Shop
+### 246. Stan Store Creator Shop
 
 - **Tool Name**: Stan Store Creator Shop
 - **Tool ID**: `osint_stan_store`
@@ -6290,15 +6575,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 241. TeePublic Artist Store
+### 247. TeePublic Artist Store
 
 - **Tool Name**: TeePublic Artist Store
 - **Tool ID**: `osint_teepublic_design`
@@ -6313,15 +6598,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 242. Telegram Messenger
+### 248. Telegram Messenger
 
 - **Tool Name**: Telegram Messenger
 - **Tool ID**: `osint_telegram`
@@ -6336,15 +6621,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 243. Audiomack Hip-Hop & Music
+### 249. Audiomack Hip-Hop & Music
 
 - **Tool Name**: Audiomack Hip-Hop & Music
 - **Tool ID**: `osint_audiomack`
@@ -6359,15 +6644,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 244. Audius Decentralized Music
+### 250. Audius Decentralized Music
 
 - **Tool Name**: Audius Decentralized Music
 - **Tool ID**: `osint_audius_music`
@@ -6382,15 +6667,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 245. Bandcamp Artist
+### 251. Bandcamp Artist
 
 - **Tool Name**: Bandcamp Artist
 - **Tool ID**: `osint_bandcamp`
@@ -6405,15 +6690,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 246. Bandcamp Discography & Vinyl
+### 252. Bandcamp Discography & Vinyl
 
 - **Tool Name**: Bandcamp Discography & Vinyl
 - **Tool ID**: `osint_bandcamp_discography`
@@ -6428,15 +6713,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 247. Discogs Vinyl & CD Database
+### 253. Discogs Vinyl & CD Database
 
 - **Tool Name**: Discogs Vinyl & CD Database
 - **Tool ID**: `osint_discogs_community`
@@ -6451,15 +6736,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 248. Last.fm Music Scrobbler
+### 254. Last.fm Music Scrobbler
 
 - **Tool Name**: Last.fm Music Scrobbler
 - **Tool ID**: `osint_last_fm`
@@ -6474,15 +6759,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 249. Last.fm Top Artists Telemetry
+### 255. Last.fm Top Artists Telemetry
 
 - **Tool Name**: Last.fm Top Artists Telemetry
 - **Tool ID**: `osint_last_fm_top_artists`
@@ -6497,15 +6782,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 250. Mixcloud DJ & Radio
+### 256. Mixcloud DJ & Radio
 
 - **Tool Name**: Mixcloud DJ & Radio
 - **Tool ID**: `osint_mixcloud`
@@ -6520,15 +6805,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 251. ReverbNation Indie Artists
+### 257. ReverbNation Indie Artists
 
 - **Tool Name**: ReverbNation Indie Artists
 - **Tool ID**: `osint_reverbnation`
@@ -6543,15 +6828,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 252. Smule Social Karaoke
+### 258. Smule Social Karaoke
 
 - **Tool Name**: Smule Social Karaoke
 - **Tool ID**: `osint_smule`
@@ -6566,15 +6851,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 253. SoundCloud Music
+### 259. SoundCloud Music
 
 - **Tool Name**: SoundCloud Music
 - **Tool ID**: `osint_soundcloud`
@@ -6589,15 +6874,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 254. SoundCloud Track Catalog
+### 260. SoundCloud Track Catalog
 
 - **Tool Name**: SoundCloud Track Catalog
 - **Tool ID**: `osint_soundcloud_tracks`
@@ -6612,15 +6897,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 255. Shodan Intelligence
+### 261. Shodan Intelligence
 
 - **Tool Name**: Shodan Intelligence
 - **Tool ID**: `shodan`
@@ -6640,10 +6925,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `NOT_CONFIGURED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 256. Substack Newsletter
+### 262. Substack Newsletter
 
 - **Tool Name**: Substack Newsletter
 - **Tool ID**: `osint_substack`
@@ -6658,15 +6943,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 257. Substack Newsletter Archive
+### 263. Substack Newsletter Archive
 
 - **Tool Name**: Substack Newsletter Archive
 - **Tool ID**: `osint_substack_archive`
@@ -6681,15 +6966,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 258. Debian Project Contributor
+### 264. Debian Project Contributor
 
 - **Tool Name**: Debian Project Contributor
 - **Tool ID**: `osint_debian_contributors`
@@ -6702,17 +6987,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 259. Fandom (Wikia) Contributor
+### 265. Fandom (Wikia) Contributor
 
 - **Tool Name**: Fandom (Wikia) Contributor
 - **Tool ID**: `osint_fandom_wikia_contributor`
@@ -6725,17 +7010,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 260. OpenStreetMap Mapper
+### 266. OpenStreetMap Mapper
 
 - **Tool Name**: OpenStreetMap Mapper
 - **Tool ID**: `osint_openstreetmap_mappers`
@@ -6748,17 +7033,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 261. Wikipedia User Page
+### 267. Wikipedia User Page
 
 - **Tool Name**: Wikipedia User Page
 - **Tool ID**: `osint_wikipedia_users`
@@ -6771,17 +7056,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 262. Ansible Galaxy
+### 268. Ansible Galaxy
 
 - **Tool Name**: Ansible Galaxy
 - **Tool ID**: `osint_ansible_galaxy`
@@ -6796,15 +7081,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 263. Arch Linux AUR Maintainer
+### 269. Arch Linux AUR Maintainer
 
 - **Tool Name**: Arch Linux AUR Maintainer
 - **Tool ID**: `osint_arch_aur_users`
@@ -6819,15 +7104,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 264. CPAN MetaCPAN
+### 270. CPAN MetaCPAN
 
 - **Tool Name**: CPAN MetaCPAN
 - **Tool ID**: `osint_cpan`
@@ -6842,15 +7127,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 265. Clojars Clojure
+### 271. Clojars Clojure
 
 - **Tool Name**: Clojars Clojure
 - **Tool ID**: `osint_clojars`
@@ -6865,15 +7150,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 266. CocoaPods Apple
+### 272. CocoaPods Apple
 
 - **Tool Name**: CocoaPods Apple
 - **Tool ID**: `osint_cocoapods`
@@ -6888,15 +7173,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 267. Crates.io Rust Packages
+### 273. Crates.io Rust Packages
 
 - **Tool Name**: Crates.io Rust Packages
 - **Tool ID**: `osint_crates_io`
@@ -6911,15 +7196,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 268. Fedora Linux Packager
+### 274. Fedora Linux Packager
 
 - **Tool Name**: Fedora Linux Packager
 - **Tool ID**: `osint_fedora_packagers`
@@ -6934,15 +7219,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 269. Hex.pm Erlang & Elixir
+### 275. Hex.pm Erlang & Elixir
 
 - **Tool Name**: Hex.pm Erlang & Elixir
 - **Tool ID**: `osint_hex_pm`
@@ -6957,15 +7242,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 270. Libraries.io Package Monitor
+### 276. Libraries.io Package Monitor
 
 - **Tool Name**: Libraries.io Package Monitor
 - **Tool ID**: `osint_libraries_io`
@@ -6980,15 +7265,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 271. NuGet .NET Packages
+### 277. NuGet .NET Packages
 
 - **Tool Name**: NuGet .NET Packages
 - **Tool ID**: `osint_nuget`
@@ -7003,15 +7288,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 272. Packagist Composer
+### 278. Packagist Composer
 
 - **Tool Name**: Packagist Composer
 - **Tool ID**: `osint_packagist`
@@ -7026,15 +7311,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 273. Pub.dev Dart & Flutter
+### 279. Pub.dev Dart & Flutter
 
 - **Tool Name**: Pub.dev Dart & Flutter
 - **Tool ID**: `osint_pub_dev`
@@ -7049,15 +7334,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 274. PyPI Python Packages
+### 280. PyPI Python Packages
 
 - **Tool Name**: PyPI Python Packages
 - **Tool ID**: `osint_pypi`
@@ -7072,15 +7357,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 275. RubyGems
+### 281. RubyGems
 
 - **Tool Name**: RubyGems
 - **Tool ID**: `osint_rubygems`
@@ -7095,15 +7380,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 276. npm Packages
+### 282. npm Packages
 
 - **Tool Name**: npm Packages
 - **Tool ID**: `osint_npm`
@@ -7118,15 +7403,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 277. 500px Photography
+### 283. 500px Photography
 
 - **Tool Name**: 500px Photography
 - **Tool ID**: `osint_500px`
@@ -7141,15 +7426,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 278. Flickr Photography
+### 284. Flickr Photography
 
 - **Tool Name**: Flickr Photography
 - **Tool ID**: `osint_flickr`
@@ -7164,15 +7449,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 279. Pixelfed Art Showcase
+### 285. Pixelfed Art Showcase
 
 - **Tool Name**: Pixelfed Art Showcase
 - **Tool ID**: `osint_pixelfed_art_showcase`
@@ -7187,15 +7472,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 280. Pixelfed Decentralized Photos
+### 286. Pixelfed Decentralized Photos
 
 - **Tool Name**: Pixelfed Decentralized Photos
 - **Tool ID**: `osint_pixelfed_social`
@@ -7210,15 +7495,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 281. Unsplash High-Res Photos
+### 287. Unsplash High-Res Photos
 
 - **Tool Name**: Unsplash High-Res Photos
 - **Tool ID**: `osint_unsplash`
@@ -7233,15 +7518,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 282. VSCO Creative Journal
+### 288. VSCO Creative Journal
 
 - **Tool Name**: VSCO Creative Journal
 - **Tool ID**: `osint_vsco`
@@ -7256,15 +7541,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 283. Buzzsprout Podcasts
+### 289. Buzzsprout Podcasts
 
 - **Tool Name**: Buzzsprout Podcasts
 - **Tool ID**: `osint_buzzsprout`
@@ -7279,15 +7564,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 284. Castbox Podcasts
+### 290. Castbox Podcasts
 
 - **Tool Name**: Castbox Podcasts
 - **Tool ID**: `osint_castbox_fm`
@@ -7302,15 +7587,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 285. Podbean Podcasts
+### 291. Podbean Podcasts
 
 - **Tool Name**: Podbean Podcasts
 - **Tool ID**: `osint_podbean`
@@ -7325,15 +7610,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 286. Spreaker Radio
+### 292. Spreaker Radio
 
 - **Tool Name**: Spreaker Radio
 - **Tool ID**: `osint_spreaker`
@@ -7348,15 +7633,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 287. About.me Personal Splash
+### 293. About.me Personal Splash
 
 - **Tool Name**: About.me Personal Splash
 - **Tool ID**: `osint_about_me`
@@ -7371,15 +7656,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 288. Carrd Interactive Showcase
+### 294. Carrd Interactive Showcase
 
 - **Tool Name**: Carrd Interactive Showcase
 - **Tool ID**: `osint_carrd_portfolio`
@@ -7394,15 +7679,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 289. Carrd Responsive Sites
+### 295. Carrd Responsive Sites
 
 - **Tool Name**: Carrd Responsive Sites
 - **Tool ID**: `osint_carrd_co`
@@ -7417,15 +7702,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 290. ReadCV Minimalist Resume
+### 296. ReadCV Minimalist Resume
 
 - **Tool Name**: ReadCV Minimalist Resume
 - **Tool ID**: `osint_readcv`
@@ -7440,15 +7725,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 291. Contra Freelance Network
+### 297. Contra Freelance Network
 
 - **Tool Name**: Contra Freelance Network
 - **Tool ID**: `osint_contra_independent`
@@ -7463,15 +7748,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 292. Peerlist Professional Network
+### 298. Peerlist Professional Network
 
 - **Tool Name**: Peerlist Professional Network
 - **Tool ID**: `osint_peerlist`
@@ -7486,15 +7771,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 293. Polywork Multidisciplinary Profile
+### 299. Polywork Multidisciplinary Profile
 
 - **Tool Name**: Polywork Multidisciplinary Profile
 - **Tool ID**: `osint_polywork`
@@ -7509,15 +7794,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 294. Showwcase Developer Community
+### 300. Showwcase Developer Community
 
 - **Tool Name**: Showwcase Developer Community
 - **Tool ID**: `osint_showwcase_developer`
@@ -7532,15 +7817,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 295. Wellfound (AngelList)
+### 301. Wellfound (AngelList)
 
 - **Tool Name**: Wellfound (AngelList)
 - **Tool ID**: `osint_wellfound`
@@ -7555,15 +7840,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 296. Gravatar Globally Recognized Avatar
+### 302. Gravatar Globally Recognized Avatar
 
 - **Tool Name**: Gravatar Globally Recognized Avatar
 - **Tool ID**: `osint_gravatar`
@@ -7578,15 +7863,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 297. Medium Author Articles
+### 303. Medium Author Articles
 
 - **Tool Name**: Medium Author Articles
 - **Tool ID**: `osint_medium_stories`
@@ -7599,17 +7884,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 298. Medium Publication
+### 304. Medium Publication
 
 - **Tool Name**: Medium Publication
 - **Tool ID**: `osint_medium`
@@ -7622,17 +7907,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 299. Vocal Media Storytellers
+### 305. Vocal Media Storytellers
 
 - **Tool Name**: Vocal Media Storytellers
 - **Tool ID**: `osint_vocal_media`
@@ -7645,17 +7930,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 300. Write.as Thoughtful Writing
+### 306. Write.as Thoughtful Writing
 
 - **Tool Name**: Write.as Thoughtful Writing
 - **Tool ID**: `osint_writeas_blog`
@@ -7668,17 +7953,17 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **API / CLI**: HTTP REST / Asynchronous HTTPX prober
 - **Authentication Required**: `False` (Public read-only profiles)
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
-- **Input Types**: `username, person, identity, handle, domain`
+- **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 301. Bilibili Video & Creator
+### 307. Bilibili Video & Creator
 
 - **Tool Name**: Bilibili Video & Creator
 - **Tool ID**: `osint_bilibili_tv`
@@ -7693,15 +7978,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 302. Douban Film & Books
+### 308. Douban Film & Books
 
 - **Tool Name**: Douban Film & Books
 - **Tool ID**: `osint_douban_movie`
@@ -7716,15 +8001,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 303. Hatena Bookmark & Blog
+### 309. Hatena Bookmark & Blog
 
 - **Tool Name**: Hatena Bookmark & Blog
 - **Tool ID**: `osint_hatena_id`
@@ -7739,15 +8024,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 304. Qiita Japanese Tech Hub
+### 310. Qiita Japanese Tech Hub
 
 - **Tool Name**: Qiita Japanese Tech Hub
 - **Tool ID**: `osint_qiita_tech`
@@ -7762,15 +8047,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 305. Sina Weibo
+### 311. Sina Weibo
 
 - **Tool Name**: Sina Weibo
 - **Tool ID**: `osint_weibo`
@@ -7785,15 +8070,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 306. Taringa Latin America
+### 312. Taringa Latin America
 
 - **Tool Name**: Taringa Latin America
 - **Tool ID**: `osint_taringa`
@@ -7808,15 +8093,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 307. Zenn.dev Japanese Devs
+### 313. Zenn.dev Japanese Devs
 
 - **Tool Name**: Zenn.dev Japanese Devs
 - **Tool ID**: `osint_zenn_dev_tech`
@@ -7831,15 +8116,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 308. Zhihu Knowledge Column
+### 314. Zhihu Knowledge Column
 
 - **Tool Name**: Zhihu Knowledge Column
 - **Tool ID**: `osint_zhihu_column`
@@ -7854,15 +8139,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 309. Google Dork Recon Engine
+### 315. Google Dork Recon Engine
 
 - **Tool Name**: Google Dork Recon Engine
 - **Tool ID**: `google_dork`
@@ -7882,10 +8167,240 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 310. Bluesky Directory Search
+### 316. Social Identity & Profile Recon
+
+- **Tool Name**: Social Identity & Profile Recon
+- **Tool ID**: `username_recon`
+- **Category**: SOCIAL_IDENTITY
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/username_recon.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, handle, person`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `username, handle, person, email`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `15.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 317. Discord
+
+- **Tool Name**: Discord
+- **Tool ID**: `osint_discord`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_discord.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 318. Facebook
+
+- **Tool Name**: Facebook
+- **Tool ID**: `osint_facebook`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_facebook.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 319. Instagram
+
+- **Tool Name**: Instagram
+- **Tool ID**: `osint_instagram`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_instagram.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 320. LinkedIn
+
+- **Tool Name**: LinkedIn
+- **Tool ID**: `osint_linkedin`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_linkedin.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 321. Mastodon
+
+- **Tool Name**: Mastodon
+- **Tool ID**: `osint_mastodon`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_mastodon.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 322. Spotify
+
+- **Tool Name**: Spotify
+- **Tool ID**: `osint_spotify`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_spotify.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 323. TikTok
+
+- **Tool Name**: TikTok
+- **Tool ID**: `osint_tiktok`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_tiktok.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 324. Twitter / X
+
+- **Tool Name**: Twitter / X
+- **Tool ID**: `osint_twitter_x`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_twitter_x.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 325. WhatsApp
+
+- **Tool Name**: WhatsApp
+- **Tool ID**: `osint_whatsapp`
+- **Category**: Social Media
+- **Module**: `osint`
+- **Provider Type**: PLATFORM_PROBER
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/osint_whatsapp.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `username, person, identity, handle`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `30/min`
+- **Timeout**: `4.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 326. Bluesky Directory Search
 
 - **Tool Name**: Bluesky Directory Search
 - **Tool ID**: `osint_bluesky_directory_actor`
@@ -7900,15 +8415,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 311. Bluesky Social
+### 327. Bluesky Social
 
 - **Tool Name**: Bluesky Social
 - **Tool ID**: `osint_bluesky`
@@ -7923,15 +8438,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 312. Cohost Social
+### 328. Cohost Social
 
 - **Tool Name**: Cohost Social
 - **Tool ID**: `osint_cohost`
@@ -7946,15 +8461,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 313. Disqus Comment Network
+### 329. Disqus Comment Network
 
 - **Tool Name**: Disqus Comment Network
 - **Tool ID**: `osint_disqus`
@@ -7969,15 +8484,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 314. Gab Social
+### 330. Gab Social
 
 - **Tool Name**: Gab Social
 - **Tool ID**: `osint_gab_ai`
@@ -7992,15 +8507,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 315. Keybase Cryptographic Identity
+### 331. Keybase Cryptographic Identity
 
 - **Tool Name**: Keybase Cryptographic Identity
 - **Tool ID**: `osint_keybase`
@@ -8015,15 +8530,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 316. Mastodon (mastodon.social)
+### 332. Mastodon (mastodon.social)
 
 - **Tool Name**: Mastodon (mastodon.social)
 - **Tool ID**: `osint_mastodon_social`
@@ -8038,15 +8553,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 317. MeWe Social
+### 333. MeWe Social
 
 - **Tool Name**: MeWe Social
 - **Tool ID**: `osint_mewe`
@@ -8061,15 +8576,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 318. Meta Threads
+### 334. Meta Threads
 
 - **Tool Name**: Meta Threads
 - **Tool ID**: `osint_threads`
@@ -8084,15 +8599,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 319. Mix Content Curation
+### 335. Mix Content Curation
 
 - **Tool Name**: Mix Content Curation
 - **Tool ID**: `osint_mix_com`
@@ -8107,15 +8622,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 320. Pinterest Visual Discovery
+### 336. Pinterest Visual Discovery
 
 - **Tool Name**: Pinterest Visual Discovery
 - **Tool ID**: `osint_pinterest`
@@ -8130,15 +8645,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 321. Plurk Microblogging
+### 337. Plurk Microblogging
 
 - **Tool Name**: Plurk Microblogging
 - **Tool ID**: `osint_plurk`
@@ -8153,15 +8668,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 322. Reddit Community
+### 338. Reddit Community
 
 - **Tool Name**: Reddit Community
 - **Tool ID**: `osint_reddit`
@@ -8176,15 +8691,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 323. Snapchat Public Profile
+### 339. Snapchat Public Profile
 
 - **Tool Name**: Snapchat Public Profile
 - **Tool ID**: `osint_snapchat`
@@ -8199,15 +8714,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 324. Tumblr Microblogging
+### 340. Tumblr Microblogging
 
 - **Tool Name**: Tumblr Microblogging
 - **Tool ID**: `osint_tumblr`
@@ -8222,15 +8737,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 325. VKontakte (VK)
+### 341. VKontakte (VK)
 
 - **Tool Name**: VKontakte (VK)
 - **Tool ID**: `osint_vkontakte`
@@ -8245,15 +8760,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 326. AllTrails Outdoor Maps
+### 342. AllTrails Outdoor Maps
 
 - **Tool Name**: AllTrails Outdoor Maps
 - **Tool ID**: `osint_alltrails`
@@ -8268,15 +8783,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 327. Intervals.icu Endurance Analytics
+### 343. Intervals.icu Endurance Analytics
 
 - **Tool Name**: Intervals.icu Endurance Analytics
 - **Tool ID**: `osint_intervals_icu`
@@ -8291,15 +8806,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 328. Komoot Cycling & Hiking Route
+### 344. Komoot Cycling & Hiking Route
 
 - **Tool Name**: Komoot Cycling & Hiking Route
 - **Tool ID**: `osint_komoot`
@@ -8314,15 +8829,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 329. Parkrun Athlete
+### 345. Parkrun Athlete
 
 - **Tool Name**: Parkrun Athlete
 - **Tool ID**: `osint_parkrun_results`
@@ -8337,15 +8852,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 330. Ride with GPS Cycling
+### 346. Ride with GPS Cycling
 
 - **Tool Name**: Ride with GPS Cycling
 - **Tool ID**: `osint_ridewithgps`
@@ -8360,15 +8875,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 331. Strava Athletics
+### 347. Strava Athletics
 
 - **Tool Name**: Strava Athletics
 - **Tool ID**: `osint_strava`
@@ -8383,15 +8898,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 332. Trailforks Mountain Biking
+### 348. Trailforks Mountain Biking
 
 - **Tool Name**: Trailforks Mountain Biking
 - **Tool ID**: `osint_trailforks_bike`
@@ -8406,15 +8921,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 333. Wikiloc GPS Outdoor Trails
+### 349. Wikiloc GPS Outdoor Trails
 
 - **Tool Name**: Wikiloc GPS Outdoor Trails
 - **Tool ID**: `osint_wikiloc_gps`
@@ -8429,15 +8944,15 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 334. Maltego Entity Transforms
+### 350. Maltego Entity Transforms
 
 - **Tool Name**: Maltego Entity Transforms
 - **Tool ID**: `maltego`
@@ -8457,10 +8972,10 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Rate Limits**: `120/min`
 - **Timeout**: `15.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 
-### 335. PeerTube Federated Video
+### 351. PeerTube Federated Video
 
 - **Tool Name**: PeerTube Federated Video
 - **Tool ID**: `osint_peertube_tv`
@@ -8475,11 +8990,57 @@ This document is the verified migration and live inventory of all **339 OSINT to
 - **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
 - **Input Types**: `username, person, identity, handle`
 - **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
-- **Capabilities**: `profile_lookup, handle_detection, social_graph, account_enumeration`
+- **Capabilities**: `profile_lookup, handle_detection, metadata_extraction, provenance_tracking`
 - **Health Check**: Active endpoint status prober
 - **Rate Limits**: `30/min`
 - **Timeout**: `4.0s`
 - **Retry**: `Standard HTTP retry on 503`
-- **Current Status**: `HEALTHY`
+- **Current Status**: `REGISTERED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 352. Censys Platform Host & Service Intelligence API v2
+
+- **Tool Name**: Censys Platform Host & Service Intelligence API v2
+- **Tool ID**: `censys`
+- **Category**: WEB_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/censys.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `ip, domain, hostname, cve`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `host_discovery, service_ports, certificates, software_versions`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `10.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `NOT_CONFIGURED`
+- **Migration Status**: `FULLY_MIGRATED`
+
+### 353. urlscan.io Historical Scan & Technology Discovery
+
+- **Tool Name**: urlscan.io Historical Scan & Technology Discovery
+- **Tool ID**: `urlscan`
+- **Category**: WEB_INTEL
+- **Module**: `osint`
+- **Provider Type**: DEEP_ENGINE
+- **Implementation Location**: `backend/app/modules/osint/catalog_adapter.py` / `providers/urlscan.py`
+- **Backend Service**: `OsintModule` -> `OSINTPlatformAdapter`
+- **Frontend Component**: Registered via Provider Registry API
+- **API / CLI**: HTTP REST / Asynchronous HTTPX prober
+- **Authentication Required**: `False` (Public read-only profiles)
+- **Environment Variables**: `SHODAN_API_KEY`, `SPIDERFOOT_URL` (for primary engines only)
+- **Input Types**: `domain, url, ip, hostname`
+- **Output Types**: `Entity (Username/Person/Domain)`, `Evidence (Cryptographic SHA-256)`
+- **Capabilities**: `historical_scans, technologies, screenshots, ip`
+- **Health Check**: Active endpoint status prober
+- **Rate Limits**: `120/min`
+- **Timeout**: `8.0s`
+- **Retry**: `Standard HTTP retry on 503`
+- **Current Status**: `OPERATIONAL`
 - **Migration Status**: `FULLY_MIGRATED`
 

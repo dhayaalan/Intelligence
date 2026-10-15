@@ -4,7 +4,7 @@ SOCIAL_MEDIA_INTELLIGENCE_MANIFEST = ModuleManifest(
     id="social_media_intelligence",
     name="Social Media Intelligence & Inauthentic Behavior Engine",
     version="2.0.0",
-    description="Multi-platform social media intelligence collection (Bluesky, Telegram, Reddit, Mastodon, YouTube) with Coordinated Inauthentic Behavior (CIB) detection, bot credibility scoring, and AI agent investigation workflows.",
+    description="Multi-platform social media intelligence collection (Bluesky, Telegram, Reddit, Mastodon, YouTube, Instagram, Facebook) with Coordinated Inauthentic Behavior (CIB) detection, bot credibility scoring, and AI agent investigation workflows.",
     capabilities=[
         "social_search",
         "live_firehose_monitoring",
@@ -12,6 +12,8 @@ SOCIAL_MEDIA_INTELLIGENCE_MANIFEST = ModuleManifest(
         "cib_cluster_analysis",
         "credibility_scoring",
         "youtube_video_intelligence",
+        "instagram_graph_recon",
+        "facebook_page_recon",
         "persona_correlation",
         "evidence_correlation"
     ],
@@ -22,6 +24,8 @@ SOCIAL_MEDIA_INTELLIGENCE_MANIFEST = ModuleManifest(
         "reddit_collector",
         "mastodon_collector",
         "youtube_collector",
+        "instagram_collector",
+        "facebook_collector",
         "cib_engine",
         "credibility_engine"
     ],
@@ -49,6 +53,30 @@ SOCIAL_MEDIA_INTELLIGENCE_MANIFEST = ModuleManifest(
             required=False,
             default=40.0,
             description="Threshold below which accounts are flagged as suspicious or likely inauthentic"
+        ),
+        ModuleConfigField(
+            key="instagram_access_token",
+            label="Instagram Graph API Access Token",
+            type="string",
+            required=False,
+            default="",
+            description="Meta Graph API access token for authenticated Instagram hashtag and user queries"
+        ),
+        ModuleConfigField(
+            key="instagram_business_account_id",
+            label="Instagram Business Account ID",
+            type="string",
+            required=False,
+            default="",
+            description="Target Instagram Professional/Business account ID for authorized discovery"
+        ),
+        ModuleConfigField(
+            key="facebook_access_token",
+            label="Facebook Graph API Access Token",
+            type="string",
+            required=False,
+            default="",
+            description="Meta Graph API access token for authorized Facebook page post queries"
         )
     ],
     ui_metadata={

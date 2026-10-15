@@ -557,6 +557,32 @@ CURATED_TOOL_DEFINITIONS = [
         "status": "AVAILABLE",
         "requires_api_key": False,
         "supported_inputs": ["organization", "company", "lei", "domain"],
+    },
+    {
+        "id": "tool_sec_edgar",
+        "name": "US SEC EDGAR Official Corporate Submissions & Filings",
+        "category": "Identity",
+        "description": "Official US Securities and Exchange Commission (SEC) EDGAR lookup for verified corporate CIK numbers, 10-K/10-Q/8-K regulatory filings, former legal names, and SIC industry codes.",
+        "provider": "US SEC EDGAR Submissions API",
+        "module_id": "osint",
+        "version": "2.0.0",
+        "execution_type": "REAL_TIME",
+        "status": "AVAILABLE",
+        "requires_api_key": False,
+        "supported_inputs": ["organization", "company", "cik", "ticker", "domain"],
+    },
+    {
+        "id": "tool_censys",
+        "name": "Censys Platform Host & Service Intelligence",
+        "category": "Infrastructure",
+        "description": "Global internet scanning telemetry for open services, ports, TLS certificates, and software banners.",
+        "provider": "Censys Platform Search API v2",
+        "module_id": "osint",
+        "version": "2.0.0",
+        "execution_type": "REAL_TIME",
+        "status": "AVAILABLE" if (os.getenv("CENSYS_API_ID") and os.getenv("CENSYS_API_SECRET")) else "CONFIG_REQUIRED",
+        "requires_api_key": True,
+        "supported_inputs": ["ip", "domain", "hostname", "cve"],
     }
 ]
 

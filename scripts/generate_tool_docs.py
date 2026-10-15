@@ -30,15 +30,23 @@ def generate_inventory():
     print(f"Discovered OSINT providers: {len(osint_providers)}")
     print(f"Discovered Threat Intelligence providers: {len(ti_providers)}")
 
+    stats = provider_registry.get_stats()
+
     # 1. Generate tool-inventory.json & TOOL_INVENTORY.json
     inventory_data = {
         "platform": "Sential Investigation SaaS Platform",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "database": "MongoDB",
         "counts": {
             "total_providers": len(all_providers),
             "osint": len(osint_providers),
-            "threat_intelligence": len(ti_providers)
+            "threat_intelligence": len(ti_providers),
+            "operational": stats.operational_providers,
+            "registered": stats.registered_providers,
+            "not_configured": stats.not_configured_providers,
+            "not_installed": stats.not_installed_providers,
+            "degraded": stats.degraded_providers,
+            "status_breakdown": stats.status_breakdown
         },
         "osint": {
             "count": len(osint_providers),
@@ -86,15 +94,21 @@ def generate_inventory():
     # 2. Generate docs/TOOL_INVENTORY.md
     with open(docs_dir / "TOOL_INVENTORY.md", "w") as f:
         f.write("# Sential Platform — Comprehensive Tool & Provider Inventory\n\n")
-        f.write("This document is the verified migration inventory of all **335 OSINT tools/platforms** ")
-        f.write("and **33 Threat Intelligence engines** recovered from `saas_platform` and operational in Sential.\n\n")
+        f.write(f"This document is the verified migration inventory of all **{len(osint_providers)} OSINT tools/platforms** ")
+        f.write(f"and **{len(ti_providers)} Threat Intelligence engines** active and operational in Sential.\n\n")
         f.write("## Summary Metrics\n\n")
         f.write(f"- **Total Integrated Tools / Providers**: {len(all_providers)}\n")
         f.write(f"- **OSINT Capabilities / Providers**: {len(osint_providers)} (Requirement: 300+)\n")
         f.write(f"- **Threat Intelligence Capabilities / Providers**: {len(ti_providers)} (Requirement: 33)\n")
+        f.write(f"- **Operational States**: {stats.operational_providers} Operational | {stats.registered_providers} Registered (Probers) | {stats.not_installed_providers} Not Installed (Optional CLI Scanners) | {stats.not_configured_providers} Config Required\n")
         f.write("- **Primary Database**: MongoDB (`sential_db`)\n")
         f.write("- **Architecture**: Pluggable Provider Registry with Zero Core Coupling\n\n")
-        f.write("---\n\n")
+        f.write("### Operational Status Breakdown\n\n")
+        f.write("| Operational State | Provider Count | Description |\n")
+        f.write("| :--- | :--- | :--- |\n")
+        for st_name, count in sorted(stats.status_breakdown.items(), key=lambda x: -x[1]):
+            f.write(f"| **`{st_name}`** | {count} | Tracked via live registry telemetry |\n")
+        f.write("\n---\n\n")
 
         f.write("## 1. Threat Intelligence Scanning Engines (33 Engines)\n\n")
         for i, p in enumerate(ti_providers, 1):

@@ -424,3 +424,57 @@ async def test_gleif_success_and_error(monkeypatch):
     assert len(tool_res.results) == 1
     assert tool_res.results[0].type == "ORGANIZATION"
     assert "BARCLAYS PLC" in tool_res.results[0].value
+
+
+# =========================================================================
+# 8. SEC EDGAR Corporate Filings & Censys Platform Tests
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_sec_edgar_provider_end_to_end(monkeypatch):
+    """Verify SEC EDGAR queries company submissions and parses 10-K filings with fair-access headers."""
+    from app.modules.osint.providers.sec_edgar import SECEDGARProvider
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        assert "investigations@sential.org" in request.headers.get("user-agent", "")
+        if "company_tickers.json" in url_str:
+            return httpx.Response(200, json={
+                "0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}
+            })
+        elif "CIK0000320193.json" in url_str:
+            return httpx.Response(200, json={
+                "name": "Apple Inc.",
+                "cik": "0000320193",
+                "sic": "3571",
+                "sicDescription": "ELECTRONIC COMPUTERS",
+                "tickers": ["AAPL"],
+                "formerNames": [{"name": "APPLE COMPUTER INC"}],
+                "filings": {
+                    "recent": {
+                        "form": ["10-K", "10-Q"],
+                        "filingDate": ["2026-10-01", "2026-07-20"],
+                        "accessionNumber": ["0000320193-26-000100", "0000320193-26-000080"],
+                        "primaryDocument": ["aapl-10k.htm", "aapl-10q.htm"],
+                        "primaryDocDescription": ["10-K ANNUAL REPORT", "10-Q QUARTERLY REPORT"]
+                    }
+                }
+            })
+        return httpx.Response(404, json={})
+
+    patch_httpx_client(monkeypatch, handler)
+
+    provider = SECEDGARProvider()
+    resp = await provider.execute(ProviderRequest(query="AAPL", target_type="company"))
+    assert resp.status == "success"
+    assert resp.raw_data["record"]["cik"] == "0000320193"
+    assert resp.raw_data["record"]["legal_name"] == "Apple Inc."
+    assert len(resp.raw_data["record"]["recent_filings"]) == 2
+
+    # Tool executor integration test
+    tool_res = await tool_executor.execute_tool("tool_sec_edgar", "AAPL")
+    assert tool_res.status == "SUCCESS"
+    assert len(tool_res.results) == 1
+    assert "Apple Inc." in tool_res.results[0].value
+    assert "0000320193" in tool_res.results[0].value
+

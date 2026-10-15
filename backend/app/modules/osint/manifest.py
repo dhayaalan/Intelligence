@@ -7,7 +7,7 @@ OSINT_MANIFEST = ModuleManifest(
     description="Comprehensive Open Source Intelligence engine covering recon, transforms, and public footprint analysis.",
     capabilities=["search", "enrichment", "entity_discovery"],
     permissions=["search", "view_results"],
-    providers=["spiderfoot", "shodan", "maltego", "theharvester", "google_dork", "image_osint", "username_recon", "marketplace_recon", "financial_intel", "wayback_cdx", "urlscan", "opensanctions", "gleif_lei"],
+    providers=["spiderfoot", "shodan", "maltego", "theharvester", "google_dork", "image_osint", "username_recon", "marketplace_recon", "financial_intel", "wayback_cdx", "urlscan", "opensanctions", "gleif_lei", "sec_edgar", "censys"],
     configuration_schema=[
         ModuleConfigField(
             key="spiderfoot_url",
@@ -24,6 +24,22 @@ OSINT_MANIFEST = ModuleManifest(
             required=False,
             default="",
             description="Shodan API key for host banner enrichment"
+        ),
+        ModuleConfigField(
+            key="censys_api_id",
+            label="Censys API ID",
+            type="string",
+            required=False,
+            default="",
+            description="Censys Platform API ID for host and certificate queries"
+        ),
+        ModuleConfigField(
+            key="censys_api_secret",
+            label="Censys API Secret",
+            type="secret",
+            required=False,
+            default="",
+            description="Censys Platform API Secret token"
         ),
         ModuleConfigField(
             key="passive_only",

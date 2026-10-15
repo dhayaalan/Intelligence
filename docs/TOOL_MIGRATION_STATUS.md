@@ -24,36 +24,44 @@
 - **Anime & Manga**: 9 providers
 - **Crypto & Web3**: 9 providers
 - **Education**: 9 providers
+- **Social Media**: 9 providers
 - **Design & Art**: 8 providers
 - **Film & TV**: 8 providers
 - **Regional & Niche**: 8 providers
 - **Sports & Fitness**: 8 providers
 - **Link in Bio**: 7 providers
+- **ATTACK_SURFACE**: 7 providers
 - **Photography**: 6 providers
-- **ATTACK_SURFACE**: 6 providers
+- **VULNERABILITY**: 6 providers
 - **Professional & Career**: 5 providers
 - **Open Knowledge**: 4 providers
 - **Podcasting**: 4 providers
 - **Portfolios**: 4 providers
 - **Publishing**: 4 providers
-- **VULNERABILITY**: 4 providers
+- **THREAT_INTEL**: 4 providers
+- **FINANCIAL_INTEL**: 3 providers
 - **Live Streaming**: 3 providers
 - **CRAWLER**: 3 providers
 - **PORT_SERVICE**: 3 providers
 - **Blogging**: 2 providers
 - **Language Learning**: 2 providers
 - **Newsletters**: 2 providers
+- **WEB_INTEL**: 2 providers
 - **CLOUD_SECURITY**: 2 providers
 - **HTTP**: 2 providers
 - **TLS**: 2 providers
 - **WEB_SECURITY**: 2 providers
+- **ARCHIVE_INTEL**: 1 providers
 - **AUTOMATION**: 1 providers
+- **COMPLIANCE_WATCHLIST**: 1 providers
 - **IDENTITY_OSINT**: 1 providers
 - **IMAGE_METADATA**: 1 providers
+- **MARKETPLACE_INTEL**: 1 providers
 - **Messaging**: 1 providers
 - **NETWORK_INTEL**: 1 providers
 - **Public Directories**: 1 providers
 - **SEARCH_OPERATORS**: 1 providers
+- **SOCIAL_IDENTITY**: 1 providers
 - **TRANSFORMS**: 1 providers
 - **Video**: 1 providers
 - **API_DISCOVERY**: 1 providers
@@ -64,4 +72,3 @@
 - **NETWORK**: 1 providers
 - **SECRET_DISCOVERY**: 1 providers
 - **TECHNOLOGY**: 1 providers
-- **THREAT_INTEL**: 1 providers

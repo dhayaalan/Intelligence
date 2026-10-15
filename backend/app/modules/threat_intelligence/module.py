@@ -45,7 +45,10 @@ class ThreatIntelligenceModule(IntelligenceModule):
             adapter = ThreatIntelEngineAdapter(engine)
             self._providers[engine_id] = adapter
             
-            # Register in central platform ProviderRegistry
+            # Check availability of scanner binary
+            is_installed = engine.is_installed() if hasattr(engine, "is_installed") else True
+            eng_status = "OPERATIONAL" if is_installed else "NOT_INSTALLED"
+
             meta = ProviderMetadata(
                 provider_id=engine_id,
                 name=adapter.name,
@@ -56,7 +59,7 @@ class ThreatIntelligenceModule(IntelligenceModule):
                 supported_targets=adapter.supported_targets,
                 version=adapter.version,
                 is_enabled=True,
-                status="HEALTHY",
+                status=eng_status,
                 timeout_seconds=float(engine.timeout_seconds()),
                 rate_limit="60/min"
             )
@@ -83,7 +86,7 @@ class ThreatIntelligenceModule(IntelligenceModule):
                 supported_targets=targets,
                 version=getattr(provider, "version", "1.0.0"),
                 is_enabled=True,
-                status="HEALTHY",
+                status="OPERATIONAL",
                 timeout_seconds=float(getattr(provider, "timeout_seconds", 10.0)),
                 rate_limit="60/min"
             )

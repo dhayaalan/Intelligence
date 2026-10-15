@@ -42,7 +42,12 @@ class ProviderRegistry:
             meta = self._metadata.get(provider_id)
             if meta:
                 meta.is_enabled = True
-                meta.status = "HEALTHY"
+                if meta.auth_required and not any(meta.env_vars):
+                    meta.status = "NOT_CONFIGURED"
+                elif meta.provider_type == "PLATFORM_PROBER":
+                    meta.status = "REGISTERED"
+                else:
+                    meta.status = "OPERATIONAL"
                 return True
             return False
 
@@ -55,6 +60,38 @@ class ProviderRegistry:
                 meta.status = "DISABLED"
                 return True
             return False
+
+    def record_telemetry(
+        self,
+        provider_id: str,
+        success: bool,
+        latency_ms: float = 0.0,
+        rate_limited: bool = False,
+        degraded: bool = False
+    ) -> None:
+        """Updates live execution telemetry and honest operational status for a provider."""
+        with self._lock:
+            meta = self._metadata.get(provider_id)
+            if not meta:
+                return
+            meta.last_execution = datetime.utcnow()
+            meta.execution_count += 1
+            if rate_limited:
+                meta.status = "RATE_LIMITED"
+            elif degraded:
+                meta.status = "DEGRADED"
+            elif success:
+                meta.status = "OPERATIONAL"
+                # Update rolling success rate
+                meta.success_rate = round(
+                    ((meta.success_rate * (meta.execution_count - 1)) + 1.0) / meta.execution_count,
+                    3
+                )
+            else:
+                meta.success_rate = round(
+                    (meta.success_rate * (meta.execution_count - 1)) / meta.execution_count,
+                    3
+                )
 
     def get_adapter(self, provider_id: str) -> Optional[ProviderAdapter]:
         with self._lock:
@@ -115,7 +152,27 @@ class ProviderRegistry:
             osint_count = sum(1 for m in all_meta if m.module_id == "osint")
             ti_count = sum(1 for m in all_meta if m.module_id == "threat_intelligence")
             enabled = sum(1 for m in all_meta if m.is_enabled)
-            healthy = sum(1 for m in all_meta if m.status in ("HEALTHY", "READY", "VERIFIED"))
+
+            status_counts: Dict[str, int] = {}
+            for m in all_meta:
+                st = m.status.upper()
+                status_counts[st] = status_counts.get(st, 0) + 1
+
+            # Count honest categories
+            healthy = sum(
+                1 for m in all_meta
+                if m.status in ("HEALTHY", "OPERATIONAL", "REGISTERED", "CONFIGURED", "READY", "VERIFIED")
+            )
+            operational_count = status_counts.get("OPERATIONAL", 0) + status_counts.get("HEALTHY", 0)
+            registered_count = status_counts.get("REGISTERED", 0)
+            pending_count = status_counts.get("HEALTH_CHECK_PENDING", 0)
+            not_configured_count = status_counts.get("NOT_CONFIGURED", 0)
+            not_installed_count = status_counts.get("NOT_INSTALLED", 0)
+            degraded_count = (
+                status_counts.get("DEGRADED", 0) +
+                status_counts.get("RATE_LIMITED", 0) +
+                status_counts.get("UNAVAILABLE", 0)
+            )
 
             cats: Dict[str, int] = {}
             for m in all_meta:
@@ -127,6 +184,13 @@ class ProviderRegistry:
                 total_threat_intel_providers=ti_count,
                 enabled_providers=enabled,
                 healthy_providers=healthy,
+                operational_providers=operational_count,
+                registered_providers=registered_count,
+                pending_check_providers=pending_count,
+                not_configured_providers=not_configured_count,
+                not_installed_providers=not_installed_count,
+                degraded_providers=degraded_count,
+                status_breakdown=status_counts,
                 categories=cats
             )
 

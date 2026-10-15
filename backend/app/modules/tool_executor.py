@@ -170,6 +170,10 @@ class ToolExecutor:
                 res = await self._run_greynoise(exec_id, tool_id, cleaned_target)
             elif tool_id in ["tool_gleif", "gleif", "gleif_lei"]:
                 res = await self._run_gleif(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_sec_edgar", "sec_edgar", "edgar"]:
+                res = await self._run_sec_edgar(exec_id, tool_id, cleaned_target)
+            elif tool_id in ["tool_censys", "censys"]:
+                res = await self._run_censys(exec_id, tool_id, cleaned_target)
             # Commercial / API-Key Required Tools
             elif tool_id in ["tool_shodan", "shodan"]:
                 res = await self._run_shodan(exec_id, tool_id, cleaned_target)
@@ -2149,6 +2153,137 @@ class ToolExecutor:
             error=None
         )
 
+    async def _run_sec_edgar(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """Official US SEC EDGAR corporate submissions and public filings."""
+        from app.modules.osint.providers.sec_edgar import SECEDGARProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = SECEDGARProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="organization"))
+        if resp.status == "error":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"SEC EDGAR lookup failed for {target}",
+                error=resp.error
+            )
+        elif resp.status == "not_found":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="SUCCESS",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=f"No SEC EDGAR corporate filings or CIK found for {target}",
+                error=None
+            )
+
+        results: List[NormalizedResult] = []
+        raw_record = resp.raw_data.get("record") if resp.raw_data else None
+        if raw_record:
+            cik = raw_record.get("cik", "")
+            legal_name = raw_record.get("legal_name", target)
+            sic = raw_record.get("sic_description") or raw_record.get("sic", "")
+            filings = raw_record.get("recent_filings", [])
+
+            results.append(
+                NormalizedResult(
+                    id=f"sec_edgar_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="ORGANIZATION",
+                    target=target,
+                    value=f"CIK: {cik} | Legal Name: {legal_name} | Industry: {sic} | Filings: {len(filings)}",
+                    source="US SEC EDGAR Official Regulatory Submissions",
+                    confidence=0.99,
+                    severity="INFO",
+                    metadata=raw_record,
+                    raw_result=raw_record
+                )
+            )
+
+        summary_msg = f"Resolved SEC EDGAR CIK {raw_record.get('cik')} for {target} with {len(raw_record.get('recent_filings', []))} filings" if raw_record else f"No SEC EDGAR filings for {target}"
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=summary_msg,
+            error=None
+        )
+
+    async def _run_censys(self, exec_id: str, tool_id: str, target: str) -> ToolExecutionResponse:
+        """Censys Platform Search API v2 for internet hosts and services."""
+        from app.modules.osint.providers.censys import CensysSearchProvider
+        from app.module_sdk.provider_adapter import ProviderRequest
+
+        provider = CensysSearchProvider()
+        resp = await provider.execute(ProviderRequest(query=target, target_type="ip"))
+        if resp.status == "config_required":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="CONFIG_REQUIRED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary="Censys API credentials required. Please set CENSYS_API_ID and CENSYS_API_SECRET in environment.",
+                config_help="Set CENSYS_API_ID and CENSYS_API_SECRET in your environment or Docker configuration."
+            )
+        elif resp.status == "error":
+            return ToolExecutionResponse(
+                execution_id=exec_id,
+                tool_id=tool_id,
+                target=target,
+                status="FAILED",
+                duration_ms=resp.duration_ms,
+                results=[],
+                summary=resp.error or f"Censys query failed for {target}",
+                error=resp.error
+            )
+
+        results: List[NormalizedResult] = []
+        hosts = (resp.raw_data.get("hosts") or []) if resp.raw_data else []
+        for h in hosts[:15]:
+            ip = h.get("ip", target)
+            services = h.get("services", [])
+            svc_names = [f"{s.get('port')}/{s.get('service_name', 'tcp')}" for s in services[:5]]
+            loc = h.get("location", {})
+            country = loc.get("country", "Unknown")
+
+            results.append(
+                NormalizedResult(
+                    id=f"censys_{uuid.uuid4().hex[:8]}",
+                    tool_id=tool_id,
+                    type="IP",
+                    target=target,
+                    value=f"IP: {ip} | Country: {country} | Services: {', '.join(svc_names) or 'None'}",
+                    source="Censys Platform Search API v2",
+                    confidence=0.95,
+                    severity="INFO",
+                    metadata=h,
+                    raw_result=h
+                )
+            )
+
+        summary_msg = f"Discovered {len(results)} hosts via Censys for {target}" if results else f"No Censys host records found for {target}"
+        return ToolExecutionResponse(
+            execution_id=exec_id,
+            tool_id=tool_id,
+            target=target,
+            status="SUCCESS",
+            duration_ms=resp.duration_ms,
+            results=results,
+            summary=summary_msg,
+            error=None
+        )
+
     def _record_history(self, response: ToolExecutionResponse, user: Optional[UserRecord]):
         record = {
             "execution_id": response.execution_id,
@@ -2165,6 +2300,19 @@ class ToolExecutor:
         self._history.insert(0, record)
         if len(self._history) > 500:
             self._history.pop()
+
+        # Update central provider registry operational telemetry
+        try:
+            from app.core.provider_registry.registry import provider_registry
+            provider_registry.record_telemetry(
+                provider_id=response.tool_id.replace("tool_", ""),
+                success=(response.status == "SUCCESS"),
+                latency_ms=response.duration_ms,
+                rate_limited=("rate limit" in str(response.error or "").lower()),
+                degraded=(response.status == "FAILED")
+            )
+        except Exception:
+            pass
 
     def get_history(self, tenant_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
         if not tenant_id:
