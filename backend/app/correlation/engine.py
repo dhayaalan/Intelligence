@@ -28,21 +28,66 @@ class CorrelationEngine:
                 key = (ent.type.value, ent.value.lower().strip())
                 if key in entities_by_key:
                     existing = entities_by_key[key]
-                    # Merge sources
-                    merged_sources = list(set(existing.sources + ent.sources))
-                    existing.sources = merged_sources
-                    # Boost confidence when multiple independent modules/providers discover the same entity
-                    existing.confidence = min(1.0, existing.confidence + 0.1)
-                    # Merge module metadata
-                    existing.metadata.update(ent.metadata)
+                    # Check for genuinely new independent sources
+                    new_sources = set(ent.sources) - set(existing.sources)
+                    existing.sources = list(set(existing.sources + ent.sources))
+                    
+                    # Boost confidence only when an independent source corroborates the entity
+                    if new_sources:
+                        existing.confidence = min(1.0, round(existing.confidence + 0.1, 2))
+                    
+                    # Merge module metadata without discarding valid corroboration
+                    for m_key, m_val in ent.metadata.items():
+                        if m_key in ("platform", "platforms"):
+                            plat_list = existing.metadata.get("platforms")
+                            if not plat_list:
+                                orig_plat = existing.metadata.get("platform")
+                                plat_list = [orig_plat] if orig_plat else []
+                            if isinstance(m_val, list):
+                                plat_list.extend(m_val)
+                            elif m_val and m_val not in plat_list:
+                                plat_list.append(m_val)
+                            existing.metadata["platforms"] = list(set(plat_list))
+                        elif m_key in ("profile_url", "profile_urls", "url", "urls"):
+                            url_list = existing.metadata.get("profile_urls")
+                            if not url_list:
+                                orig_url = existing.metadata.get("profile_url") or existing.metadata.get("url")
+                                url_list = [orig_url] if orig_url else []
+                            if isinstance(m_val, list):
+                                url_list.extend(m_val)
+                            elif m_val and m_val not in url_list:
+                                url_list.append(m_val)
+                            existing.metadata["profile_urls"] = list(set(url_list))
+                        elif m_key not in existing.metadata:
+                            existing.metadata[m_key] = m_val
+
+                    # Corroboration metrics
+                    existing.metadata["corroborating_sources_count"] = len(existing.sources)
+                    
+                    # Preserve distinction: USERNAME_MATCH vs PROFILE_MATCH vs CONFIRMED_IDENTITY
+                    if len(existing.sources) >= 3 and existing.metadata.get("profile_urls"):
+                        existing.metadata["match_type"] = "CORROBORATED_PROFILE"
+                    elif existing.type == EntityType.USERNAME:
+                        existing.metadata.setdefault("match_type", "USERNAME_MATCH")
+                    elif existing.type == EntityType.PERSON:
+                        existing.metadata.setdefault("match_type", "PROFILE_MATCH")
                 else:
+                    initial_meta = dict(ent.metadata)
+                    initial_meta["corroborating_sources_count"] = len(ent.sources)
+                    if ent.type == EntityType.USERNAME:
+                        initial_meta.setdefault("match_type", "USERNAME_MATCH")
+                    elif ent.type == EntityType.PERSON:
+                        initial_meta.setdefault("match_type", "PROFILE_MATCH")
+                    elif ent.type in (EntityType.ORGANIZATION, EntityType.DOMAIN, EntityType.IP):
+                        initial_meta.setdefault("match_type", "IDENTIFIER_MATCH")
+
                     entities_by_key[key] = EntityPayload(
                         id=ent.id,
                         type=ent.type,
                         value=ent.value.strip(),
                         confidence=ent.confidence,
                         sources=list(set(ent.sources)),
-                        metadata=dict(ent.metadata)
+                        metadata=initial_meta
                     )
             
             # Merge relationships

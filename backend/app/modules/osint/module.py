@@ -29,6 +29,8 @@ from app.modules.osint.providers.wayback_cdx import WaybackCDXProvider
 from app.modules.osint.providers.urlscan import URLScanProvider
 from app.modules.osint.providers.opensanctions import OpenSanctionsProvider
 from app.modules.osint.providers.gleif import GLEIFProvider
+from app.modules.osint.providers.sec_edgar import SECEDGARProvider
+from app.modules.osint.providers.censys import CensysSearchProvider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -63,15 +65,24 @@ class OsintModule(IntelligenceModule):
             ("wayback_cdx", WaybackCDXProvider(), "ARCHIVE_INTEL", ["snapshots", "historical_urls", "archives"], ["domain", "url", "hostname"]),
             ("urlscan", URLScanProvider(), "WEB_INTEL", ["historical_scans", "technologies", "screenshots", "ip"], ["domain", "url", "ip", "hostname"]),
             ("opensanctions", OpenSanctionsProvider(), "COMPLIANCE_WATCHLIST", ["sanctions", "pep", "debarment", "crime"], ["person", "organization", "company", "keyword", "username"]),
-            ("gleif_lei", GLEIFProvider(), "FINANCIAL_INTEL", ["legal_entity_identifier", "corporate_ownership", "regulatory_records", "lei_lookup"], ["organization", "company", "lei", "domain"])
+            ("gleif_lei", GLEIFProvider(), "FINANCIAL_INTEL", ["legal_entity_identifier", "corporate_ownership", "regulatory_records", "lei_lookup"], ["organization", "company", "lei", "domain"]),
+            ("sec_edgar", SECEDGARProvider(), "FINANCIAL_INTEL", ["corporate_filings", "cik_resolution", "10k_annual_reports", "8k_current_reports", "xbrl_facts"], ["organization", "company", "cik", "ticker", "domain"]),
+            ("censys", CensysSearchProvider(), "WEB_INTEL", ["host_discovery", "service_ports", "certificates", "software_versions"], ["ip", "domain", "hostname", "cve"])
         ]
 
         for pid, provider, category, caps, targets in primary_providers:
             self._providers[pid] = provider
-            auth_req = pid == "shodan"
-            env_vars = ["SHODAN_API_KEY"] if auth_req else []
-            has_credentials = bool(os.getenv("SHODAN_API_KEY")) if auth_req else True
-            prov_status = "HEALTHY" if has_credentials else "NOT_CONFIGURED"
+            auth_req = pid in ("shodan", "censys")
+            if pid == "shodan":
+                env_vars = ["SHODAN_API_KEY"]
+                has_credentials = bool(os.getenv("SHODAN_API_KEY"))
+            elif pid == "censys":
+                env_vars = ["CENSYS_API_ID", "CENSYS_API_SECRET"]
+                has_credentials = bool(os.getenv("CENSYS_API_ID") and os.getenv("CENSYS_API_SECRET"))
+            else:
+                env_vars = []
+                has_credentials = True
+            prov_status = "OPERATIONAL" if has_credentials else "NOT_CONFIGURED"
 
             meta = ProviderMetadata(
                 provider_id=pid,
@@ -107,7 +118,7 @@ class OsintModule(IntelligenceModule):
                 supported_targets=adapter.supported_targets,
                 version=adapter.version,
                 is_enabled=True,
-                status="HEALTHY",
+                status="REGISTERED",
                 timeout_seconds=float(raw.get("timeout_seconds", 4.0)),
                 rate_limit="30/min"
             )

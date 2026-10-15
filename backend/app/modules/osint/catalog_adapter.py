@@ -43,9 +43,13 @@ class OSINTPlatformAdapter(ProviderAdapter):
         self._timeout = float(raw.get("timeout_seconds", 5.0))
         self._supported_targets = ["username", "person", "identity", "handle"]
         
-        # If platform category relates to developer, package or publishing, also support domain
-        if self._category in ("Developer & Tech", "Publishing", "Open Knowledge"):
-            self._supported_targets.append("domain")
+        # Operational execution telemetry & health tracking
+        self._last_execution: Optional[datetime] = None
+        self._last_status: str = "HEALTH_CHECK_PENDING"
+        self._execution_count: int = 0
+        self._success_count: int = 0
+        self._consecutive_failures: int = 0
+        self._last_latency_ms: float = 0.0
 
     @property
     def provider_id(self) -> str:
@@ -72,9 +76,30 @@ class OSINTPlatformAdapter(ProviderAdapter):
         return "2.0.0"
 
     async def health_check(self) -> HealthCheckResult:
+        """Bounded health check utilizing cached execution telemetry without hammering public websites."""
+        if self._last_status == "RATE_LIMITED":
+            return HealthCheckResult(
+                status=ModuleHealthStatus.DEGRADED,
+                latency_ms=self._last_latency_ms,
+                message=f"Platform prober '{self._name}' rate limited on recent requests"
+            )
+        elif self._last_status == "DEGRADED" or self._consecutive_failures >= 3:
+            return HealthCheckResult(
+                status=ModuleHealthStatus.DEGRADED,
+                latency_ms=self._last_latency_ms,
+                message=f"Platform prober '{self._name}' experienced {self._consecutive_failures} consecutive connection failures"
+            )
+        elif self._last_status == "OPERATIONAL":
+            return HealthCheckResult(
+                status=ModuleHealthStatus.HEALTHY,
+                latency_ms=self._last_latency_ms,
+                message=f"Platform prober '{self._name}' verified operational ({self._execution_count} probes executed)"
+            )
+        # Bounded health check pending execution: prober configuration is valid and registered
         return HealthCheckResult(
             status=ModuleHealthStatus.HEALTHY,
-            message=f"Platform prober & extractor '{self._name}' active and verified"
+            latency_ms=0.0,
+            message=f"Platform prober '{self._name}' registered and configured for execution (telemetry pending)"
         )
 
     async def execute(self, request: ProviderRequest) -> ProviderResponse:
@@ -108,6 +133,10 @@ class OSINTPlatformAdapter(ProviderAdapter):
 
                 # 1. Rate limiting
                 if resp.status_code == 429:
+                    self._last_status = "RATE_LIMITED"
+                    self._consecutive_failures += 1
+                    self._last_execution = datetime.now(timezone.utc)
+                    self._last_latency_ms = duration_ms
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="skipped",
@@ -119,6 +148,14 @@ class OSINTPlatformAdapter(ProviderAdapter):
                         },
                         duration_ms=duration_ms
                     )
+
+                # Track successful connectivity
+                self._last_status = "OPERATIONAL"
+                self._consecutive_failures = 0
+                self._success_count += 1
+                self._execution_count += 1
+                self._last_execution = datetime.now(timezone.utc)
+                self._last_latency_ms = duration_ms
 
                 # 2. Access restriction / Auth required
                 if resp.status_code in (401, 403):
@@ -516,6 +553,11 @@ class OSINTPlatformAdapter(ProviderAdapter):
 
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                self._last_status = "DEGRADED"
+            self._last_execution = datetime.now(timezone.utc)
+            self._last_latency_ms = duration_ms
             return ProviderResponse(
                 provider_id=self.provider_id,
                 status="skipped",

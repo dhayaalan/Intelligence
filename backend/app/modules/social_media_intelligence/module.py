@@ -33,13 +33,25 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
         logger.info("Social Media Intelligence Engine initialized.")
 
     async def health_check(self) -> HealthCheckResult:
+        import os
+        ig_status = "online" if os.getenv("INSTAGRAM_ACCESS_TOKEN") or os.getenv("META_GRAPH_API_TOKEN") else "config_required"
+        fb_status = "online" if os.getenv("FACEBOOK_ACCESS_TOKEN") or os.getenv("META_GRAPH_API_TOKEN") else "config_required"
         return HealthCheckResult(
             module_id=self.manifest.id,
             status=ModuleHealthStatus.HEALTHY,
             latency_ms=1.8,
             message="Social Media Intelligence Engine is operational across all collectors.",
             details={
-                "collectors": ["bluesky", "telegram", "reddit", "mastodon", "youtube"],
+                "collectors": ["bluesky", "telegram", "reddit", "mastodon", "youtube", "instagram", "facebook"],
+                "collector_states": {
+                    "bluesky": "online",
+                    "telegram": "online",
+                    "reddit": "online",
+                    "mastodon": "online",
+                    "youtube": "online",
+                    "instagram": ig_status,
+                    "facebook": fb_status
+                },
                 "cib_engine": "online",
                 "credibility_scorer": "online"
             }

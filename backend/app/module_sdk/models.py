@@ -9,10 +9,12 @@ class ModuleHealthStatus(str, Enum):
     UNAVAILABLE = "unavailable"
 
 class HealthCheckResult(BaseModel):
+    module_id: Optional[str] = None
     status: ModuleHealthStatus = ModuleHealthStatus.HEALTHY
     latency_ms: float = 0.0
     message: str = "Operating normally"
     provider_statuses: Dict[str, str] = Field(default_factory=dict)
+    details: Dict[str, Any] = Field(default_factory=dict)
     checked_at: datetime = Field(default_factory=datetime.utcnow)
 
 class EntityType(str, Enum):
@@ -114,8 +116,8 @@ class SearchContext(BaseModel):
     options: Dict[str, Any] = Field(default_factory=dict)
 
 class NormalizedModuleResult(BaseModel):
-    module: str
-    execution_id: str
+    module: str = ""
+    execution_id: str = "default-exec"
     status: str = "completed"  # "completed", "failed", "partial"
     entities: List[EntityPayload] = Field(default_factory=list)
     relationships: List[RelationshipPayload] = Field(default_factory=list)
@@ -124,3 +126,12 @@ class NormalizedModuleResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
     duration_ms: float = 0.0
+
+    def __init__(self, **data: Any) -> None:
+        if "module_id" in data and ("module" not in data or not data["module"]):
+            data["module"] = data["module_id"]
+        super().__init__(**data)
+
+    @property
+    def module_id(self) -> str:
+        return self.module
