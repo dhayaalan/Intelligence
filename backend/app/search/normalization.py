@@ -114,26 +114,57 @@ def normalize_phone(
     
     try:
         # If starts with +, parse with None region to force international code resolution
-        region_to_use = None if trimmed.startswith("+") else default_region
-        parsed = phonenumbers.parse(trimmed, region_to_use)
-        
-        if not phonenumbers.is_valid_number(parsed):
-            # Check if it's possible but invalid
-            if phonenumbers.is_possible_number(parsed):
-                return None, f"Phone number '{trimmed}' has valid length but is not assigned to a valid telecommunications range"
-            return None, f"Invalid phone number: '{trimmed}' is not a valid international phone number"
-        
-        e164_format = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-        region_code = phonenumbers.region_code_for_number(parsed)
-        
-        return NormalizedPhone(
-            raw_phone=trimmed,
-            e164=e164_format,
-            country_code=parsed.country_code,
-            national_number=parsed.national_number,
-            region_code=region_code,
-            is_valid=True
-        ), None
+        if trimmed.startswith("+"):
+            parsed = phonenumbers.parse(trimmed, None)
+            if phonenumbers.is_valid_number(parsed):
+                e164_format = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+                region_code = phonenumbers.region_code_for_number(parsed)
+                return NormalizedPhone(
+                    raw_phone=trimmed,
+                    e164=e164_format,
+                    country_code=parsed.country_code,
+                    national_number=parsed.national_number,
+                    region_code=region_code,
+                    is_valid=True
+                ), None
+            else:
+                if phonenumbers.is_possible_number(parsed):
+                    return None, f"Phone number '{trimmed}' has valid length but is not assigned to a valid telecommunications range"
+                return None, f"Invalid phone number: '{trimmed}' is not a valid international phone number"
+
+        # If no '+' prefix, try primary default_region first, then common candidate plans (IN, GB, US, CA, AU)
+        candidate_regions = [default_region] if default_region else []
+        for r in ["IN", "GB", "US", "CA", "AU"]:
+            if r not in candidate_regions:
+                candidate_regions.append(r)
+
+        valid_parsed = None
+        last_err = None
+
+        for region in candidate_regions:
+            try:
+                parsed = phonenumbers.parse(trimmed, region)
+                if phonenumbers.is_valid_number(parsed):
+                    valid_parsed = parsed
+                    break
+                elif phonenumbers.is_possible_number(parsed):
+                    last_err = f"Phone number '{trimmed}' has valid length but is not assigned to a valid telecommunications range"
+            except Exception:
+                continue
+
+        if valid_parsed and phonenumbers.is_valid_number(valid_parsed):
+            e164_format = phonenumbers.format_number(valid_parsed, phonenumbers.PhoneNumberFormat.E164)
+            region_code = phonenumbers.region_code_for_number(valid_parsed)
+            return NormalizedPhone(
+                raw_phone=trimmed,
+                e164=e164_format,
+                country_code=valid_parsed.country_code,
+                national_number=valid_parsed.national_number,
+                region_code=region_code,
+                is_valid=True
+            ), None
+
+        return None, last_err or f"Invalid phone number: '{trimmed}' is not assigned to a valid telecommunications range"
         
     except NumberParseException as e:
         return None, f"Phone number parsing error: {e._msg}"
