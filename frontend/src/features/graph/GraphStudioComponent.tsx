@@ -1,21 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import cytoscape, { Core, EventObject } from 'cytoscape';
 import { Entity, Relationship } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { apiRequest } from '../../core/api/client';
 import {
-  Globe,
-  Server,
-  User,
-  Hash,
-  Mail,
   Info,
   Filter,
   Network,
   Search,
-  Building2,
-  FileText,
-  Shield,
   Maximize2,
   Minimize2,
   Loader2,
@@ -31,7 +23,6 @@ import {
   Sparkles,
   ZoomIn,
   ZoomOut,
-  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -72,6 +63,37 @@ export const extractEntityAvatar = (ent: any): string | null => {
   return null;
 };
 
+// Generates crisp, clean SVG icons to render directly inside circular graph nodes
+const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string => {
+  let content = '';
+  switch (category) {
+    case 'PERSON':
+      content = `<circle cx="24" cy="15" r="7.5" fill="${color}"/><path d="M9 37c0-8.284 6.716-15 15-15s15 6.716 15 15" fill="${color}"/>`;
+      break;
+    case 'ORGANIZATION':
+      content = `<path d="M8 40V12a2 2 0 0 1 2-2h12v30M22 18h14a2 2 0 0 1 2 2v20M6 40h36" stroke="${color}" stroke-width="3" stroke-linecap="round" fill="none"/><line x1="14" y1="18" x2="16" y2="18" stroke="${color}" stroke-width="3"/><line x1="14" y1="26" x2="16" y2="26" stroke="${color}" stroke-width="3"/><line x1="14" y1="34" x2="16" y2="34" stroke="${color}" stroke-width="3"/><line x1="30" y1="26" x2="32" y2="26" stroke="${color}" stroke-width="3"/><line x1="30" y1="34" x2="32" y2="34" stroke="${color}" stroke-width="3"/>`;
+      break;
+    case 'THREAT_INDICATOR':
+      content = `<path d="M24 6l14 5v12c0 9-14 19-14 19S10 32 10 23V11l14-5z" fill="${color}" opacity="0.35" stroke="${color}" stroke-width="3" stroke-linejoin="round"/><line x1="24" y1="16" x2="24" y2="26" stroke="${color}" stroke-width="3.5" stroke-linecap="round"/><circle cx="24" cy="32" r="2.2" fill="${color}"/>`;
+      break;
+    case 'IP':
+      content = `<rect x="6" y="8" width="36" height="12" rx="3" stroke="${color}" stroke-width="3" fill="none"/><rect x="6" y="26" width="36" height="12" rx="3" stroke="${color}" stroke-width="3" fill="none"/><circle cx="13" cy="14" r="2.5" fill="${color}"/><circle cx="13" cy="32" r="2.5" fill="${color}"/><line x1="24" y1="14" x2="35" y2="14" stroke="${color}" stroke-width="2.5"/><line x1="24" y1="32" x2="35" y2="32" stroke="${color}" stroke-width="2.5"/>`;
+      break;
+    case 'EMAIL':
+      content = `<rect x="6" y="10" width="36" height="26" rx="4" stroke="${color}" stroke-width="3" fill="none"/><path d="M7 13l17 12 17-12" stroke="${color}" stroke-width="3" stroke-linecap="round" fill="none"/>`;
+      break;
+    case 'DOCUMENT':
+      content = `<path d="M12 6h18a2 2 0 0 1 2 2v28a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" stroke="${color}" stroke-width="3" fill="none"/><line x1="16" y1="14" x2="26" y2="14" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="16" y1="20" x2="26" y2="20" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="16" y1="26" x2="22" y2="26" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+      break;
+    case 'DOMAIN':
+    default:
+      content = `<circle cx="24" cy="24" r="17" stroke="${color}" stroke-width="3" fill="none"/><ellipse cx="24" cy="24" rx="7.5" ry="17" stroke="${color}" stroke-width="2.5" fill="none"/><line x1="7" y1="24" x2="41" y2="24" stroke="${color}" stroke-width="2.5"/>`;
+      break;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">${content}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   ORGANIZATION: { bg: '#6366f1', border: '#4338ca', text: '#ffffff' },
   PERSON: { bg: '#f59e0b', border: '#d97706', text: '#ffffff' },
@@ -80,6 +102,12 @@ const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string
   EMAIL: { bg: '#14b8a6', border: '#0d9488', text: '#ffffff' },
   DOCUMENT: { bg: '#10b981', border: '#059669', text: '#ffffff' },
   DOMAIN: { bg: '#64748b', border: '#475569', text: '#ffffff' },
+};
+
+const getEntityImage = (ent: any, category: string): string => {
+  const avatar = extractEntityAvatar(ent);
+  if (avatar) return avatar;
+  return getCategorySvgIcon(category, '#ffffff');
 };
 
 export const GraphStudioComponent: React.FC<Props> = ({
@@ -173,7 +201,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
     return { filteredEntities: list, unlinkedCount: unlinked };
   }, [entities, connectedKeys, filterCategory, searchFilter, showUnlinked]);
 
-  // 3. Build Cytoscape Elements
+  // 3. Build Cytoscape Elements with embedded images and legible pill labels
   const elements = useMemo(() => {
     const elems: cytoscape.ElementDefinition[] = [];
     const rootVal = (selectedEntity?.value || rootCandidate?.value || '').toLowerCase().trim();
@@ -188,20 +216,22 @@ export const GraphStudioComponent: React.FC<Props> = ({
       const cat = getEntityCategory(ent.type);
       const isRoot = val.toLowerCase() === rootVal;
       const deg = degrees[val.toLowerCase()] || 0;
-      const size = isRoot ? 54 : Math.min(60, Math.max(34, 34 + deg * 3));
+      const size = isRoot ? 64 : Math.min(68, Math.max(46, 46 + deg * 3));
+      const bgImage = getEntityImage(ent, cat);
 
       elems.push({
         group: 'nodes',
         data: {
           id,
-          label: val.length > 24 ? `${val.slice(0, 22)}…` : val,
+          label: val.length > 28 ? `${val.slice(0, 26)}…` : val,
           fullLabel: val,
           category: cat,
           color: CATEGORY_COLORS[cat]?.bg || '#64748b',
           borderColor: isRoot ? '#4f46e5' : CATEGORY_COLORS[cat]?.border || '#475569',
-          borderWidth: isRoot ? 4 : 2,
+          borderWidth: isRoot ? 4 : 2.5,
           isRoot,
           size,
+          bgImage,
           rawEntity: ent,
         },
       });
@@ -239,7 +269,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
     return elems;
   }, [filteredEntities, relationships, selectedEntity, rootCandidate, degrees]);
 
-  // 4. Initialize Cytoscape Instance
+  // 4. Initialize Cytoscape Instance with Rich Visual Styling
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -251,20 +281,34 @@ export const GraphStudioComponent: React.FC<Props> = ({
           selector: 'node',
           style: {
             'background-color': 'data(color)',
+            'background-image': 'data(bgImage)',
+            'background-fit': 'contain',
+            'background-clip': 'node',
+            'background-width': '60%',
+            'background-height': '60%',
+            'background-position-x': '50%',
+            'background-position-y': '50%',
             label: 'data(label)',
             width: 'data(size)',
             height: 'data(size)',
             'border-width': 'data(borderWidth)',
             'border-color': 'data(borderColor)',
-            'border-opacity': 0.9,
-            color: '#1e293b',
-            'font-family': 'monospace, sans-serif',
+            'border-opacity': 0.95,
+            color: '#0f172a',
+            'font-family': 'Inter, system-ui, -apple-system, sans-serif',
             'font-size': '11px',
-            'font-weight': 'bold',
+            'font-weight': 700,
             'text-valign': 'bottom',
-            'text-margin-y': 6,
-            'text-wrap': 'ellipsis',
-            'text-max-width': '120px',
+            'text-margin-y': 8,
+            'text-wrap': 'wrap',
+            'text-max-width': '140px',
+            'text-background-opacity': 0.95,
+            'text-background-color': '#ffffff',
+            'text-background-padding': '4px',
+            'text-background-shape': 'roundrectangle',
+            'text-border-opacity': 0.7,
+            'text-border-width': 1,
+            'text-border-color': '#e2e8f0',
             'overlay-opacity': 0,
             'transition-property': 'background-color, border-color, border-width, opacity',
             'transition-duration': 0.2,
@@ -273,46 +317,51 @@ export const GraphStudioComponent: React.FC<Props> = ({
         {
           selector: 'node:selected',
           style: {
-            'border-width': 4,
+            'border-width': 4.5,
             'border-color': '#0f172a',
             'border-opacity': 1,
             'underlay-color': '#4f46e5',
-            'underlay-padding': 4,
-            'underlay-opacity': 0.3,
+            'underlay-padding': 6,
+            'underlay-opacity': 0.35,
           },
         },
         {
           selector: 'node[?isRoot]',
           style: {
-            'border-width': 4,
+            'border-width': 4.5,
             'border-color': '#4f46e5',
             'border-opacity': 1,
-            'border-style': 'double',
+            'underlay-color': '#4f46e5',
+            'underlay-padding': 6,
+            'underlay-opacity': 0.25,
+            'text-background-color': '#eff6ff',
+            'text-border-color': '#bfdbfe',
           },
         },
         {
           selector: 'edge',
           style: {
-            width: 2,
+            width: 2.2,
             'line-color': '#94a3b8',
             'line-style': 'data(lineStyle)' as any,
             'target-arrow-color': '#64748b',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
-            'arrow-scale': 1.1,
+            'arrow-scale': 1.15,
             label: 'data(label)',
-            color: '#475569',
-            'font-size': '9px',
-            'font-family': 'monospace',
+            color: '#334155',
+            'font-size': '10px',
+            'font-weight': 600,
+            'font-family': 'Inter, system-ui, sans-serif',
             'text-rotation': 'autorotate',
-            'text-background-opacity': 0.85,
-            'text-background-color': '#ffffff',
+            'text-background-opacity': 0.92,
+            'text-background-color': '#f8fafc',
             'text-background-padding': '3px',
             'text-background-shape': 'roundrectangle',
-            'text-border-opacity': 0.4,
+            'text-border-opacity': 0.5,
             'text-border-width': 1,
             'text-border-color': '#cbd5e1',
-            opacity: 0.85,
+            opacity: 0.9,
           },
         },
         {
@@ -327,7 +376,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
         {
           selector: '.highlighted',
           style: {
-            'border-width': 4,
+            'border-width': 4.5,
             'border-color': '#4f46e5',
             'line-color': '#4f46e5',
             'target-arrow-color': '#4f46e5',
@@ -338,7 +387,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
         {
           selector: '.faded',
           style: {
-            opacity: 0.15,
+            opacity: 0.12,
           },
         },
       ],
@@ -346,14 +395,19 @@ export const GraphStudioComponent: React.FC<Props> = ({
         name: activeLayout,
         animate: true,
         animationDuration: 500,
-        padding: 50,
+        nodeRepulsion: (node: any) => 800000,
+        idealEdgeLength: (edge: any) => 160,
+        edgeElasticity: (edge: any) => 32,
+        gravity: 0.15,
+        numIter: 1000,
+        padding: 70,
       } as any,
       wheelSensitivity: 0.25,
       minZoom: 0.2,
       maxZoom: 3.0,
     });
 
-    // Node Click Handlers
+    // Node Click Handler
     cy.on('tap', 'node', (evt: EventObject) => {
       const node = evt.target;
       const raw = node.data('rawEntity');
@@ -363,14 +417,13 @@ export const GraphStudioComponent: React.FC<Props> = ({
         setInspectorOpen(true);
       }
 
-      // Highlight neighborhood
       cy.elements().removeClass('highlighted faded');
       const neighborhood = node.neighborhood().add(node);
       cy.elements().not(neighborhood).addClass('faded');
       neighborhood.addClass('highlighted');
     });
 
-    // Edge Click Handlers
+    // Edge Click Handler
     cy.on('tap', 'edge', (evt: EventObject) => {
       const edge = evt.target;
       const raw = edge.data('rawRel');
@@ -394,7 +447,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
     };
   }, []);
 
-  // Update Cytoscape Elements when data changes
+  // Update Cytoscape Elements & Run Layout with Spacious Spacing
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -404,17 +457,36 @@ export const GraphStudioComponent: React.FC<Props> = ({
       cy.add(elements);
     });
 
-    // Run active layout with animation
-    const layout = cy.layout({
+    let layoutConfig: any = {
       name: activeLayout,
       animate: true,
-      animationDuration: 400,
-      padding: 60,
-    } as any);
+      animationDuration: 500,
+      padding: 70,
+    };
+
+    if (activeLayout === 'cose') {
+      layoutConfig = {
+        ...layoutConfig,
+        nodeRepulsion: (node: any) => 800000,
+        idealEdgeLength: (edge: any) => 160,
+        edgeElasticity: (edge: any) => 32,
+        gravity: 0.15,
+        numIter: 1000,
+      };
+    } else if (activeLayout === 'concentric') {
+      layoutConfig = {
+        ...layoutConfig,
+        concentric: (node: any) => (node.data('isRoot') ? 3 : (node.degree() || 1)),
+        levelWidth: () => 1,
+        minNodeSpacing: 70,
+      };
+    }
+
+    const layout = cy.layout(layoutConfig);
     layout.run();
   }, [elements, activeLayout]);
 
-  // 1-Hop Graph Expansion via Neo4j API
+  // Robust 1-Hop Graph Expansion: Safe against nonexistent targets
   const handleExpand1Hop = async () => {
     if (!selectedEntity || isExpanding) return;
     setIsExpanding(true);
@@ -438,45 +510,116 @@ export const GraphStudioComponent: React.FC<Props> = ({
       const cy = cyRef.current;
       if (!cy) return;
 
-      const newElemDefs: cytoscape.ElementDefinition[] = [];
+      const knownNodeIds = new Set<string>();
+      cy.nodes().forEach((n) => {
+        knownNodeIds.add(n.id());
+      });
+
+      const newNodes: cytoscape.ElementDefinition[] = [];
+      const newEdges: cytoscape.ElementDefinition[] = [];
       const newNodeIds: string[] = [];
       const newEdgeIds: string[] = [];
 
+      // 1. Add incoming nodes
       incomingNodes.forEach((nDoc: any) => {
         const val = (nDoc.value || nDoc.name || nDoc.id || '').trim();
         const id = nDoc.id || `node_${val.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
 
-        if (cy.getElementById(id).length === 0) {
+        if (!knownNodeIds.has(id)) {
           const cat = getEntityCategory(nDoc.type);
-          newElemDefs.push({
+          const bgImage = getEntityImage(nDoc, cat);
+          newNodes.push({
             group: 'nodes',
             data: {
               id,
-              label: val.length > 24 ? `${val.slice(0, 22)}…` : val,
+              label: val.length > 28 ? `${val.slice(0, 26)}…` : val,
               fullLabel: val,
               category: cat,
               color: CATEGORY_COLORS[cat]?.bg || '#64748b',
               borderColor: CATEGORY_COLORS[cat]?.border || '#475569',
-              borderWidth: 2,
+              borderWidth: 2.5,
               isRoot: false,
-              size: 38,
+              size: 46,
+              bgImage,
               rawEntity: nDoc,
             },
           });
+          knownNodeIds.add(id);
           newNodeIds.push(id);
         }
       });
 
-      incomingEdges.forEach((r: any, idx: number) => {
-        const sVal = (r.source_id || r.source_entity_value || '').toLowerCase().trim();
-        const tVal = (r.target_id || r.target_entity_value || '').toLowerCase().trim();
-        const sId = cy.getElementById(sVal).length > 0 ? sVal : `node_${sVal.replace(/[^a-z0-9_-]/g, '_')}`;
-        const tId = cy.getElementById(tVal).length > 0 ? tVal : `node_${tVal.replace(/[^a-z0-9_-]/g, '_')}`;
-        const edgeId = r.id || `edge_exp_${idx}_${sId}_${tId}`;
+      // Add nodes into Cytoscape first
+      if (newNodes.length > 0) {
+        cy.add(newNodes);
+      }
 
+      // 2. Connect edges safely
+      incomingEdges.forEach((r: any, idx: number) => {
+        const sRaw = (r.source_id || r.source_entity_value || '').toLowerCase().trim();
+        const tRaw = (r.target_id || r.target_entity_value || '').toLowerCase().trim();
+
+        const sId = knownNodeIds.has(sRaw)
+          ? sRaw
+          : knownNodeIds.has(`node_${sRaw.replace(/[^a-z0-9_-]/g, '_')}`)
+          ? `node_${sRaw.replace(/[^a-z0-9_-]/g, '_')}`
+          : sRaw;
+
+        const tId = knownNodeIds.has(tRaw)
+          ? tRaw
+          : knownNodeIds.has(`node_${tRaw.replace(/[^a-z0-9_-]/g, '_')}`)
+          ? `node_${tRaw.replace(/[^a-z0-9_-]/g, '_')}`
+          : tRaw;
+
+        // Ensure both endpoints exist in Cy before creating the edge
+        if (!knownNodeIds.has(sId)) {
+          const sLabel = r.source_entity_value || sRaw;
+          const cat = 'DOMAIN';
+          cy.add({
+            group: 'nodes',
+            data: {
+              id: sId,
+              label: sLabel.length > 28 ? `${sLabel.slice(0, 26)}…` : sLabel,
+              fullLabel: sLabel,
+              category: cat,
+              color: CATEGORY_COLORS[cat]?.bg || '#64748b',
+              borderColor: CATEGORY_COLORS[cat]?.border || '#475569',
+              borderWidth: 2,
+              size: 42,
+              bgImage: getCategorySvgIcon(cat, '#ffffff'),
+              rawEntity: { id: sId, value: sLabel, type: cat },
+            },
+          });
+          knownNodeIds.add(sId);
+          newNodeIds.push(sId);
+        }
+
+        if (!knownNodeIds.has(tId)) {
+          const tLabel = r.target_entity_value || tRaw;
+          const cat = 'DOMAIN';
+          cy.add({
+            group: 'nodes',
+            data: {
+              id: tId,
+              label: tLabel.length > 28 ? `${tLabel.slice(0, 26)}…` : tLabel,
+              fullLabel: tLabel,
+              category: cat,
+              color: CATEGORY_COLORS[cat]?.bg || '#64748b',
+              borderColor: CATEGORY_COLORS[cat]?.border || '#475569',
+              borderWidth: 2,
+              size: 42,
+              bgImage: getCategorySvgIcon(cat, '#ffffff'),
+              rawEntity: { id: tId, value: tLabel, type: cat },
+            },
+          });
+          knownNodeIds.add(tId);
+          newNodeIds.push(tId);
+        }
+
+        const edgeId = r.id || `edge_exp_${idx}_${sId}_${tId}`;
         if (cy.getElementById(edgeId).length === 0) {
-          const relType = r.relationship_type || r.type || 'RELATED';
-          newElemDefs.push({
+          const relType = r.relationship_type || (r as any).type || 'RELATED';
+          newEdges.push({
             group: 'edges',
             data: {
               id: edgeId,
@@ -491,9 +634,11 @@ export const GraphStudioComponent: React.FC<Props> = ({
         }
       });
 
-      cy.add(newElemDefs);
+      if (newEdges.length > 0) {
+        cy.add(newEdges);
+      }
 
-      // Re-layout with concentric or force around parent
+      // Smooth concentric repositioning around parent
       const parentNode = cy.getElementById(selectedEntity.id || `node_${entVal.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`);
       if (parentNode.length > 0) {
         const neighborhood = parentNode.neighborhood().add(parentNode);
@@ -501,6 +646,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
           name: 'concentric',
           concentric: (node: any) => (node.id() === parentNode.id() ? 2 : 1),
           levelWidth: () => 1,
+          minNodeSpacing: 80,
           animate: true,
           animationDuration: 400,
         } as any);
@@ -514,7 +660,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
       }));
 
       setFeedback({
-        message: `Discovered ${newNodeIds.length} connected entities & ${newEdgeIds.length} verified paths.`,
+        message: `Expanded ${newNodeIds.length} connected entities & ${newEdgeIds.length} verified paths.`,
         type: 'success',
       });
     } catch (err: any) {
@@ -558,7 +704,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
     });
   };
 
-  // Pathfinding Tool (Shortest Path between two nodes)
+  // Shortest Path Finder
   const handleFindPath = () => {
     const cy = cyRef.current;
     if (!cy || !pathSource || !pathTarget) return;
@@ -789,7 +935,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
             </button>
             <button
               type="button"
-              onClick={() => cyRef.current?.fit(undefined, 50)}
+              onClick={() => cyRef.current?.fit(undefined, 60)}
               className="p-1 rounded hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300"
               title="Fit View"
             >
