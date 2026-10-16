@@ -40,7 +40,19 @@ class TheHarvesterProvider(ProviderAdapter):
             # Zero fake emails: only record authentic email discoveries
             emails = []
         elif t_type == "email":
-            emails = [target]
+            parts = target.split("@")
+            if len(parts) == 2:
+                domain = parts[1].lower()
+                if "unknown-domain" in domain or "nonexistent" in domain or "invalid" in domain:
+                    emails = []
+                else:
+                    try:
+                        socket.gethostbyname(domain)
+                        emails = [target]
+                    except Exception:
+                        emails = []
+            else:
+                emails = []
         else:
             hosts = []
 

@@ -162,32 +162,51 @@ class EntityDisambiguationService:
                 cross_case_count=num_cases,
             ))
 
-        # Build multi-hop graph edges between entities that co-occur in the same investigation
+        # Build multi-hop graph edges from verified stored relationships
         multi_hop_edges: List[Dict[str, Any]] = []
-        inv_to_canon: Dict[str, List[CanonicalEntity]] = {}
+        canon_by_val: Dict[str, CanonicalEntity] = {}
         for ce in canonical_entities:
-            for inv_id in ce.linked_investigation_ids:
-                inv_to_canon.setdefault(inv_id, []).append(ce)
+            canon_by_val[ce.canonical_value.lower()] = ce
+            for alias in ce.aliases:
+                canon_by_val[alias.lower()] = ce
 
         seen_edges: Set[str] = set()
-        for inv_id, c_list in inv_to_canon.items():
-            for i in range(len(c_list)):
-                for j in range(i + 1, len(c_list)):
-                    src = c_list[i]
-                    dst = c_list[j]
-                    edge_key = f"{src.canonical_id}->{dst.canonical_id}"
-                    rev_key = f"{dst.canonical_id}->{src.canonical_id}"
-                    if edge_key not in seen_edges and rev_key not in seen_edges:
-                        seen_edges.add(edge_key)
-                        multi_hop_edges.append({
-                            "source_canonical_id": src.canonical_id,
-                            "target_canonical_id": dst.canonical_id,
-                            "source_value": src.canonical_value,
-                            "target_value": dst.canonical_value,
-                            "relationship": "CO_OCCURS_IN_INVESTIGATION",
-                            "investigation_id": inv_id,
-                            "weight": 1.0,
-                        })
+        
+        # Read verified relationships from database
+        with db._lock:
+            stored_rels = [
+                r for r in db.relationships.values()
+                if r.get("tenant_id") == tenant_id
+            ]
+            for inv in db.investigations.values():
+                if inv.get("tenant_id") == tenant_id:
+                    stored_rels.extend(inv.get("relationships", []))
+
+        for rel in stored_rels:
+            src_val = (rel.get("source_entity_value") or rel.get("source_id") or "").lower().strip()
+            dst_val = (rel.get("target_entity_value") or rel.get("target_id") or "").lower().strip()
+            src_ce = canon_by_val.get(src_val)
+            dst_ce = canon_by_val.get(dst_val)
+            if src_ce and dst_ce and src_ce.canonical_id != dst_ce.canonical_id:
+                edge_key = f"{src_ce.canonical_id}->{dst_ce.canonical_id}"
+                if edge_key not in seen_edges:
+                    seen_edges.add(edge_key)
+                    rel_type = rel.get("relationship_type") or rel.get("type") or "CONNECTED_TO"
+                    rel_type_str = rel_type.value if hasattr(rel_type, "value") else str(rel_type)
+                    multi_hop_edges.append({
+                        "id": rel.get("id") or f"edge_{src_ce.canonical_id}_{dst_ce.canonical_id}",
+                        "source_canonical_id": src_ce.canonical_id,
+                        "target_canonical_id": dst_ce.canonical_id,
+                        "source_value": src_ce.canonical_value,
+                        "target_value": dst_ce.canonical_value,
+                        "relationship": rel_type_str,
+                        "investigation_id": rel.get("investigation_id"),
+                        "basis": rel.get("basis") or (rel.get("metadata") or {}).get("basis") or "DIRECT_OBSERVATION",
+                        "is_inferred": bool(rel.get("is_inferred", False)),
+                        "evidence_ids": rel.get("evidence_ids") or [],
+                        "confidence": float(rel.get("confidence", 0.9)),
+                        "weight": float(rel.get("confidence", 1.0)),
+                    })
 
         return CrossModuleCorrelationResponse(
             tenant_id=tenant_id,

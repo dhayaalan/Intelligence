@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
 from fastapi import Query
 
@@ -125,3 +125,66 @@ async def get_entity(
     if not ent:
         raise HTTPException(status_code=404, detail="Entity not found in this tenant")
     return ent
+
+@router.get("/{entity_id}/expand", response_model=Dict[str, Any])
+async def expand_entity(
+    entity_id: str,
+    investigation_id: Optional[str] = Query(None),
+    limit: int = Query(25, ge=1, le=50),
+    relationship_types: Optional[List[str]] = Query(None),
+    min_confidence: Optional[float] = Query(None),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    from app.infrastructure.mongodb.repositories import relationship_repo, entity_repo
+    tenant_id = current_user.tenant_id
+    expansion = await relationship_repo.expand_entity_1hop(
+        tenant_id=tenant_id,
+        entity_id_or_val=entity_id,
+        investigation_id=investigation_id,
+        limit=limit,
+        relationship_types=relationship_types,
+        min_confidence=min_confidence
+    )
+    rels = expansion.get("relationships", [])
+    connected_vals = set()
+    for r in rels:
+        src = r.get("source_id") or r.get("source_entity_value")
+        tgt = r.get("target_id") or r.get("target_entity_value")
+        if src and str(src).lower() != entity_id.lower():
+            connected_vals.add(str(src))
+        if tgt and str(tgt).lower() != entity_id.lower():
+            connected_vals.add(str(tgt))
+
+    all_ents = await entity_repo.list_by_tenant(tenant_id, investigation_id=investigation_id)
+    ent_lookup = {}
+    for e in all_ents:
+        ent_lookup[str(e.get("id", "")).lower()] = e
+        ent_lookup[str(e.get("value", "")).lower()] = e
+
+    nodes = []
+    seen = set()
+    for cv in connected_vals:
+        cv_clean = cv.lower()
+        node_doc = ent_lookup.get(cv_clean) or {
+            "id": f"ent_{cv.replace(' ', '_')[:24]}",
+            "value": cv,
+            "type": "entity",
+            "confidence": 0.85,
+            "sources": ["graph"]
+        }
+        nid = node_doc.get("id", cv)
+        if nid not in seen:
+            seen.add(nid)
+            nodes.append(node_doc)
+
+    seed_node = ent_lookup.get(entity_id.lower()) or {"id": entity_id, "value": entity_id}
+    all_nodes = [seed_node] + [n for n in nodes if n.get("id") != seed_node.get("id")]
+    return {
+        "seed_entity_id": entity_id,
+        "seed_entity": seed_node,
+        "hop_count": 1,
+        "nodes": all_nodes,
+        "edges": rels,
+        "has_more": expansion.get("has_more", False),
+        "total_edges": expansion.get("total_count", len(rels))
+    }

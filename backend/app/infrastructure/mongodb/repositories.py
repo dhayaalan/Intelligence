@@ -1,4 +1,6 @@
 import asyncio
+import re
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from app.infrastructure.mongodb.client import get_database, get_sync_database
@@ -191,7 +193,7 @@ class EntityRepository(BaseMongoRepository):
             if items:
                 return items
         with memory_cache._lock:
-            items = [d for d in memory_cache.entities.values() if d.get("tenant_id") == tenant_id]
+            items = [d for d in memory_cache.entities.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
             if investigation_id:
                 items = [d for d in items if d.get("investigation_id") == investigation_id]
             return items
@@ -221,11 +223,119 @@ class RelationshipRepository(BaseMongoRepository):
             if items:
                 return items
         with memory_cache._lock:
-            return [d for d in memory_cache.relationships.values() if d.get("tenant_id") == tenant_id]
+            return [d for d in memory_cache.relationships.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
+
+    async def get_by_id(self, tenant_id: str, rel_id: str) -> Optional[Dict[str, Any]]:
+        if self.collection is not None:
+            doc = await self.collection.find_one({"id": rel_id, "tenant_id": tenant_id}, {"_id": 0})
+            if doc:
+                return doc
+        with memory_cache._lock:
+            rel = memory_cache.relationships.get(rel_id)
+            if rel and (not rel.get("tenant_id") or rel.get("tenant_id") in [tenant_id, "tenant_global", "global"]):
+                return rel
+            for inv in memory_cache.investigations.values():
+                if not inv.get("tenant_id") or inv.get("tenant_id") in [tenant_id, "tenant_global", "global"]:
+                    for r in inv.get("relationships", []):
+                        if r.get("id") == rel_id:
+                            return r
+        return None
+
+    async def expand_entity_1hop(
+        self,
+        tenant_id: str,
+        entity_id_or_val: str,
+        investigation_id: Optional[str] = None,
+        limit: int = 25,
+        relationship_types: Optional[List[str]] = None,
+        min_confidence: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Bounded 1-hop relationship traversal originating from an entity identifier or value.
+        Preserves tenancy boundaries, deduplicates edges, and returns connected node stubs.
+        """
+        key_val = entity_id_or_val.strip().lower()
+        rels: List[Dict[str, Any]] = []
+        seen_ids = set()
+
+        # 1. Query Mongo collection if online
+        if self.collection is not None:
+            q: Dict[str, Any] = {
+                "tenant_id": tenant_id,
+                "$or": [
+                    {"source_id": entity_id_or_val},
+                    {"target_id": entity_id_or_val},
+                    {"source_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}},
+                    {"target_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}}
+                ]
+            }
+            if investigation_id:
+                q["investigation_id"] = investigation_id
+            if relationship_types:
+                q["relationship_type"] = {"$in": relationship_types}
+            if min_confidence is not None:
+                q["confidence"] = {"$gte": min_confidence}
+
+            cursor = self.collection.find(q, {"_id": 0}).limit(limit + 1)
+            docs = await cursor.to_list(length=limit + 1)
+            for d in docs:
+                r_id = d.get("id") or f"{d.get('source_id')}-{d.get('target_id')}"
+                if r_id not in seen_ids:
+                    seen_ids.add(r_id)
+                    rels.append(d)
+
+        # 2. Check memory cache and investigation embedded relationships
+        with memory_cache._lock:
+            all_cached = list(memory_cache.relationships.values())
+            for inv in memory_cache.investigations.values():
+                if inv.get("tenant_id") == tenant_id:
+                    if not investigation_id or inv.get("id") == investigation_id:
+                        all_cached.extend(inv.get("relationships", []))
+
+            for r in all_cached:
+                if r.get("tenant_id") and r.get("tenant_id") != tenant_id:
+                    continue
+                if investigation_id and r.get("investigation_id") and r.get("investigation_id") != investigation_id:
+                    continue
+                if relationship_types and r.get("relationship_type") not in relationship_types:
+                    continue
+                if min_confidence is not None and float(r.get("confidence", 1.0)) < min_confidence:
+                    continue
+
+                src_id = str(r.get("source_id", "")).lower()
+                tgt_id = str(r.get("target_id", "")).lower()
+                src_val = str(r.get("source_entity_value", "")).lower()
+                tgt_val = str(r.get("target_entity_value", "")).lower()
+
+                if key_val in (src_id, tgt_id, src_val, tgt_val):
+                    r_id = r.get("id") or f"{src_id}-{tgt_id}-{r.get('relationship_type')}"
+                    if r_id not in seen_ids:
+                        seen_ids.add(r_id)
+                        rels.append(r)
+
+        has_more = len(rels) > limit
+        bounded_rels = rels[:limit]
+        return {
+            "seed_entity": entity_id_or_val,
+            "relationships": bounded_rels,
+            "has_more": has_more,
+            "total_count": len(rels)
+        }
 
     async def save(self, tenant_id: str, rel_data: Dict[str, Any]) -> None:
-        rel_id = rel_data["id"]
+        rel_id = rel_data.get("id") or f"rel_{uuid.uuid4().hex[:10]}"
+        rel_data["id"] = rel_id
         rel_data["tenant_id"] = tenant_id
+        if "first_seen" not in rel_data:
+            rel_data["first_seen"] = datetime.utcnow().isoformat()
+        rel_data["last_seen"] = datetime.utcnow().isoformat()
+        if "basis" not in rel_data:
+            rel_data["basis"] = "DIRECT_OBSERVATION"
+        if "is_inferred" not in rel_data:
+            rel_data["is_inferred"] = False
+        if "evidence_ids" not in rel_data:
+            rel_data["evidence_ids"] = []
+
         with memory_cache._lock:
             memory_cache.relationships[rel_id] = rel_data
         if self.collection is not None:

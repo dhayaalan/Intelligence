@@ -15,6 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Entity, Relationship } from '../../types';
 import { Badge } from '../../components/ui/Badge';
+import { apiRequest } from '../../core/api/client';
 import {
   Globe,
   Server,
@@ -30,6 +31,13 @@ import {
   Shield,
   Layers,
   ExternalLink,
+  Maximize2,
+  Minimize2,
+  Loader2,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Link2,
 } from 'lucide-react';
 
 interface Props {
@@ -723,6 +731,26 @@ const DISINFOLAB_COORDINATES: Record<string, { x: number; y: number }> = {
   'ghulam nabi fai': { x: 1080, y: 780 },
 };
 
+export const getEdgeStyle = (relType: string) => {
+  const rt = (relType || '').toUpperCase();
+  if (['FOUNDER', 'CHAIR', 'PRESIDENT', 'DIRECTOR', 'LEADERSHIP', 'MEMBER', 'CO_FOUNDER', 'ADVOCACY_DIRECTOR'].includes(rt)) {
+    return { stroke: '#059669', color: '#059669', labelBg: '#ecfdf5', labelStroke: '#34d399' };
+  }
+  if (['OWNS', 'AFFILIATED_WITH', 'ASSOCIATED_WITH', 'SISTER_NGO', 'PARTNER'].includes(rt)) {
+    return { stroke: '#2563eb', color: '#2563eb', labelBg: '#eff6ff', labelStroke: '#60a5fa' };
+  }
+  if (['FUNDING', 'SPONSORS', 'USES', 'POWERED_BY', 'EVENTS_AND_SEMINARS', 'PROJECT', 'PROJECT_OF', 'WORKS_WITH'].includes(rt)) {
+    return { stroke: '#d97706', color: '#d97706', labelBg: '#fffbeb', labelStroke: '#fbbf24' };
+  }
+  if (['EXPOSED_BY', 'THREAT', 'ATTRIBUTED_TO', 'MALICIOUS', 'CONVICTED'].includes(rt)) {
+    return { stroke: '#dc2626', color: '#dc2626', labelBg: '#fef2f2', labelStroke: '#f87171' };
+  }
+  if (['NEXUS', 'SEMINAR_CIRCUIT', 'RESOLVES_TO', 'HOSTED_ON'].includes(rt)) {
+    return { stroke: '#7c3aed', color: '#7c3aed', labelBg: '#f5f3ff', labelStroke: '#a78bfa' };
+  }
+  return { stroke: '#64748b', color: '#64748b', labelBg: '#f8fafc', labelStroke: '#94a3b8' };
+};
+
 export const GraphStudioComponent: React.FC<Props> = ({
   investigationId,
   entities = [],
@@ -928,30 +956,10 @@ export const GraphStudioComponent: React.FC<Props> = ({
     const edgesResult: Edge[] = [];
     const seenEdges = new Set<string>();
 
-    const getEdgeStyle = (relType: string) => {
-      const rt = (relType || '').toUpperCase();
-      if (['FOUNDER', 'CHAIR', 'PRESIDENT', 'DIRECTOR', 'LEADERSHIP', 'MEMBER', 'CO_FOUNDER', 'ADVOCACY_DIRECTOR'].includes(rt)) {
-        return { stroke: '#059669', color: '#059669', labelBg: '#ecfdf5', labelStroke: '#34d399' };
-      }
-      if (['OWNS', 'AFFILIATED_WITH', 'ASSOCIATED_WITH', 'SISTER_NGO', 'PARTNER'].includes(rt)) {
-        return { stroke: '#2563eb', color: '#2563eb', labelBg: '#eff6ff', labelStroke: '#60a5fa' };
-      }
-      if (['FUNDING', 'SPONSORS', 'USES', 'POWERED_BY', 'EVENTS_AND_SEMINARS', 'PROJECT', 'PROJECT_OF', 'WORKS_WITH'].includes(rt)) {
-        return { stroke: '#d97706', color: '#d97706', labelBg: '#fffbeb', labelStroke: '#fbbf24' };
-      }
-      if (['EXPOSED_BY', 'THREAT', 'ATTRIBUTED_TO', 'MALICIOUS', 'CONVICTED'].includes(rt)) {
-        return { stroke: '#dc2626', color: '#dc2626', labelBg: '#fef2f2', labelStroke: '#f87171' };
-      }
-      if (['NEXUS', 'SEMINAR_CIRCUIT', 'RESOLVES_TO', 'HOSTED_ON'].includes(rt)) {
-        return { stroke: '#7c3aed', color: '#7c3aed', labelBg: '#f5f3ff', labelStroke: '#a78bfa' };
-      }
-      return { stroke: '#64748b', color: '#64748b', labelBg: '#f8fafc', labelStroke: '#94a3b8' };
-    };
-
     if (relationships && relationships.length > 0) {
       relationships.forEach((rel, rIdx) => {
-        const srcVal = (rel.source_entity_value || '').toLowerCase().trim();
-        const tgtVal = (rel.target_entity_value || '').toLowerCase().trim();
+        const srcVal = (rel.source_entity_value || (rel as any).source_id || '').toLowerCase().trim();
+        const tgtVal = (rel.target_entity_value || (rel as any).target_id || '').toLowerCase().trim();
         const srcId = entityValueMap.get(srcVal);
         const tgtId = entityValueMap.get(tgtVal);
 
@@ -961,13 +969,15 @@ export const GraphStudioComponent: React.FC<Props> = ({
             seenEdges.add(edgeKey);
             const style = getEdgeStyle(rel.relationship_type);
             const labelText = rel.metadata?.role || rel.relationship_type.replace(/_/g, ' ');
+            const isInferred = Boolean(rel.metadata?.is_inferred || rel.metadata?.basis === 'INFERRED' || (rel as any).is_inferred);
 
             edgesResult.push({
-              id: `edge-${rIdx}-${srcId}-${tgtId}`,
+              id: (rel as any).id || `edge-${rIdx}-${srcId}-${tgtId}`,
               source: srcId,
               target: tgtId,
               label: labelText,
               type: 'smoothstep',
+              data: rel,
               markerEnd: {
                 type: MarkerType.ArrowClosed,
                 width: 15,
@@ -977,6 +987,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
               style: {
                 stroke: style.stroke,
                 strokeWidth: 2.2,
+                strokeDasharray: isInferred ? '6,4' : undefined,
               },
               labelStyle: {
                 fill: '#0f172a',
@@ -998,61 +1009,15 @@ export const GraphStudioComponent: React.FC<Props> = ({
       });
     }
 
-    if (edgesResult.length === 0 && initialNodes.length > 1) {
-      const rootId = initialNodes[0].id;
-      initialNodes.slice(1).forEach((node) => {
-        const targetId = node.id;
-        const cat = getEntityCategory(node.data?.type);
-        const relLabel =
-          cat === 'PERSON'
-            ? 'KEY ACTOR'
-            : cat === 'ORGANIZATION'
-            ? 'AFFILIATED ORG'
-            : cat === 'THREAT_INDICATOR'
-            ? 'INDICATOR'
-            : 'CORRELATED';
-
-        const style = getEdgeStyle(relLabel);
-
-        edgesResult.push({
-          id: `e-synth-${rootId}-${targetId}`,
-          source: rootId,
-          target: targetId,
-          label: relLabel,
-          type: 'smoothstep',
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 14,
-            height: 14,
-            color: style.color,
-          },
-          style: {
-            stroke: style.stroke,
-            strokeWidth: 1.8,
-          },
-          labelStyle: {
-            fill: '#0f172a',
-            fontWeight: 800,
-            fontSize: 9,
-            fontFamily: 'monospace',
-          },
-          labelBgStyle: {
-            fill: style.labelBg,
-            stroke: style.labelStroke,
-            strokeWidth: 1,
-            rx: 6,
-            ry: 6,
-          },
-          labelBgPadding: [5, 2],
-        });
-      });
-    }
-
     return edgesResult;
   }, [filteredEntities, relationships, initialNodes]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [expandedBranches, setExpandedBranches] = useState<Record<string, { nodeIds: string[]; edgeIds: string[] }>>({});
+  const [isExpanding, setIsExpanding] = useState<boolean>(false);
+  const [expansionFeedback, setExpansionFeedback] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
 
   React.useEffect(() => {
     setNodes(initialNodes);
@@ -1064,15 +1029,179 @@ export const GraphStudioComponent: React.FC<Props> = ({
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      setSelectedEdge(null);
       const found = entities.find(
         (e) => (e.id || `node-${(e.value || (e as any).name || '').toLowerCase().trim()}`) === node.id || e.value === node.data?.value
-      );
+      ) || node.data;
       if (found) {
         setSelectedEntity(found);
       }
     },
     [entities]
   );
+
+  const onEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      setSelectedEdge(edge);
+      setSelectedEntity(null);
+    },
+    []
+  );
+
+  const handleExpand1Hop = async () => {
+    if (!selectedEntity || isExpanding) return;
+    setIsExpanding(true);
+    setExpansionFeedback(null);
+    try {
+      const entVal = selectedEntity.value || (selectedEntity as any).name || selectedEntity.id;
+      const res = await apiRequest<any>(
+        `/graph/expand?entity_id=${encodeURIComponent(entVal)}${investigationId ? `&investigation_id=${encodeURIComponent(investigationId)}` : ''}&limit=25`
+      );
+      const incomingEdges = res.edges || [];
+      const incomingNodes = res.nodes || [];
+
+      if (incomingEdges.length === 0) {
+        setExpansionFeedback({
+          message: `No further verified relationships discovered for '${entVal}'.`,
+          type: 'info'
+        });
+        return;
+      }
+
+      const currentNodes = [...nodes];
+      const currentEdges = [...edges];
+      const existingNodeIds = new Set(currentNodes.map((n) => n.id));
+      const existingEdgeIds = new Set(currentEdges.map((e) => e.id));
+
+      const parentNode = currentNodes.find(
+        (n) => n.id === selectedEntity.id || n.data?.value === entVal
+      );
+      const parentPos = parentNode ? parentNode.position : { x: 400, y: 300 };
+
+      const newNodeIds: string[] = [];
+      const newEdgeIds: string[] = [];
+      const radius = 240;
+      const angleStep = (2 * Math.PI) / Math.max(1, incomingNodes.length);
+
+      incomingNodes.forEach((nDoc: any, i: number) => {
+        const nId = nDoc.id || `node-${(nDoc.value || '').toLowerCase().trim()}`;
+        if (!existingNodeIds.has(nId)) {
+          const angle = i * angleStep;
+          const pos = {
+            x: Math.round(parentPos.x + radius * Math.cos(angle)),
+            y: Math.round(parentPos.y + radius * Math.sin(angle)),
+          };
+          currentNodes.push({
+            id: nId,
+            type: 'intelNode',
+            position: pos,
+            data: nDoc,
+          });
+          existingNodeIds.add(nId);
+          newNodeIds.push(nId);
+        }
+      });
+
+      incomingEdges.forEach((r: any) => {
+        const edgeId = r.id || `e-${r.source_id || r.source_entity_value}-${r.target_id || r.target_entity_value}`;
+        if (!existingEdgeIds.has(edgeId)) {
+          const srcId = r.source_id || `node-${(r.source_entity_value || '').toLowerCase().trim()}`;
+          const tgtId = r.target_id || `node-${(r.target_entity_value || '').toLowerCase().trim()}`;
+          const relLabel = r.relationship_type || r.relationship || 'CONNECTED';
+          const style = getEdgeStyle(relLabel);
+          const isInferred = Boolean(r.is_inferred || r.basis === 'INFERRED');
+
+          currentEdges.push({
+            id: edgeId,
+            source: srcId,
+            target: tgtId,
+            label: relLabel,
+            type: 'smoothstep',
+            data: r,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 14,
+              height: 14,
+              color: style.color,
+            },
+            style: {
+              stroke: style.stroke,
+              strokeWidth: 1.8,
+              strokeDasharray: isInferred ? '6,4' : undefined,
+            },
+            labelStyle: {
+              fill: '#0f172a',
+              fontWeight: 800,
+              fontSize: 10,
+              fontFamily: 'monospace',
+            },
+            labelBgStyle: {
+              fill: style.labelBg,
+              stroke: style.labelStroke,
+              strokeWidth: 1.5,
+              rx: 6,
+              ry: 6,
+            },
+            labelBgPadding: [6, 3],
+          });
+          existingEdgeIds.add(edgeId);
+          newEdgeIds.push(edgeId);
+        }
+      });
+
+      setNodes(currentNodes);
+      setEdges(currentEdges);
+      const branchKey = selectedEntity.id || entVal;
+      setExpandedBranches((prev) => ({
+        ...prev,
+        [branchKey]: { nodeIds: newNodeIds, edgeIds: newEdgeIds },
+      }));
+      setExpansionFeedback({
+        message: `Expanded ${newNodeIds.length} entities and ${newEdgeIds.length} verified connections.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setExpansionFeedback({
+        message: `Expansion failed: ${err.message || 'Server error'}. Retry available.`,
+        type: 'error',
+      });
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+  const handleCollapseBranch = () => {
+    if (!selectedEntity) return;
+    const branchKey = selectedEntity.id || selectedEntity.value || (selectedEntity as any).name;
+    const branchData = expandedBranches[branchKey];
+    if (!branchData) return;
+
+    // Preserve shared nodes used by other branches or present in initialNodes
+    const otherBranchNodeIds = new Set<string>();
+    Object.entries(expandedBranches).forEach(([bKey, data]) => {
+      if (bKey !== branchKey) {
+        data.nodeIds.forEach((id) => otherBranchNodeIds.add(id));
+      }
+    });
+
+    const initialNodeIds = new Set(initialNodes.map((n) => n.id));
+    const nodesToRemove = new Set(
+      branchData.nodeIds.filter((nid) => !otherBranchNodeIds.has(nid) && !initialNodeIds.has(nid))
+    );
+    const edgesToRemove = new Set(branchData.edgeIds);
+
+    setNodes((prev) => prev.filter((n) => !nodesToRemove.has(n.id)));
+    setEdges((prev) => prev.filter((e) => !edgesToRemove.has(e.id)));
+    setExpandedBranches((prev) => {
+      const next = { ...prev };
+      delete next[branchKey];
+      return next;
+    });
+    setExpansionFeedback({
+      message: `Branch collapsed successfully. Shared entities preserved.`,
+      type: 'info',
+    });
+  };
 
   if (entities.length === 0) {
     return (
@@ -1196,6 +1325,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
             nodeTypes={nodeTypes}
             fitView
             minZoom={0.2}
@@ -1240,23 +1370,139 @@ export const GraphStudioComponent: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Node Inspector Panel */}
+        {/* Node & Relationship Inspector Panel */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-2xs dark:border-slate-800 dark:bg-[#0f1422]">
-          <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800">
-            <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <h3 className="text-xs font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Entity Telemetry Inspector
-            </h3>
-          </div>
+          {selectedEdge ? (
+            /* Relationship Edge Inspector */
+            <div className="space-y-3.5 text-xs">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-xs font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Relationship Provenance
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEdge(null)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-mono"
+                >
+                  ✕
+                </button>
+              </div>
 
-          {selectedEntity ? (() => {
+              <div>
+                <span className="text-slate-400 uppercase text-[10px] block font-mono">Connection Type</span>
+                <p className="font-mono font-bold text-slate-900 dark:text-white break-all mt-0.5 text-sm uppercase">
+                  {selectedEdge.label || selectedEdge.data?.relationship_type || 'CONNECTED'}
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 space-y-1.5 font-mono text-[11px]">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Source:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                    {selectedEdge.data?.source_entity_value || selectedEdge.source}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Target:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                    {selectedEdge.data?.target_entity_value || selectedEdge.target}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono text-xs">Evidence Basis</span>
+                <Badge
+                  variant={selectedEdge.data?.basis === 'DIRECT_OBSERVATION' ? 'success' : 'warning'}
+                  className="font-mono text-[10px] uppercase"
+                >
+                  {selectedEdge.data?.basis || (selectedEdge.data?.is_inferred ? 'INFERRED' : 'DIRECT OBSERVATION')}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono text-xs">Confidence Score</span>
+                <Badge variant="mono" className="font-mono text-[10px]">
+                  {Math.round((selectedEdge.data?.confidence || 0.9) * 100)}%
+                </Badge>
+              </div>
+
+              {selectedEdge.data?.evidence_ids && selectedEdge.data.evidence_ids.length > 0 && (
+                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-400 uppercase text-[10px] block font-mono">Supporting Evidence</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedEdge.data.evidence_ids.map((evId: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800"
+                      >
+                        Evidence #{evId.slice(0, 8)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : selectedEntity ? (() => {
             const avatarUrl = extractEntityAvatar(selectedEntity);
             const profileUrl = (selectedEntity.metadata?.profile_url as string) || (selectedEntity.metadata?.url as string) || (selectedEntity.value?.startsWith('http') ? selectedEntity.value : null);
             const platform = (selectedEntity.metadata?.platform as string) || (selectedEntity.metadata?.category as string) || selectedEntity.sources?.[0] || 'Identity Target';
             const handleClean = selectedEntity.value?.includes('@') ? selectedEntity.value.split('@')[0] : selectedEntity.value;
+            const branchKey = selectedEntity.id || selectedEntity.value || (selectedEntity as any).name;
+            const hasActiveBranch = Boolean(expandedBranches[branchKey]);
 
             return (
               <div className="space-y-3.5 text-xs">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800">
+                  <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-xs font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Entity Telemetry Inspector
+                  </h3>
+                </div>
+
+                {/* Graph Traversal Controls: Expand 1-Hop & Collapse Branch */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleExpand1Hop}
+                    disabled={isExpanding}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-mono text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                    title="Expand verified relationships by 1 hop"
+                  >
+                    {isExpanding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    <span>Expand 1-Hop</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCollapseBranch}
+                    disabled={!hasActiveBranch}
+                    className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 text-slate-700 dark:text-slate-300 font-mono text-xs font-bold transition-colors cursor-pointer"
+                    title="Collapse expanded branch (preserves shared nodes)"
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span>Collapse</span>
+                  </button>
+                </div>
+
+                {/* Expansion Feedback Banner */}
+                {expansionFeedback && (
+                  <div
+                    className={`p-2.5 rounded-lg border text-[11px] font-mono ${
+                      expansionFeedback.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                        : expansionFeedback.type === 'error'
+                        ? 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800'
+                    }`}
+                  >
+                    {expansionFeedback.message}
+                  </div>
+                )}
+
                 {/* Profile Card Preview */}
                 {(avatarUrl || profileUrl) && (
                   <div className="p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 space-y-3 shadow-2xs">
@@ -1314,55 +1560,58 @@ export const GraphStudioComponent: React.FC<Props> = ({
                   </p>
                 </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-mono text-xs">Classification</span>
-                <Badge variant="outline" className="font-mono text-[10px] uppercase">
-                  {selectedEntity.type}
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-mono text-xs">Analytic Confidence</span>
-                <Badge variant={(selectedEntity.confidence || 0) >= 0.85 ? 'success' : 'warning'} className="font-mono text-[10px]">
-                  {Math.round((selectedEntity.confidence || 0.85) * 100)}%
-                </Badge>
-              </div>
-
-              {selectedEntity.sources && selectedEntity.sources.length > 0 && (
-                <div>
-                  <span className="text-slate-400 uppercase text-[10px] block font-mono mb-1">Correlated Sources</span>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedEntity.sources.map((src, i) => (
-                      <span
-                        key={i}
-                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                      >
-                        {src}
-                      </span>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-mono text-xs">Classification</span>
+                  <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                    {selectedEntity.type}
+                  </Badge>
                 </div>
-              )}
 
-              {selectedEntity.metadata && Object.keys(selectedEntity.metadata).length > 0 && (
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 uppercase text-[10px] block font-mono">Telemetry Metadata</span>
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5 font-mono text-[11px] dark:bg-slate-950 dark:border-slate-800 max-h-56 overflow-y-auto">
-                    {Object.entries(selectedEntity.metadata).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-2 border-b border-slate-100 dark:border-slate-900 pb-1 last:border-0 last:pb-0">
-                        <span className="text-slate-500 shrink-0">{k}:</span>
-                        <span className="text-slate-800 dark:text-slate-200 font-bold truncate text-right">
-                          {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-mono text-xs">Analytic Confidence</span>
+                  <Badge variant={(selectedEntity.confidence || 0) >= 0.85 ? 'success' : 'warning'} className="font-mono text-[10px]">
+                    {Math.round((selectedEntity.confidence || 0.85) * 100)}%
+                  </Badge>
+                </div>
+
+                {selectedEntity.sources && selectedEntity.sources.length > 0 && (
+                  <div>
+                    <span className="text-slate-400 uppercase text-[10px] block font-mono mb-1">Correlated Sources</span>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedEntity.sources.map((src: string, i: number) => (
+                        <span
+                          key={i}
+                          className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                        >
+                          {src}
                         </span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {selectedEntity.metadata && Object.keys(selectedEntity.metadata).length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-slate-400 uppercase text-[10px] block font-mono">Telemetry Metadata</span>
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5 font-mono text-[11px] dark:bg-slate-950 dark:border-slate-800 max-h-56 overflow-y-auto">
+                      {Object.entries(selectedEntity.metadata).map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-2 border-b border-slate-100 dark:border-slate-900 pb-1 last:border-0 last:pb-0">
+                          <span className="text-slate-500 shrink-0">{k}:</span>
+                          <span className="text-slate-800 dark:text-slate-200 font-bold truncate text-right">
+                            {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+            <div className="text-center py-8 space-y-2 text-slate-500 dark:text-slate-400">
+              <Network className="w-8 h-8 mx-auto text-slate-400 opacity-60" />
+              <p className="text-xs font-mono">Click a graph node to inspect telemetry and expand branches, or click an edge to inspect evidence provenance.</p>
             </div>
-          );
-        })() : (
-            <p className="text-xs text-slate-500 font-mono">Click a graph node to inspect telemetry.</p>
           )}
         </div>
       </div>

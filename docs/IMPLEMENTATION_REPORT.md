@@ -1,81 +1,87 @@
-# SENTIAL INTELLIGENCE PLATFORM — IMPLEMENTATION & REMEDIATION REPORT
+# Implementation Report — Search Accuracy, Relationship Graph & Media Integrity
 
-**Mission ID:** Main Branch Remediation, Accuracy Validation, and Advanced Tool Expansion  
-**Execution Branch:** `feat/main-branch-remediation-and-advanced-expansion`  
-**Date:** October 2026  
-**Status:** Successfully Implemented, Tested, and Verified (100% Pass)  
-
----
-
-## 1. Summary of Remediations & Technical Solutions
-
-### A. Provider Contract Mismatches Resolved (P1)
-1. **`URLScanProvider` -> `tool_executor._run_urlscan`**:
-   - In `backend/app/modules/osint/providers/urlscan.py`, normalized raw output to contain both `"scans"` and `"results"`.
-   - In `backend/app/modules/tool_executor.py`, updated `_run_urlscan` to check `resp.raw_data.get("scans") or resp.raw_data.get("results")`, ensuring scan findings are correctly transformed into `NormalizedResult` records of type `URL_SCAN`.
-2. **`ThreatFoxProvider` -> `tool_executor._run_threatfox`**:
-   - In `backend/app/modules/threat_intelligence/providers/threatfox.py`, normalized raw output to contain both `"matches"` and `"iocs"`.
-   - Replaced incorrect classification of indicators as `EntityType.VULNERABILITY` with accurate `EntityType.THREAT_INDICATOR`, `EntityType.IP`, `EntityType.DOMAIN`, or `EntityType.URL`.
-   - In `tool_executor.py`, updated `_run_threatfox` to resolve `ioc` / `ioc_value`, `threat_type` / `threat_type_desc`, and `malware_family` / `malware_printable`.
-3. **`NVDVulnerabilityProvider` -> `tool_executor._run_nvd_cve`**:
-   - In `backend/app/modules/threat_intelligence/providers/nvd_cve.py`, normalized raw output to contain both `"cves"` and `"vulnerabilities"`.
-   - Preserved NIST NVD API 2.0 metrics (`cvssMetricV31`, `cvssData.baseScore`, `baseSeverity`, `vectorString`, CWE descriptions) without fabricating synthetic defaults when fields are missing.
-
-### B. Error Handling & Success/Failure Semantics Enforced (P1)
-- Audited all recent and existing provider adapters (`urlscan`, `threatfox`, `nvd_cve`, `opensanctions`, `wayback_cdx`, `greynoise_community`, `gleif_lei`).
-- Enforced strict error boundaries:
-  - Non-200 responses (HTTP 401, 403, 429, 500, 503) and network timeouts return `status="error"` with safe, non-leaking diagnostic messages.
-  - In `tool_executor.py`, if `resp.status != "success"`, the response is immediately marked `status="FAILED"`.
-  - Legitimate empty searches (HTTP 200 with 0 findings or ThreatFox `query_status == "no_result"`) remain distinct as `status="SUCCESS"` with empty finding lists.
-  - **Zero failures are converted into misleading empty successes.**
-
-### C. Disabled-Module Execution Boundary Enforced (P0)
-- In `backend/app/search/orchestrator.py`:
-  - Enforced that `effective_module_ids` filters through `module_registry.is_module_enabled(m)`, even when explicit modules are requested via `request.selected_modules`.
-  - Added an execution boundary guard inside `execute_single_module(module_id)` rejecting any disabled or unregistered module immediately.
-  - Retained `example_intelligence` and `test_intelligence` for isolated dev/testing; verified they cannot leak synthetic findings into production investigations.
-  - Added regression test `test_disabled_module_blocked_at_execution_boundary`.
-
-### D. OSINT Catalog Precision & Soft-404 Rejection (P1)
-- In `backend/app/modules/osint/catalog_adapter.py`:
-  - Added redirect validation: requests redirected to `/login`, `/signin`, or back to root `/` or `/search` are classified as `ACCESS_RESTRICTED` or `NOT_FOUND`.
-  - Added WAF/anti-bot challenge wall detection (Cloudflare Turnstile, CAPTCHA).
-  - Added soft-404 phrase detection across HTML `<title>` tags and page bodies.
-  - Ensured that if 0 metadata fields were extracted and the username does not appear in the body/title, status is marked `UNVERIFIED` and `found: False`, preventing false positive profile assertions.
-
-### E. Advanced High-Value Tool Expansion (P2)
-Researched, designed, and implemented two official, non-duplicative external API providers:
-1. **GreyNoise Community Provider (`greynoise_community`)**:
-   - Location: `backend/app/modules/threat_intelligence/providers/greynoise.py`
-   - Queries official GreyNoise Community API v3 (`https://api.greynoise.io/v3/community/{ip}`).
-   - Distinguishes mass internet background noise, benign business infrastructure (RIOT), and malicious IP actors.
-   - Handles HTTP 404 unobserved IPs as legitimate no-match (`found=False`).
-   - Integrated into `threat_intelligence` manifest, module, `tool_executor`, and tool API.
-2. **GLEIF Legal Entity Identifier Provider (`gleif_lei`)**:
-   - Location: `backend/app/modules/osint/providers/gleif.py`
-   - Queries official Global Legal Entity Identifier Foundation Golden Copy API v1 (`https://api.gleif.org/api/v1/lei-records`).
-   - Endorsed by G20 and FSB; free public API requiring no credentials.
-   - Resolves ISO 17442 LEI identifiers, legal corporate names, jurisdictions, addresses, and registration status.
-   - Integrated into `osint` manifest, module, `tool_executor`, and tool API.
+**Branch:** `feat/search-accuracy-graph-intelligence-integrity`  
+**Repository:** `/home/songoku/Pictures/Intelligence`  
+**Status:** Completed & Validated  
 
 ---
 
-## 2. Test Execution & Verification
+## 1. Summary of Changes
 
-### Test Suite Results
-- `tests/test_new_intelligence_providers.py`: 12/12 PASSED (exercising genuine `httpx.MockTransport` across all 7 providers with real schemas, error handling, rate limits, and failure modes).
-- `tests/test_synthetic_intelligence_isolation.py`: 5/5 PASSED (verifying module isolation, production skipping, and SearchOrchestrator boundary enforcement).
-- `tests/test_new_module_extensibility.py`: 1/1 PASSED.
-- Full backend suite (`pytest tests/`): **127 / 127 PASSED (100%)**.
-- Frontend typecheck (`npm run typecheck`): **0 errors (PASS)**.
-- Frontend production build (`npm run build`): **PASS (built in 4.57s)**.
+This implementation addresses foundational inaccuracies across OSINT and identifier searches, relationship graph persistence and expansion, news media attribution, and evidence traceability.
 
 ---
 
-## 3. Operational Tool Inventory Summary
+## 2. Inventory of Modified & Created Files
 
-| Domain | Catalog / Integrated Providers | Core Deep Engines | Live Operational Tools |
-| :--- | :--- | :--- | :--- |
-| **OSINT Intelligence** | 329 Public Platform Probes | 10 Deep Engines (SpiderFoot, Shodan, Maltego, theHarvester, Google Dork, Image Engine, Wayback CDX, urlscan.io, OpenSanctions, GLEIF LEI) | **339** |
-| **Threat Intelligence** | 33 Security Scanning Engines | 3 Authoritative Threat Feeds (ThreatFox, NIST NVD CVE 2.0, GreyNoise Community) | **36** |
-| **Total Platform Providers** | — | — | **375** |
+### A. Search Accuracy & Normalization Architecture
+- `backend/app/search/normalization.py` *(Created)*:
+  - RFC 5322 compliant `normalize_email` (domain lowercasing, whitespace trimming, local-part preservation without unsafe transforms).
+  - Google `phonenumbers` (libphonenumber) E.164 canonical `normalize_phone` with country code resolution and invalid string rejection.
+  - Deterministic `classify_query_intent_and_mode` enforcing `EXACT_IDENTIFIER` mode for emails and phone numbers with zero fallback.
+  - Server-side `verify_identifier_match` ensuring records returned by upstream engines genuinely match the queried canonical identifier.
+- `backend/app/search/schemas.py` *(Modified)*:
+  - Added `search_mode`, `active_search_mode_label`, `is_exact_identifier`, `normalized_identifier`, and `validation_error` to `SearchResponse`.
+- `backend/app/search/orchestrator.py` *(Modified)*:
+  - Enforced deterministic classification at pipeline inception.
+  - Bounded module selection for exact identifiers (routes to identity-capable engines only, bypassing 329 platform probers).
+  - Integrated stored database entity discovery with strict server-side canonical verification.
+  - Enforced strict zero-match return when no exact identifier exists (no silent fallback to fuzzy or semantic search).
+- `backend/app/modules/osint/module.py` *(Modified)*:
+  - Filtered active providers so platform username probers are disabled for phone and email queries.
+  - Appended evidence and sources only when verified findings exist.
+- `backend/app/modules/osint/providers/theharvester.py` *(Modified)*:
+  - Replaced blind email echoing with authentic domain reachability and DNS verification.
+
+### B. Relationship Graph Persistence & Intelligence
+- `backend/app/correlation/engine.py` *(Modified)*:
+  - Eliminated arbitrary relationship synthesis (`if len(relationships_by_key) < 10:`).
+  - Explicitly tagged relationships with `basis: "DIRECT_OBSERVATION"` and `is_inferred: False`.
+- `backend/app/entities/resolver.py` *(Modified)*:
+  - Replaced $O(N^2)$ synthetic `CO_OCCURS_IN_INVESTIGATION` cross-product with authentic stored relationships.
+- `backend/app/infrastructure/mongodb/repositories.py` *(Modified)*:
+  - Added bounded 1-hop traversal `expand_entity_1hop()` with compound indexing support.
+  - Implemented idempotent `save()` for relationships and entities with upsert deduplication.
+  - Updated in-memory and MongoDB repository lookups with tenant-scoped fallback.
+- `backend/app/api/v1/graph.py` *(Created)*:
+  - `GET /api/v1/graph/expand`: Bounded 1-hop entity expansion.
+  - `POST /api/v1/graph/expand`: Batch state-aware multi-branch expansion distinguishing `new_nodes` from `shared_nodes`.
+  - `GET /api/v1/graph/relationships/{id}/evidence`: Relationship evidence provenance inspector.
+- `backend/app/api/v1/entities.py` *(Modified)*:
+  - Added `GET /api/v1/entities/{id}/expand` endpoint.
+- `backend/app/api/v1/router.py` *(Modified)*:
+  - Mounted `/graph` router under `/api/v1`.
+
+### C. News Media Integrity
+- `backend/app/modules/news_intelligence/search_engine.py` *(Modified)*:
+  - Removed `_pick_default_hero_image` array-modulo Unsplash photo assignments.
+  - Bound article media strictly to publisher OpenGraph and Twitter cards, setting `None` when unverified.
+- `backend/app/modules/news_intelligence/dossier_compiler.py` *(Modified)*:
+  - Replaced fabricated SHA-256 EXIF checksums with authentic publisher attribution.
+  - Provided explicit placeholder forensic notes when no media is present.
+
+### D. Frontend Investigation Experience
+- `frontend/src/features/search/SearchPage.tsx` *(Modified)*:
+  - Added active search mode badge (`MODE: Exact email search`, `Exact phone search`, `Semantic text search`).
+  - Added clear zero-match warning banner when exact identifier queries yield zero verified matches.
+- `frontend/src/features/graph/GraphStudioComponent.tsx` *(Modified)*:
+  - Removed all `e-synth-...` synthetic edge generation.
+  - Added Relationship Provenance Inspector displaying evidence IDs, confidence, and observation basis.
+  - Added Entity Inspector with 1-Hop Expand and Branch Collapse controls that preserve shared nodes and canvas layout.
+  - Exported `getEdgeStyle` for consistent edge rendering across initial load and dynamic expansions.
+
+### E. Automated Test Suites
+- `backend/tests/test_identifier_search_accuracy.py` *(Created — 10 tests)*
+- `backend/tests/test_relationship_graph_integrity.py` *(Created — 5 tests)*
+- `backend/tests/test_news_media_integrity.py` *(Created — 4 tests)*
+
+---
+
+## 3. Key Architectural Decisions
+
+1. **Deterministic Intent Classifier**:
+   Query classification is enforced in the backend independently of UI state. Even if an attacker or UI client requests `mode=semantic` with an email or phone number, the backend overrides it to `EXACT_IDENTIFIER` and forbids fuzzy/semantic broadening.
+2. **MongoDB Graph Layer with Clean REST Abstraction**:
+   Evaluated Neo4j versus MongoDB. Given existing production MongoDB 7.0 deployment and 1-hop traversal needs, improving MongoDB indexing and traversal avoided 2GB JVM overhead and distributed write inconsistency, while providing a clean REST contract for future graph database upgrades.
+3. **Preservation of Shared Nodes**:
+   Branch expansion and collapse track node ownership per branch, preventing the deletion of shared entities when an investigator collapses one line of inquiry.

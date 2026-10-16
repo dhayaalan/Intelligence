@@ -393,7 +393,8 @@ class MultiSourceRetrievalEngine:
                             event_loc = ent_c.name
                             break
 
-                hero_img = item.get("hero_image") or item.get("thumbnail_url") or self._pick_default_hero_image(req.query, idx)
+                # Only associate authentic publisher-verified imagery; never assign stock photos by array index
+                hero_img = item.get("hero_image") or item.get("thumbnail_url") or None
                 source_type = item.get("source_type") or self._classify_source_type(item.get("publisher", ""), item.get("canonical_url", ""))
                 is_indep = item.get("is_independent", source_type not in ["SYNDICATED", "SOCIAL"])
 
@@ -635,7 +636,7 @@ class MultiSourceRetrievalEngine:
         canonical_url = item.canonical_url or ""
         publisher = item.publisher or "News Wire"
         country = item.country or item.publisher_country or "International"
-        hero_img = item.hero_image or self._pick_default_hero_image(query_val, 0)
+        hero_img = item.hero_image or None
         entities = item.detected_entities or []
         is_video = bool(item.is_video)
         video_embed_url = item.video_embed_url

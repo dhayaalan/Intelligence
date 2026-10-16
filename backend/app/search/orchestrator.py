@@ -11,10 +11,14 @@ from app.core.logging import app_logger
 from app.identity.models import UserRecord
 from app.authorization.service import authorization_service
 from app.module_registry.registry import module_registry
-from app.module_sdk.models import SearchContext, NormalizedModuleResult, EntityType
+from app.module_sdk.models import SearchContext, NormalizedModuleResult, EntityType, EntityPayload
+from app.infrastructure.mongodb.repositories import entity_repo, search_repo, evidence_repo
 from app.correlation.engine import correlation_engine
 from app.search.classifier import target_classifier
 from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord
+from app.search.normalization import (
+    classify_query_intent_and_mode, verify_identifier_match, SearchMode, IdentifierType
+)
 from app.modules.osint.pivot_engine import pivot_engine
 
 class SearchOrchestrator:
@@ -28,59 +32,107 @@ class SearchOrchestrator:
         search_id = f"srch_{uuid.uuid4().hex[:10]}"
         query = request.query.strip()
         
-        # 1. High-precision query intent classification
-        intent_info = target_classifier.classify_intent(query)
-        intent = intent_info.get("intent", "GENERAL_RESEARCH")
-        intent_explanation = intent_info.get("explanation", "")
-        is_technical = intent_info.get("is_technical_target", False)
-        target_type = request.target_type or target_classifier.classify(query)
+        # 1. Deterministic query intent classification and search mode enforcement
+        mode_info = classify_query_intent_and_mode(
+            query=query,
+            requested_mode=request.search_mode,
+            default_phone_region="US"
+        )
+        is_identifier = mode_info["is_identifier"]
+        search_mode = mode_info["search_mode"]
+        active_search_mode_label = mode_info["active_search_mode_label"]
+        normalized_identifier = mode_info["normalized_value"]
+        validation_error = mode_info["validation_error"]
+        identifier_type = mode_info["identifier_type"]
+
         tenant_id = user.tenant_id
         start_time = time.time()
 
-        # 2. Scope-based module mapping
-        selected_scopes = request.selected_scopes or ["ALL INTELLIGENCE"]
-        all_registered_module_ids = module_registry.list_modules()
-        extra_pluggable_modules = [
-            m for m in all_registered_module_ids
-            if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]
-            and module_registry.is_module_enabled(m)
-        ]
+        if is_identifier and validation_error:
+            # Immediate rejection of invalid/malformed identifier with zero matches
+            app_logger.info(
+                f"Identifier validation failed for query '{query}': {validation_error}",
+                extra={"search_id": search_id, "tenant_id": tenant_id, "user_id": user.id}
+            )
+            return SearchResponse(
+                search_id=search_id,
+                query=query,
+                target_type="email" if identifier_type == "EMAIL" else "phone",
+                intent=identifier_type,
+                intent_explanation=f"Exact identifier validation error: {validation_error}",
+                selected_scopes=request.selected_scopes or ["PEOPLE & IDENTITIES"],
+                status="completed",
+                search_mode=search_mode,
+                active_search_mode_label=active_search_mode_label,
+                is_exact_identifier=True,
+                normalized_identifier=None,
+                validation_error=validation_error,
+                entities=[],
+                relationships=[],
+                evidence=[],
+                module_jobs=[],
+                stats={"total_duration_ms": 0.0, "entities_count": 0, "relationships_count": 0, "evidence_count": 0}
+            )
 
-        all_core_mods = ["osint", "news_intelligence", "social_media_intelligence"]
-        if is_technical:
-            all_core_mods.append("threat_intelligence")
-
-        scope_module_map = {
-            "ALL INTELLIGENCE": list(set(all_core_mods + extra_pluggable_modules)),
-            "OSINT": ["osint"] + extra_pluggable_modules,
-            "THREAT INTELLIGENCE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
-            "NEWS INTELLIGENCE": ["news_intelligence"] + extra_pluggable_modules,
-            "SOCIAL MEDIA INTELLIGENCE": ["social_media_intelligence"] + extra_pluggable_modules,
-            "DIGITAL INFRASTRUCTURE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
-            "PEOPLE & IDENTITIES": ["osint", "social_media_intelligence", "news_intelligence"] + extra_pluggable_modules,
-            "GEO INTELLIGENCE": ["news_intelligence", "osint"] + extra_pluggable_modules,
-            "MEDIA": ["news_intelligence", "social_media_intelligence", "osint"] + extra_pluggable_modules,
-            "EVIDENCE": ["news_intelligence", "social_media_intelligence", "osint", "threat_intelligence"] + extra_pluggable_modules,
-        }
-
-        if request.selected_modules:
-            target_modules_set = set(request.selected_modules)
+        if is_identifier and normalized_identifier:
+            target_type = "email" if identifier_type == "EMAIL" else "phone"
+            intent = identifier_type
+            intent_explanation = f"Deterministic exact {target_type} identifier lookup: canonical value '{normalized_identifier}'"
+            is_technical = False
+            effective_query = normalized_identifier
+            target_modules_set = {"osint"}
+            selected_scopes = ["PEOPLE & IDENTITIES"]
         else:
-            target_modules_set = set()
-            for scope in selected_scopes:
-                mods = scope_module_map.get(scope.upper(), [])
-                target_modules_set.update(mods)
+            intent_info = target_classifier.classify_intent(query)
+            intent = intent_info.get("intent", "GENERAL_RESEARCH")
+            intent_explanation = intent_info.get("explanation", "")
+            is_technical = intent_info.get("is_technical_target", False)
+            target_type = request.target_type or target_classifier.classify(query)
+            effective_query = query
+            selected_scopes = request.selected_scopes or ["ALL INTELLIGENCE"]
 
-            if not target_modules_set:
-                target_modules_set = set(intent_info.get("applicable_modules", ["news_intelligence", "osint"]) + extra_pluggable_modules)
+            all_registered_module_ids = module_registry.list_modules()
+            extra_pluggable_modules = [
+                m for m in all_registered_module_ids
+                if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]
+                and module_registry.is_module_enabled(m)
+            ]
 
-        # SAFETY GOVERNOR: Guard against port scanning non-technical queries like "India vs China"
-        has_explicit_threat = (request.selected_modules and "threat_intelligence" in request.selected_modules) or any(s.upper() in ["THREAT INTELLIGENCE", "DIGITAL INFRASTRUCTURE"] for s in selected_scopes)
-        if not is_technical and not has_explicit_threat and "threat_intelligence" in target_modules_set:
-            target_modules_set.discard("threat_intelligence")
+            all_core_mods = ["osint", "news_intelligence", "social_media_intelligence"]
+            if is_technical:
+                all_core_mods.append("threat_intelligence")
+
+            scope_module_map = {
+                "ALL INTELLIGENCE": list(set(all_core_mods + extra_pluggable_modules)),
+                "OSINT": ["osint"] + extra_pluggable_modules,
+                "THREAT INTELLIGENCE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
+                "NEWS INTELLIGENCE": ["news_intelligence"] + extra_pluggable_modules,
+                "SOCIAL MEDIA INTELLIGENCE": ["social_media_intelligence"] + extra_pluggable_modules,
+                "DIGITAL INFRASTRUCTURE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
+                "PEOPLE & IDENTITIES": ["osint", "social_media_intelligence", "news_intelligence"] + extra_pluggable_modules,
+                "GEO INTELLIGENCE": ["news_intelligence", "osint"] + extra_pluggable_modules,
+                "MEDIA": ["news_intelligence", "social_media_intelligence", "osint"] + extra_pluggable_modules,
+                "EVIDENCE": ["news_intelligence", "social_media_intelligence", "osint", "threat_intelligence"] + extra_pluggable_modules,
+            }
+
+            if request.selected_modules:
+                target_modules_set = set(request.selected_modules)
+            else:
+                target_modules_set = set()
+                for scope in selected_scopes:
+                    mods = scope_module_map.get(scope.upper(), [])
+                    target_modules_set.update(mods)
+
+                if not target_modules_set:
+                    target_modules_set = set(intent_info.get("applicable_modules", ["news_intelligence", "osint"]) + extra_pluggable_modules)
+
+            # SAFETY GOVERNOR: Guard against port scanning non-technical queries like "India vs China"
+            has_explicit_threat = (request.selected_modules and "threat_intelligence" in request.selected_modules) or any(s.upper() in ["THREAT INTELLIGENCE", "DIGITAL INFRASTRUCTURE"] for s in selected_scopes)
+            if not is_technical and not has_explicit_threat and "threat_intelligence" in target_modules_set:
+                target_modules_set.discard("threat_intelligence")
 
         app_logger.info(
-            f"Search initiated for '{query}' [Intent: {intent}, Type: {target_type}] with modules {list(target_modules_set)}",
+            f"Search initiated for '{effective_query}' [Intent: {intent}, Type: {target_type}, Mode: {search_mode}] with modules {list(target_modules_set)}",
             extra={"search_id": search_id, "tenant_id": tenant_id, "user_id": user.id}
         )
 
@@ -105,7 +157,7 @@ class SearchOrchestrator:
             search_id=search_id,
             tenant_id=tenant_id,
             user_id=user.id,
-            query=query,
+            query=effective_query,
             target_type=target_type,
             options=request.options
         )
@@ -209,10 +261,59 @@ class SearchOrchestrator:
 
         # 3. Correlate normalized findings across all completed modules
         corr_entities, corr_relationships, all_evidence = correlation_engine.correlate_module_results(
-            target_query=query,
+            target_query=effective_query,
             target_type=target_type,
             results=normalized_results
         )
+
+        # STRICT SERVER-SIDE IDENTIFIER VERIFICATION STEP
+        if is_identifier and normalized_identifier:
+            stored_entities = await entity_repo.list_by_tenant(tenant_id)
+            for se in stored_entities:
+                se_val = se.get("value")
+                if se_val and verify_identifier_match(
+                    queried_canonical=normalized_identifier,
+                    identifier_type=identifier_type,
+                    record_type=se.get("type", "entity"),
+                    record_value=se_val,
+                    metadata=se.get("metadata", {})
+                ):
+                    try:
+                        e_type = EntityType(se.get("type"))
+                    except Exception:
+                        e_type = EntityType.EMAIL if identifier_type == "EMAIL" else EntityType.PHONE
+                    corr_entities.append(EntityPayload(
+                        id=se.get("id"),
+                        type=e_type,
+                        value=se_val,
+                        confidence=float(se.get("confidence", 1.0)),
+                        sources=se.get("sources", ["stored_database_record"]),
+                        metadata=se.get("metadata", {})
+                    ))
+
+            verified_entities = [
+                e for e in corr_entities
+                if verify_identifier_match(
+                    queried_canonical=normalized_identifier,
+                    identifier_type=identifier_type,
+                    record_type=e.type.value if hasattr(e.type, "value") else str(e.type),
+                    record_value=e.value,
+                    metadata=e.metadata
+                )
+            ]
+            if not verified_entities:
+                # MANDATORY: When a valid email or phone-number search returns no exact matches,
+                # return zero identifier matches. Do not automatically invoke fuzzy, full-text, or semantic search.
+                corr_entities = []
+                corr_relationships = []
+                all_evidence = []
+            else:
+                corr_entities = verified_entities
+                verified_vals = {e.value.lower() for e in verified_entities}
+                corr_relationships = [
+                    r for r in corr_relationships
+                    if r.source_entity_value.lower() in verified_vals or r.target_entity_value.lower() in verified_vals
+                ]
 
         # 4. Assess overall search status and partial intelligence
         failed_jobs = [j for j in module_jobs if j.status == "failed"]
@@ -437,6 +538,21 @@ class SearchOrchestrator:
             "details": f"CCI: {cci_score}% • {len(suggested_pivots)} secondary investigative pivots generated"
         })
 
+        if is_identifier and len(corr_entities) == 0:
+            key_findings = []
+            investigative_leads = []
+            suggested_pivots = []
+            investigation_snapshot = {
+                "target": query,
+                "target_type": target_type,
+                "entities_count": 0,
+                "relationships_count": 0,
+                "evidence_count": 0,
+                "verified_matches_count": 0,
+                "search_mode": search_mode,
+                "message": f"Zero exact identifier records matched '{normalized_identifier or query}'. Fallback to fuzzy or semantic search was not performed."
+            }
+
         response = SearchResponse(
             search_id=search_id,
             query=query,
@@ -457,6 +573,11 @@ class SearchOrchestrator:
             collection_completeness_index=cci_score,
             coverage_telemetry=coverage_telemetry,
             suggested_pivots=suggested_pivots,
+            search_mode=search_mode,
+            active_search_mode_label=active_search_mode_label,
+            is_exact_identifier=is_identifier,
+            normalized_identifier=normalized_identifier,
+            validation_error=validation_error,
             stats={
                 "total_duration_ms": total_duration,
                 "modules_executed": len(module_jobs),
@@ -482,7 +603,6 @@ class SearchOrchestrator:
         with db._lock:
             db.searches[search_id] = search_record
             
-        from app.infrastructure.mongodb.repositories import search_repo, entity_repo, evidence_repo
         search_repo._sync_write({"id": search_id, "tenant_id": tenant_id}, search_record)
 
         # Persist correlated entities & evidence to MongoDB

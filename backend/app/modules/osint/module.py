@@ -179,14 +179,26 @@ class OsintModule(IntelligenceModule):
             options=context.options
         )
 
-        t_type = context.target_type.lower()
+        t_type = (context.target_type or "").lower()
         
-        # Search across all 335 registered OSINT engines without restricting to a single target type
+        # Select active providers, strictly respecting target capabilities for identifiers
         active_providers = {}
         for pid, p in self._providers.items():
             meta = provider_registry.get_metadata(pid)
             if meta and not meta.is_enabled:
                 continue
+            
+            # When searching an exact identifier (email, phone), only run providers that declare support
+            if t_type in ["email", "phone"]:
+                supported = []
+                if meta and meta.supported_targets:
+                    supported = [str(st).lower() for st in meta.supported_targets]
+                elif hasattr(p, "supported_targets"):
+                    st_val = getattr(p, "supported_targets")
+                    supported = [str(x).lower() for x in (st_val() if callable(st_val) else st_val)]
+                if t_type not in supported:
+                    continue
+            
             active_providers[pid] = p
 
         semaphore = asyncio.Semaphore(50)
@@ -212,14 +224,14 @@ class OsintModule(IntelligenceModule):
             if not resp or resp.status != "success":
                 continue
                 
-            sources.append(pid)
             raw = resp.raw_data or {}
+            provider_entities: List[EntityPayload] = []
             
             # Incorporate platform prober findings
             if isinstance(raw, dict) and raw.get("found"):
                 for ent_dict in raw.get("entities", []):
                     try:
-                        entities.append(EntityPayload(**ent_dict))
+                        provider_entities.append(EntityPayload(**ent_dict))
                     except Exception:
                         pass
                 for ev_dict in raw.get("evidence", []):
@@ -228,24 +240,28 @@ class OsintModule(IntelligenceModule):
                     except Exception:
                         pass
             
-            # Incorporate primary engines findings
-            ev = ModuleSDK.create_evidence(
-                source=f"OSINT - {pid}",
-                provider=pid,
-                module=self.module_id,
-                raw_data=raw,
-                reference=f"Target: {context.query}"
-            )
-            evidence.append(ev)
-            
             if pid == "shodan":
-                entities.extend(osint_normalizer.normalize_shodan(context.query, raw))
+                provider_entities.extend(osint_normalizer.normalize_shodan(context.query, raw))
             elif pid == "theharvester":
-                entities.extend(osint_normalizer.normalize_theharvester(context.query, raw))
+                provider_entities.extend(osint_normalizer.normalize_theharvester(context.query, raw))
             elif pid == "spiderfoot":
-                entities.extend(osint_normalizer.normalize_spiderfoot(context.query, raw))
+                provider_entities.extend(osint_normalizer.normalize_spiderfoot(context.query, raw))
             elif pid == "image_osint":
-                entities.extend(osint_normalizer.normalize_image(context.query, raw))
+                provider_entities.extend(osint_normalizer.normalize_image(context.query, raw))
+
+            entities.extend(provider_entities)
+
+            # Only record source and evidence if findings were actually discovered
+            if provider_entities or (isinstance(raw, dict) and raw.get("found")) or (isinstance(raw, dict) and any(v for v in raw.values() if v)):
+                sources.append(pid)
+                ev = ModuleSDK.create_evidence(
+                    source=f"OSINT - {pid}",
+                    provider=pid,
+                    module=self.module_id,
+                    raw_data=raw,
+                    reference=f"Target: {context.query}"
+                )
+                evidence.append(ev)
 
         duration = round((time.time() - start_time) * 1000, 2)
         status = "completed"

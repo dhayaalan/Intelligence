@@ -978,6 +978,11 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   <Badge variant="accent" size="sm" className="font-mono text-[10px] uppercase">
                     {searchResult.target_type}
                   </Badge>
+                  {((searchResult as any).active_search_mode_label || (searchResult as any).search_mode) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 font-bold">
+                      MODE: {(searchResult as any).active_search_mode_label || (searchResult as any).search_mode}
+                    </span>
+                  )}
                   {searchResult.intent && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 font-bold">
                       INTENT: {searchResult.intent}
@@ -1048,6 +1053,22 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                     Search Intent Classification:
                   </span>
                   <span>{searchResult.intent_explanation}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Strict Exact Identifier Zero-Match Integrity Notice */}
+            {(searchResult as any).is_exact_identifier && searchResult.entities.length === 0 && (
+              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-mono font-bold uppercase tracking-wider text-[11px] text-amber-800 dark:text-amber-300">
+                    Zero Exact Identifier Records Found
+                  </p>
+                  <p className="font-sans leading-relaxed text-[11px]">
+                    {(searchResult as any).validation_error ||
+                      `No verified intelligence records matched canonical identifier '${(searchResult as any).normalized_identifier || searchResult.query}'. As required by investigative integrity standards, automatic fallback to fuzzy or semantic search was strictly avoided.`}
+                  </p>
                 </div>
               </div>
             )}
