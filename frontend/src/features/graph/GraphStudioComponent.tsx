@@ -1,19 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
-import ReactFlow, {
-  Node,
-  Edge,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  MarkerType,
-  Handle,
-  Position,
-  NodeProps,
-  ReactFlowInstance,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import cytoscape, { Core, EventObject } from 'cytoscape';
 import { Entity, Relationship } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { apiRequest } from '../../core/api/client';
@@ -39,10 +25,13 @@ import {
   Radio,
   Eye,
   EyeOff,
-  ChevronRight,
-  ChevronLeft,
-  Share2,
   Compass,
+  Download,
+  Route,
+  Sparkles,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -53,7 +42,7 @@ interface Props {
   isSearching?: boolean;
 }
 
-export type LayoutMode = 'FOCUS' | 'RADIAL' | 'NETWORK' | 'HIERARCHY';
+export type LayoutName = 'cose' | 'concentric' | 'breadthfirst' | 'circle';
 
 export const getEntityCategory = (type: string = ''): string => {
   const t = type.toUpperCase();
@@ -78,572 +67,358 @@ export const extractEntityAvatar = (ent: any): string | null => {
     meta.thumbnail_url ||
     meta.avatar ||
     meta.image ||
-    meta.userpic ||
-    meta.photo_url ||
-    ent.avatar_url ||
-    ent.image_url ||
     null;
-
-  if (direct && typeof direct === 'string' && direct.trim().length > 0) {
-    return direct.trim();
-  }
-
-  const val = (ent.value || ent.name || '').trim();
-  const platform = (meta.platform || meta.source || (Array.isArray(ent.sources) ? ent.sources.join(' ') : '') || '').toLowerCase();
-
-  if (val.includes('@')) {
-    const parts = val.split('@');
-    const handle = parts[0].replace(/^@/, '').trim();
-    const domainOrNet = parts[1].toLowerCase().trim();
-
-    if (handle) {
-      if (domainOrNet.includes('twitter') || domainOrNet.includes('x.com') || domainOrNet === 'x') {
-        return `https://unavatar.io/x/${handle}`;
-      }
-      if (domainOrNet.includes('youtube')) {
-        return `https://unavatar.io/youtube/${handle}`;
-      }
-      if (domainOrNet.includes('telegram') || domainOrNet === 't.me') {
-        return `https://t.me/i/userpic/320/${handle}.jpg`;
-      }
-      if (domainOrNet.includes('github')) {
-        return `https://github.com/${handle}.png`;
-      }
-      return `https://unavatar.io/${handle}`;
-    }
-  }
-
-  if (ent.type?.toUpperCase() === 'USERNAME' || ent.type?.toUpperCase() === 'PERSON') {
-    const clean = val.replace(/^@/, '').trim();
-    if (clean) {
-      if (platform.includes('twitter') || platform.includes('x.com') || platform === 'x') return `https://unavatar.io/x/${clean}`;
-      if (platform.includes('youtube')) return `https://unavatar.io/youtube/${clean}`;
-      if (platform.includes('github')) return `https://github.com/${clean}.png`;
-    }
-  }
-
+  if (direct && typeof direct === 'string') return direct.trim();
   return null;
 };
 
-const getEntityCategoryIcon = (category: string) => {
-  switch (category) {
-    case 'PERSON':
-      return User;
-    case 'ORGANIZATION':
-      return Building2;
-    case 'DOCUMENT':
-      return FileText;
-    case 'THREAT_INDICATOR':
-      return Shield;
-    case 'IP':
-      return Server;
-    case 'HASH':
-      return Hash;
-    case 'EMAIL':
-      return Mail;
-    case 'DOMAIN':
-    default:
-      return Globe;
-  }
-};
-
-const getCategoryStyles = (category: string) => {
-  switch (category) {
-    case 'PERSON':
-      return {
-        iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300',
-        dot: 'bg-amber-500',
-        border: 'hover:border-amber-400',
-      };
-    case 'ORGANIZATION':
-      return {
-        iconBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300',
-        dot: 'bg-indigo-500',
-        border: 'hover:border-indigo-400',
-      };
-    case 'THREAT_INDICATOR':
-      return {
-        iconBg: 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300',
-        dot: 'bg-rose-500',
-        border: 'hover:border-rose-400',
-      };
-    case 'IP':
-      return {
-        iconBg: 'bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300',
-        dot: 'bg-blue-500',
-        border: 'hover:border-blue-400',
-      };
-    case 'EMAIL':
-      return {
-        iconBg: 'bg-teal-100 text-teal-700 dark:bg-teal-950/80 dark:text-teal-300',
-        dot: 'bg-teal-500',
-        border: 'hover:border-teal-400',
-      };
-    case 'DOCUMENT':
-      return {
-        iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300',
-        dot: 'bg-emerald-500',
-        border: 'hover:border-emerald-400',
-      };
-    case 'DOMAIN':
-    default:
-      return {
-        iconBg: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-        dot: 'bg-slate-500',
-        border: 'hover:border-slate-400',
-      };
-  }
-};
-
-// =============================================================================
-// COMPACT NODE COMPONENT (Clean, Uncluttered OSINT Graph Standard)
-// =============================================================================
-const CompactGraphNode: React.FC<NodeProps> = ({ data, selected }) => {
-  const category = getEntityCategory(data.type);
-  const Icon = getEntityCategoryIcon(category);
-  const styles = getCategoryStyles(category);
-  const isRoot = Boolean(data.isRoot || data.is_seed);
-  const displayName = data.value || data.name || 'Unknown Entity';
-
-  return (
-    <div
-      className={`group relative flex items-center gap-2 px-2.5 py-1.5 rounded-full border transition-all duration-150 select-none cursor-pointer bg-white dark:bg-[#0f1422] shadow-2xs max-w-[200px] ${
-        selected
-          ? 'border-indigo-600 ring-2 ring-indigo-500/40 dark:border-indigo-400 shadow-md scale-105 z-20'
-          : isRoot
-          ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
-          : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600'
-      }`}
-      title={`${displayName} (${category})`}
-    >
-      {/* 4 Multi-directional handles */}
-      <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-indigo-500 !border-white dark:!border-slate-900" />
-      <Handle type="target" position={Position.Left} id="left" className="!w-1.5 !h-1.5 !bg-indigo-400 !border-white dark:!border-slate-900" />
-
-      {/* Semantic Icon Badge */}
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${styles.iconBg}`}>
-        <Icon className="w-3.5 h-3.5" />
-      </div>
-
-      {/* Truncated Short Label */}
-      <div className="min-w-0 flex-1 pr-1">
-        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate leading-tight">
-          {displayName}
-        </p>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`} />
-          <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 truncate">
-            {isRoot ? '★ ROOT' : category}
-          </span>
-        </div>
-      </div>
-
-      <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 !bg-indigo-500 !border-white dark:!border-slate-900" />
-      <Handle type="source" position={Position.Right} id="right" className="!w-1.5 !h-1.5 !bg-indigo-400 !border-white dark:!border-slate-900" />
-    </div>
-  );
-};
-
-const nodeTypes = {
-  compactNode: CompactGraphNode,
-};
-
-export const getEdgeStyle = (relType: string) => {
-  const rt = (relType || '').toUpperCase();
-  if (['FOUNDER', 'CHAIR', 'PRESIDENT', 'DIRECTOR', 'LEADERSHIP', 'MEMBER', 'CO_FOUNDER', 'ADVOCACY_DIRECTOR'].includes(rt)) {
-    return { stroke: '#059669', color: '#059669', labelBg: '#ecfdf5', labelStroke: '#34d399' };
-  }
-  if (['OWNS', 'AFFILIATED_WITH', 'ASSOCIATED_WITH', 'SISTER_NGO', 'PARTNER'].includes(rt)) {
-    return { stroke: '#2563eb', color: '#2563eb', labelBg: '#eff6ff', labelStroke: '#60a5fa' };
-  }
-  if (['FUNDING', 'SPONSORS', 'USES', 'POWERED_BY', 'EVENTS_AND_SEMINARS', 'PROJECT', 'PROJECT_OF', 'WORKS_WITH'].includes(rt)) {
-    return { stroke: '#d97706', color: '#d97706', labelBg: '#fffbeb', labelStroke: '#fbbf24' };
-  }
-  if (['EXPOSED_BY', 'THREAT', 'ATTRIBUTED_TO', 'MALICIOUS', 'CONVICTED'].includes(rt)) {
-    return { stroke: '#dc2626', color: '#dc2626', labelBg: '#fef2f2', labelStroke: '#f87171' };
-  }
-  if (['NEXUS', 'SEMINAR_CIRCUIT', 'RESOLVES_TO', 'HOSTED_ON'].includes(rt)) {
-    return { stroke: '#7c3aed', color: '#7c3aed', labelBg: '#f5f3ff', labelStroke: '#a78bfa' };
-  }
-  return { stroke: '#64748b', color: '#64748b', labelBg: '#f8fafc', labelStroke: '#cbd5e1' };
+const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  ORGANIZATION: { bg: '#6366f1', border: '#4338ca', text: '#ffffff' },
+  PERSON: { bg: '#f59e0b', border: '#d97706', text: '#ffffff' },
+  THREAT_INDICATOR: { bg: '#f43f5e', border: '#e11d48', text: '#ffffff' },
+  IP: { bg: '#3b82f6', border: '#2563eb', text: '#ffffff' },
+  EMAIL: { bg: '#14b8a6', border: '#0d9488', text: '#ffffff' },
+  DOCUMENT: { bg: '#10b981', border: '#059669', text: '#ffffff' },
+  DOMAIN: { bg: '#64748b', border: '#475569', text: '#ffffff' },
 };
 
 export const GraphStudioComponent: React.FC<Props> = ({
   investigationId,
   entities = [],
   relationships = [],
-  onRunSearch,
-  isSearching,
 }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cyRef = useRef<Core | null>(null);
+
+  const [activeLayout, setActiveLayout] = useState<LayoutName>('cose');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('FOCUS');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [showUnlinked, setShowUnlinked] = useState<boolean>(false);
-  const [showMinimap, setShowMinimap] = useState<boolean>(false);
   const [inspectorOpen, setInspectorOpen] = useState<boolean>(true);
+  const [pathfindingMode, setPathfindingMode] = useState<boolean>(false);
+  const [pathSource, setPathSource] = useState<string | null>(null);
+  const [pathTarget, setPathTarget] = useState<string | null>(null);
+
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [selectedEdgeData, setSelectedEdgeData] = useState<any | null>(null);
   const [expandedBranches, setExpandedBranches] = useState<Record<string, { nodeIds: string[]; edgeIds: string[] }>>({});
   const [isExpanding, setIsExpanding] = useState<boolean>(false);
-  const [expansionFeedback, setExpansionFeedback] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
-  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
 
-  // 1. Identify Connected Components and Node Degrees
-  const { connectedNodeKeys, nodeDegrees, rootEntityCandidate } = useMemo(() => {
-    const degrees: Record<string, number> = {};
-    const connected = new Set<string>();
+  // 1. Calculate Connected Node Keys and Degrees
+  const { connectedKeys, degrees, rootCandidate } = useMemo(() => {
+    const conn = new Set<string>();
+    const deg: Record<string, number> = {};
 
-    (relationships || []).forEach((rel) => {
-      const src = (rel.source_entity_value || (rel as any).source_id || '').toLowerCase().trim();
-      const tgt = (rel.target_entity_value || (rel as any).target_id || '').toLowerCase().trim();
-      if (src && tgt && src !== tgt) {
-        connected.add(src);
-        connected.add(tgt);
-        degrees[src] = (degrees[src] || 0) + 1;
-        degrees[tgt] = (degrees[tgt] || 0) + 1;
+    (relationships || []).forEach((r) => {
+      const s = (r.source_entity_value || (r as any).source_id || '').toLowerCase().trim();
+      const t = (r.target_entity_value || (r as any).target_id || '').toLowerCase().trim();
+      if (s && t && s !== t) {
+        conn.add(s);
+        conn.add(t);
+        deg[s] = (deg[s] || 0) + 1;
+        deg[t] = (deg[t] || 0) + 1;
       }
     });
 
-    // Find candidate root: entity with highest degree or first connected entity
     let maxDeg = -1;
     let candidate: Entity | null = null;
-    entities.forEach((ent) => {
-      const val = (ent.value || (ent as any).name || ent.id || '').toLowerCase().trim();
-      const deg = degrees[val] || 0;
-      if (deg > maxDeg) {
-        maxDeg = deg;
-        candidate = ent;
+    entities.forEach((e) => {
+      const key = (e.value || (e as any).name || e.id || '').toLowerCase().trim();
+      const d = deg[key] || 0;
+      if (d > maxDeg) {
+        maxDeg = d;
+        candidate = e;
       }
     });
 
     return {
-      connectedNodeKeys: connected,
-      nodeDegrees: degrees,
-      rootEntityCandidate: candidate || entities[0] || null,
+      connectedKeys: conn,
+      degrees: deg,
+      rootCandidate: candidate || entities[0] || null,
     };
   }, [entities, relationships]);
 
-  // Set initial selected entity to root candidate
-  React.useEffect(() => {
-    if (!selectedEntity && rootEntityCandidate) {
-      setSelectedEntity(rootEntityCandidate);
+  // Set initial selected entity
+  useEffect(() => {
+    if (!selectedEntity && rootCandidate) {
+      setSelectedEntity(rootCandidate);
     }
-  }, [rootEntityCandidate, selectedEntity]);
+  }, [rootCandidate, selectedEntity]);
 
-  // 2. Filter entities: By default, Main Graph displays Connected Entities
-  const { visibleEntities, unlinkedCount } = useMemo(() => {
+  // 2. Filter Entities
+  const { filteredEntities, unlinkedCount } = useMemo(() => {
     let unlinked = 0;
-    const filtered: Entity[] = [];
+    const list: Entity[] = [];
 
-    entities.forEach((ent) => {
-      const val = (ent.value || (ent as any).name || ent.id || '').toLowerCase().trim();
-      const isConnected = connectedNodeKeys.has(val);
+    entities.forEach((e) => {
+      const key = (e.value || (e as any).name || e.id || '').toLowerCase().trim();
+      const isConn = connectedKeys.has(key);
+      if (!isConn) unlinked += 1;
 
-      if (!isConnected) {
-        unlinked += 1;
-      }
-
-      // Check category filter
-      if (filterCategory !== 'ALL' && getEntityCategory(ent.type) !== filterCategory) {
-        return;
-      }
-
-      // Check text search
+      if (filterCategory !== 'ALL' && getEntityCategory(e.type) !== filterCategory) return;
       if (searchFilter.trim()) {
         const q = searchFilter.toLowerCase();
         const matches =
-          (ent.value || '').toLowerCase().includes(q) ||
-          ((ent as any).name || '').toLowerCase().includes(q) ||
-          (ent.type || '').toLowerCase().includes(q);
+          (e.value || '').toLowerCase().includes(q) ||
+          ((e as any).name || '').toLowerCase().includes(q) ||
+          (e.type || '').toLowerCase().includes(q);
         if (!matches) return;
       }
 
-      // If showUnlinked is false, exclude unlinked entities from main view
-      if (!showUnlinked && !isConnected) {
-        return;
-      }
-
-      filtered.push(ent);
+      if (!showUnlinked && !isConn) return;
+      list.push(e);
     });
 
-    return { visibleEntities: filtered, unlinkedCount: unlinked };
-  }, [entities, connectedNodeKeys, filterCategory, searchFilter, showUnlinked]);
+    return { filteredEntities: list, unlinkedCount: unlinked };
+  }, [entities, connectedKeys, filterCategory, searchFilter, showUnlinked]);
 
-  // 3. Layout Generation based on actual graph structure
-  const initialNodes: Node[] = useMemo(() => {
-    if (visibleEntities.length === 0) return [];
+  // 3. Build Cytoscape Elements
+  const elements = useMemo(() => {
+    const elems: cytoscape.ElementDefinition[] = [];
+    const rootVal = (selectedEntity?.value || rootCandidate?.value || '').toLowerCase().trim();
 
-    const nodesResult: Node[] = [];
-    const rootVal = (selectedEntity?.value || selectedEntity?.id || rootEntityCandidate?.value || '').toLowerCase().trim();
+    const entMap = new Map<string, string>();
+    filteredEntities.forEach((ent) => {
+      const val = (ent.value || (ent as any).name || ent.id || '').trim();
+      const id = ent.id || `node_${val.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+      entMap.set(val.toLowerCase(), id);
+      if (ent.id) entMap.set(ent.id.toLowerCase(), id);
 
-    // Map for fast lookups
-    const entKey = (e: Entity) => (e.value || (e as any).name || e.id || '').toLowerCase().trim();
+      const cat = getEntityCategory(ent.type);
+      const isRoot = val.toLowerCase() === rootVal;
+      const deg = degrees[val.toLowerCase()] || 0;
+      const size = isRoot ? 54 : Math.min(60, Math.max(34, 34 + deg * 3));
 
-    // FOCUS LAYOUT (Default: Central seed + bounded concentric neighbors)
-    if (layoutMode === 'FOCUS') {
-      const centerX = 500;
-      const centerY = 350;
-
-      // Group neighbors: 1-hop directly connected to selected entity
-      const directNeighbors: Entity[] = [];
-      const outerEntities: Entity[] = [];
-      let rootNodeAdded = false;
-
-      visibleEntities.forEach((ent) => {
-        const key = entKey(ent);
-        if (key === rootVal) {
-          nodesResult.push({
-            id: ent.id || `node-${key}`,
-            type: 'compactNode',
-            position: { x: centerX - 80, y: centerY - 20 },
-            data: { ...ent, isRoot: true },
-          });
-          rootNodeAdded = true;
-          return;
-        }
-
-        // Check if directly connected to root
-        const isDirect = (relationships || []).some((r) => {
-          const s = (r.source_entity_value || (r as any).source_id || '').toLowerCase().trim();
-          const t = (r.target_entity_value || (r as any).target_id || '').toLowerCase().trim();
-          return (s === rootVal && t === key) || (t === rootVal && s === key);
-        });
-
-        if (isDirect) {
-          directNeighbors.push(ent);
-        } else {
-          outerEntities.push(ent);
-        }
+      elems.push({
+        group: 'nodes',
+        data: {
+          id,
+          label: val.length > 24 ? `${val.slice(0, 22)}…` : val,
+          fullLabel: val,
+          category: cat,
+          color: CATEGORY_COLORS[cat]?.bg || '#64748b',
+          borderColor: isRoot ? '#4f46e5' : CATEGORY_COLORS[cat]?.border || '#475569',
+          borderWidth: isRoot ? 4 : 2,
+          isRoot,
+          size,
+          rawEntity: ent,
+        },
       });
-
-      // If root wasn't in visibleEntities, pick the first entity
-      if (!rootNodeAdded && visibleEntities.length > 0) {
-        const first = visibleEntities[0];
-        nodesResult.push({
-          id: first.id || `node-${entKey(first)}`,
-          type: 'compactNode',
-          position: { x: centerX - 80, y: centerY - 20 },
-          data: { ...first, isRoot: true },
-        });
-      }
-
-      // Arrange 1-hop neighbors in inner ring (radius 220)
-      const innerRadius = 220;
-      const innerCount = directNeighbors.length;
-      directNeighbors.forEach((ent, idx) => {
-        const angle = (idx / Math.max(1, innerCount)) * 2 * Math.PI;
-        const x = Math.round(centerX + Math.cos(angle) * innerRadius - 80);
-        const y = Math.round(centerY + Math.sin(angle) * innerRadius - 20);
-        nodesResult.push({
-          id: ent.id || `node-${entKey(ent)}`,
-          type: 'compactNode',
-          position: { x, y },
-          data: ent,
-        });
-      });
-
-      // Arrange outer entities in orbit ring (radius 380)
-      const outerRadius = 380;
-      const outerCount = outerEntities.length;
-      outerEntities.forEach((ent, idx) => {
-        const angle = (idx / Math.max(1, outerCount)) * 2 * Math.PI + 0.2;
-        const x = Math.round(centerX + Math.cos(angle) * outerRadius - 80);
-        const y = Math.round(centerY + Math.sin(angle) * outerRadius - 20);
-        nodesResult.push({
-          id: ent.id || `node-${entKey(ent)}`,
-          type: 'compactNode',
-          position: { x, y },
-          data: ent,
-        });
-      });
-    } else if (layoutMode === 'RADIAL') {
-      const centerX = 500;
-      const centerY = 350;
-
-      visibleEntities.forEach((ent, idx) => {
-        const key = entKey(ent);
-        if (idx === 0) {
-          nodesResult.push({
-            id: ent.id || `node-${key}`,
-            type: 'compactNode',
-            position: { x: centerX - 80, y: centerY - 20 },
-            data: { ...ent, isRoot: true },
-          });
-          return;
-        }
-
-        const ring = Math.floor((idx - 1) / 8);
-        const posInRing = (idx - 1) % 8;
-        const ringTotal = Math.min(8, visibleEntities.length - 1 - ring * 8);
-        const radius = 200 + ring * 180;
-        const angle = (posInRing / Math.max(1, ringTotal)) * 2 * Math.PI;
-
-        const x = Math.round(centerX + Math.cos(angle) * radius - 80);
-        const y = Math.round(centerY + Math.sin(angle) * radius - 20);
-
-        nodesResult.push({
-          id: ent.id || `node-${key}`,
-          type: 'compactNode',
-          position: { x, y },
-          data: ent,
-        });
-      });
-    } else if (layoutMode === 'HIERARCHY') {
-      // Top-to-bottom directional tiers based on category role
-      const tiers: Record<number, Entity[]> = { 1: [], 2: [], 3: [], 4: [] };
-      visibleEntities.forEach((ent) => {
-        const cat = getEntityCategory(ent.type);
-        if (cat === 'ORGANIZATION') tiers[1].push(ent);
-        else if (cat === 'PERSON') tiers[2].push(ent);
-        else if (['THREAT_INDICATOR', 'IP'].includes(cat)) tiers[3].push(ent);
-        else tiers[4].push(ent);
-      });
-
-      const tierY = { 1: 60, 2: 220, 3: 380, 4: 540 };
-      const colWidth = 220;
-
-      Object.entries(tiers).forEach(([tStr, list]) => {
-        const tNum = Number(tStr) as 1 | 2 | 3 | 4;
-        const y = tierY[tNum];
-        const count = list.length;
-        const totalW = count * colWidth;
-        const startX = Math.max(60, 500 - totalW / 2);
-
-        list.forEach((ent, i) => {
-          const x = Math.round(startX + i * colWidth);
-          nodesResult.push({
-            id: ent.id || `node-${entKey(ent)}`,
-            type: 'compactNode',
-            position: { x, y },
-            data: ent,
-          });
-        });
-      });
-    } else {
-      // NETWORK / FORCE-DIRECTED SIMULATION
-      const cols = Math.ceil(Math.sqrt(visibleEntities.length * 1.5));
-      visibleEntities.forEach((ent, idx) => {
-        const row = Math.floor(idx / cols);
-        const col = idx % cols;
-        const x = 80 + col * 240 + (row % 2 === 1 ? 50 : 0);
-        const y = 80 + row * 160;
-        nodesResult.push({
-          id: ent.id || `node-${entKey(ent)}`,
-          type: 'compactNode',
-          position: { x, y },
-          data: ent,
-        });
-      });
-    }
-
-    return nodesResult;
-  }, [visibleEntities, layoutMode, selectedEntity, rootEntityCandidate, relationships]);
-
-  // 4. Edges generation
-  const initialEdges: Edge[] = useMemo(() => {
-    if (visibleEntities.length <= 1 || !relationships || relationships.length === 0) return [];
-
-    const entityValueMap = new Map<string, string>();
-    visibleEntities.forEach((ent) => {
-      const entId = ent.id || `node-${(ent.value || (ent as any).name || '').toLowerCase().trim()}`;
-      if (ent.value) entityValueMap.set(ent.value.toLowerCase().trim(), entId);
-      if ((ent as any).name) entityValueMap.set((ent as any).name.toLowerCase().trim(), entId);
-      if (ent.id) entityValueMap.set(ent.id.toLowerCase().trim(), entId);
     });
 
-    const edgesResult: Edge[] = [];
     const seenEdges = new Set<string>();
-
-    relationships.forEach((rel, rIdx) => {
+    (relationships || []).forEach((rel, idx) => {
       const srcVal = (rel.source_entity_value || (rel as any).source_id || '').toLowerCase().trim();
       const tgtVal = (rel.target_entity_value || (rel as any).target_id || '').toLowerCase().trim();
-      const srcId = entityValueMap.get(srcVal);
-      const tgtId = entityValueMap.get(tgtVal);
+      const srcId = entMap.get(srcVal);
+      const tgtId = entMap.get(tgtVal);
 
       if (srcId && tgtId && srcId !== tgtId) {
-        const edgeKey = `${srcId}-${tgtId}`;
+        const edgeKey = `${srcId}->${tgtId}`;
         if (!seenEdges.has(edgeKey)) {
           seenEdges.add(edgeKey);
-          const style = getEdgeStyle(rel.relationship_type);
-          const labelText = (rel.relationship_type || 'CONNECTED').replace(/_/g, ' ').toLowerCase();
-          const isInferred = Boolean(rel.metadata?.is_inferred || rel.metadata?.basis === 'INFERRED' || (rel as any).is_inferred);
+          const relType = rel.relationship_type || (rel as any).type || 'RELATED';
+          const isInferred = Boolean(rel.metadata?.is_inferred || (rel as any).is_inferred);
 
-          edgesResult.push({
-            id: (rel as any).id || `edge-${rIdx}-${srcId}-${tgtId}`,
-            source: srcId,
-            target: tgtId,
-            label: labelText,
-            type: 'smoothstep',
-            data: rel,
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 12,
-              height: 12,
-              color: style.color,
+          elems.push({
+            group: 'edges',
+            data: {
+              id: (rel as any).id || `edge_${idx}_${srcId}_${tgtId}`,
+              source: srcId,
+              target: tgtId,
+              label: relType.replace(/_/g, ' ').toLowerCase(),
+              lineStyle: isInferred ? 'dashed' : 'solid',
+              rawRel: rel,
             },
-            style: {
-              stroke: style.stroke,
-              strokeWidth: 1.8,
-              strokeDasharray: isInferred ? '5,4' : undefined,
-            },
-            labelStyle: {
-              fill: '#334155',
-              fontWeight: 600,
-              fontSize: 9,
-              fontFamily: 'monospace',
-            },
-            labelBgStyle: {
-              fill: style.labelBg,
-              stroke: style.labelStroke,
-              strokeWidth: 1,
-              rx: 4,
-              ry: 4,
-            },
-            labelBgPadding: [4, 2],
           });
         }
       }
     });
 
-    return edgesResult;
-  }, [visibleEntities, relationships]);
+    return elems;
+  }, [filteredEntities, relationships, selectedEntity, rootCandidate, degrees]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // 4. Initialize Cytoscape Instance
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-  React.useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges]);
+    const cy = cytoscape({
+      container: containerRef.current,
+      elements: [],
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': 'data(color)',
+            label: 'data(label)',
+            width: 'data(size)',
+            height: 'data(size)',
+            'border-width': 'data(borderWidth)',
+            'border-color': 'data(borderColor)',
+            'border-opacity': 0.9,
+            color: '#1e293b',
+            'font-family': 'monospace, sans-serif',
+            'font-size': '11px',
+            'font-weight': 'bold',
+            'text-valign': 'bottom',
+            'text-margin-y': 6,
+            'text-wrap': 'ellipsis',
+            'text-max-width': '120px',
+            'overlay-opacity': 0,
+            'transition-property': 'background-color, border-color, border-width, opacity',
+            'transition-duration': 0.2,
+          },
+        },
+        {
+          selector: 'node:selected',
+          style: {
+            'border-width': 4,
+            'border-color': '#0f172a',
+            'border-opacity': 1,
+            'underlay-color': '#4f46e5',
+            'underlay-padding': 4,
+            'underlay-opacity': 0.3,
+          },
+        },
+        {
+          selector: 'node[?isRoot]',
+          style: {
+            'border-width': 4,
+            'border-color': '#4f46e5',
+            'border-opacity': 1,
+            'border-style': 'double',
+          },
+        },
+        {
+          selector: 'edge',
+          style: {
+            width: 2,
+            'line-color': '#94a3b8',
+            'line-style': 'data(lineStyle)' as any,
+            'target-arrow-color': '#64748b',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'arrow-scale': 1.1,
+            label: 'data(label)',
+            color: '#475569',
+            'font-size': '9px',
+            'font-family': 'monospace',
+            'text-rotation': 'autorotate',
+            'text-background-opacity': 0.85,
+            'text-background-color': '#ffffff',
+            'text-background-padding': '3px',
+            'text-background-shape': 'roundrectangle',
+            'text-border-opacity': 0.4,
+            'text-border-width': 1,
+            'text-border-color': '#cbd5e1',
+            opacity: 0.85,
+          },
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            width: 3.5,
+            'line-color': '#4f46e5',
+            'target-arrow-color': '#4f46e5',
+            opacity: 1,
+          },
+        },
+        {
+          selector: '.highlighted',
+          style: {
+            'border-width': 4,
+            'border-color': '#4f46e5',
+            'line-color': '#4f46e5',
+            'target-arrow-color': '#4f46e5',
+            opacity: 1,
+            'z-index': 99,
+          },
+        },
+        {
+          selector: '.faded',
+          style: {
+            opacity: 0.15,
+          },
+        },
+      ],
+      layout: {
+        name: activeLayout,
+        animate: true,
+        animationDuration: 500,
+        padding: 50,
+      } as any,
+      wheelSensitivity: 0.25,
+      minZoom: 0.2,
+      maxZoom: 3.0,
+    });
 
-  const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      setSelectedEdge(null);
-      const found = entities.find(
-        (e) => (e.id || `node-${(e.value || (e as any).name || '').toLowerCase().trim()}`) === node.id || e.value === node.data?.value
-      ) || node.data;
-      if (found) {
-        setSelectedEntity(found);
+    // Node Click Handlers
+    cy.on('tap', 'node', (evt: EventObject) => {
+      const node = evt.target;
+      const raw = node.data('rawEntity');
+      if (raw) {
+        setSelectedEntity(raw);
+        setSelectedEdgeData(null);
         setInspectorOpen(true);
       }
-    },
-    [entities]
-  );
 
-  const onEdgeClick = useCallback(
-    (_: React.MouseEvent, edge: Edge) => {
-      setSelectedEdge(edge);
+      // Highlight neighborhood
+      cy.elements().removeClass('highlighted faded');
+      const neighborhood = node.neighborhood().add(node);
+      cy.elements().not(neighborhood).addClass('faded');
+      neighborhood.addClass('highlighted');
+    });
+
+    // Edge Click Handlers
+    cy.on('tap', 'edge', (evt: EventObject) => {
+      const edge = evt.target;
+      const raw = edge.data('rawRel');
+      setSelectedEdgeData(raw || edge.data());
       setSelectedEntity(null);
       setInspectorOpen(true);
-    },
-    []
-  );
+    });
 
-  // 1-Hop Graph Expansion
+    // Canvas Background Click: Reset highlights
+    cy.on('tap', (evt: EventObject) => {
+      if (evt.target === cy) {
+        cy.elements().removeClass('highlighted faded');
+      }
+    });
+
+    cyRef.current = cy;
+
+    return () => {
+      cy.destroy();
+      cyRef.current = null;
+    };
+  }, []);
+
+  // Update Cytoscape Elements when data changes
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    cy.batch(() => {
+      cy.elements().remove();
+      cy.add(elements);
+    });
+
+    // Run active layout with animation
+    const layout = cy.layout({
+      name: activeLayout,
+      animate: true,
+      animationDuration: 400,
+      padding: 60,
+    } as any);
+    layout.run();
+  }, [elements, activeLayout]);
+
+  // 1-Hop Graph Expansion via Neo4j API
   const handleExpand1Hop = async () => {
     if (!selectedEntity || isExpanding) return;
     setIsExpanding(true);
-    setExpansionFeedback(null);
+    setFeedback(null);
     try {
       const entVal = selectedEntity.value || (selectedEntity as any).name || selectedEntity.id;
       const res = await apiRequest<any>(
@@ -653,108 +428,98 @@ export const GraphStudioComponent: React.FC<Props> = ({
       const incomingNodes = res.nodes || [];
 
       if (incomingEdges.length === 0) {
-        setExpansionFeedback({
-          message: `No further verified relationships discovered for '${entVal}'.`,
+        setFeedback({
+          message: `No further verified relationships found in graph database for '${entVal}'.`,
           type: 'info',
         });
         return;
       }
 
-      const currentNodes = [...nodes];
-      const currentEdges = [...edges];
-      const existingNodeIds = new Set(currentNodes.map((n) => n.id));
-      const existingEdgeIds = new Set(currentEdges.map((e) => e.id));
+      const cy = cyRef.current;
+      if (!cy) return;
 
-      const parentNode = currentNodes.find(
-        (n) => n.id === selectedEntity.id || n.data?.value === entVal
-      );
-      const parentPos = parentNode ? parentNode.position : { x: 500, y: 350 };
-
+      const newElemDefs: cytoscape.ElementDefinition[] = [];
       const newNodeIds: string[] = [];
       const newEdgeIds: string[] = [];
-      const radius = 200;
-      const angleStep = (2 * Math.PI) / Math.max(1, incomingNodes.length);
 
-      incomingNodes.forEach((nDoc: any, i: number) => {
-        const nId = nDoc.id || `node-${(nDoc.value || '').toLowerCase().trim()}`;
-        if (!existingNodeIds.has(nId)) {
-          const angle = i * angleStep;
-          const pos = {
-            x: Math.round(parentPos.x + radius * Math.cos(angle)),
-            y: Math.round(parentPos.y + radius * Math.sin(angle)),
-          };
-          currentNodes.push({
-            id: nId,
-            type: 'compactNode',
-            position: pos,
-            data: nDoc,
+      incomingNodes.forEach((nDoc: any) => {
+        const val = (nDoc.value || nDoc.name || nDoc.id || '').trim();
+        const id = nDoc.id || `node_${val.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+
+        if (cy.getElementById(id).length === 0) {
+          const cat = getEntityCategory(nDoc.type);
+          newElemDefs.push({
+            group: 'nodes',
+            data: {
+              id,
+              label: val.length > 24 ? `${val.slice(0, 22)}…` : val,
+              fullLabel: val,
+              category: cat,
+              color: CATEGORY_COLORS[cat]?.bg || '#64748b',
+              borderColor: CATEGORY_COLORS[cat]?.border || '#475569',
+              borderWidth: 2,
+              isRoot: false,
+              size: 38,
+              rawEntity: nDoc,
+            },
           });
-          existingNodeIds.add(nId);
-          newNodeIds.push(nId);
+          newNodeIds.push(id);
         }
       });
 
-      incomingEdges.forEach((r: any) => {
-        const edgeId = r.id || `e-${r.source_id || r.source_entity_value}-${r.target_id || r.target_entity_value}`;
-        if (!existingEdgeIds.has(edgeId)) {
-          const srcId = r.source_id || `node-${(r.source_entity_value || '').toLowerCase().trim()}`;
-          const tgtId = r.target_id || `node-${(r.target_entity_value || '').toLowerCase().trim()}`;
-          const relLabel = (r.relationship_type || r.type || 'connected').replace(/_/g, ' ').toLowerCase();
-          const style = getEdgeStyle(relLabel);
-          const isInferred = Boolean(r.is_inferred || r.basis === 'INFERRED');
+      incomingEdges.forEach((r: any, idx: number) => {
+        const sVal = (r.source_id || r.source_entity_value || '').toLowerCase().trim();
+        const tVal = (r.target_id || r.target_entity_value || '').toLowerCase().trim();
+        const sId = cy.getElementById(sVal).length > 0 ? sVal : `node_${sVal.replace(/[^a-z0-9_-]/g, '_')}`;
+        const tId = cy.getElementById(tVal).length > 0 ? tVal : `node_${tVal.replace(/[^a-z0-9_-]/g, '_')}`;
+        const edgeId = r.id || `edge_exp_${idx}_${sId}_${tId}`;
 
-          currentEdges.push({
-            id: edgeId,
-            source: srcId,
-            target: tgtId,
-            label: relLabel,
-            type: 'smoothstep',
-            data: r,
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 12,
-              height: 12,
-              color: style.color,
+        if (cy.getElementById(edgeId).length === 0) {
+          const relType = r.relationship_type || r.type || 'RELATED';
+          newElemDefs.push({
+            group: 'edges',
+            data: {
+              id: edgeId,
+              source: sId,
+              target: tId,
+              label: relType.replace(/_/g, ' ').toLowerCase(),
+              lineStyle: r.is_inferred ? 'dashed' : 'solid',
+              rawRel: r,
             },
-            style: {
-              stroke: style.stroke,
-              strokeWidth: 1.8,
-              strokeDasharray: isInferred ? '5,4' : undefined,
-            },
-            labelStyle: {
-              fill: '#334155',
-              fontWeight: 600,
-              fontSize: 9,
-              fontFamily: 'monospace',
-            },
-            labelBgStyle: {
-              fill: style.labelBg,
-              stroke: style.labelStroke,
-              strokeWidth: 1,
-              rx: 4,
-              ry: 4,
-            },
-            labelBgPadding: [4, 2],
           });
-          existingEdgeIds.add(edgeId);
           newEdgeIds.push(edgeId);
         }
       });
 
-      setNodes(currentNodes);
-      setEdges(currentEdges);
+      cy.add(newElemDefs);
+
+      // Re-layout with concentric or force around parent
+      const parentNode = cy.getElementById(selectedEntity.id || `node_${entVal.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`);
+      if (parentNode.length > 0) {
+        const neighborhood = parentNode.neighborhood().add(parentNode);
+        const subLayout = neighborhood.layout({
+          name: 'concentric',
+          concentric: (node: any) => (node.id() === parentNode.id() ? 2 : 1),
+          levelWidth: () => 1,
+          animate: true,
+          animationDuration: 400,
+        } as any);
+        subLayout.run();
+      }
+
       const branchKey = selectedEntity.id || entVal;
       setExpandedBranches((prev) => ({
         ...prev,
         [branchKey]: { nodeIds: newNodeIds, edgeIds: newEdgeIds },
       }));
-      setExpansionFeedback({
-        message: `Expanded ${newNodeIds.length} entities and ${newEdgeIds.length} verified connections.`,
+
+      setFeedback({
+        message: `Discovered ${newNodeIds.length} connected entities & ${newEdgeIds.length} verified paths.`,
         type: 'success',
       });
     } catch (err: any) {
-      setExpansionFeedback({
-        message: `Expansion failed: ${err.message || 'Server error'}. Retry available.`,
+      setFeedback({
+        message: `Expansion failed: ${err.message || 'Server error'}.`,
         type: 'error',
       });
     } finally {
@@ -762,14 +527,14 @@ export const GraphStudioComponent: React.FC<Props> = ({
     }
   };
 
-  // Branch Collapse: Preserves Shared Nodes
+  // Branch Collapse
   const handleCollapseBranch = () => {
     if (!selectedEntity) return;
     const branchKey = selectedEntity.id || selectedEntity.value || (selectedEntity as any).name;
     const branchData = expandedBranches[branchKey];
-    if (!branchData) return;
+    if (!branchData || !cyRef.current) return;
 
-    // Identify shared nodes across other expanded branches
+    const cy = cyRef.current;
     const otherBranchNodeIds = new Set<string>();
     Object.entries(expandedBranches).forEach(([bKey, data]) => {
       if (bKey !== branchKey) {
@@ -777,29 +542,62 @@ export const GraphStudioComponent: React.FC<Props> = ({
       }
     });
 
-    const initialNodeIds = new Set(initialNodes.map((n) => n.id));
-    const nodesToRemove = new Set(
-      branchData.nodeIds.filter((nid) => !otherBranchNodeIds.has(nid) && !initialNodeIds.has(nid))
-    );
-    const edgesToRemove = new Set(branchData.edgeIds);
+    const nodesToRemove = branchData.nodeIds.filter((nid) => !otherBranchNodeIds.has(nid));
+    nodesToRemove.forEach((nid) => cy.remove(cy.getElementById(nid)));
+    branchData.edgeIds.forEach((eid) => cy.remove(cy.getElementById(eid)));
 
-    setNodes((prev) => prev.filter((n) => !nodesToRemove.has(n.id)));
-    setEdges((prev) => prev.filter((e) => !edgesToRemove.has(e.id)));
     setExpandedBranches((prev) => {
       const next = { ...prev };
       delete next[branchKey];
       return next;
     });
-    setExpansionFeedback({
-      message: `Branch collapsed successfully. Shared entities preserved.`,
+
+    setFeedback({
+      message: `Branch collapsed. Shared nodes preserved.`,
       type: 'info',
     });
   };
 
-  const handleFitView = () => {
-    if (reactFlowInstanceRef.current) {
-      reactFlowInstanceRef.current.fitView({ padding: 0.2, duration: 400 });
+  // Pathfinding Tool (Shortest Path between two nodes)
+  const handleFindPath = () => {
+    const cy = cyRef.current;
+    if (!cy || !pathSource || !pathTarget) return;
+
+    const srcNode = cy.getElementById(pathSource);
+    const tgtNode = cy.getElementById(pathTarget);
+    if (srcNode.length === 0 || tgtNode.length === 0) return;
+
+    const aStar = cy.elements().aStar({
+      root: srcNode,
+      goal: tgtNode,
+      directed: false,
+    });
+
+    if (aStar.found) {
+      cy.elements().removeClass('highlighted faded');
+      cy.elements().not(aStar.path).addClass('faded');
+      aStar.path.addClass('highlighted');
+      setFeedback({
+        message: `Shortest path discovered: ${aStar.distance} hops connecting '${srcNode.data('label')}' to '${tgtNode.data('label')}'.`,
+        type: 'success',
+      });
+    } else {
+      setFeedback({
+        message: `No connected traversal path found between selected entities.`,
+        type: 'warning',
+      });
     }
+  };
+
+  // Export Graph Image
+  const handleExportPNG = () => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const png64 = cy.png({ full: true, scale: 2, bg: '#ffffff' });
+    const a = document.createElement('a');
+    a.href = png64;
+    a.download = `investigation_relationship_graph_${Date.now()}.png`;
+    a.click();
   };
 
   if (entities.length === 0) {
@@ -821,63 +619,63 @@ export const GraphStudioComponent: React.FC<Props> = ({
   }
 
   return (
-    <div className="space-y-3">
-      {/* Clean, Streamlined Toolbar */}
+    <div className="space-y-3 font-sans">
+      {/* Modern OSINT Link Analysis Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-[#0f1422] text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Layout Mode Selector */}
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+          {/* Layout Algorithm Selector */}
+          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg font-mono">
             <button
               type="button"
-              onClick={() => setLayoutMode('FOCUS')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-colors ${
-                layoutMode === 'FOCUS'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
+              onClick={() => setActiveLayout('cose')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                activeLayout === 'cose'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
-              title="Focus: Selected entity and bounded connections"
+              title="Force-Directed CoSE: Physics simulation clustering connected nodes"
             >
-              <Focus className="w-3.5 h-3.5" />
-              <span>Focus</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Force Network</span>
             </button>
             <button
               type="button"
-              onClick={() => setLayoutMode('RADIAL')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-colors ${
-                layoutMode === 'RADIAL'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
+              onClick={() => setActiveLayout('concentric')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                activeLayout === 'concentric'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
-              title="Radial: Concentric rings around center"
+              title="Concentric: Orbits arranged by node importance and degrees"
             >
               <Radio className="w-3.5 h-3.5" />
-              <span>Radial</span>
+              <span>Radial Orbits</span>
             </button>
             <button
               type="button"
-              onClick={() => setLayoutMode('NETWORK')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-colors ${
-                layoutMode === 'NETWORK'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
+              onClick={() => setActiveLayout('breadthfirst')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                activeLayout === 'breadthfirst'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
-              title="Network: Connected graph topology"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Network</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayoutMode('HIERARCHY')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-colors ${
-                layoutMode === 'HIERARCHY'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
-              title="Hierarchy: Directional parent-child tiers"
+              title="Hierarchical: Top-to-bottom command & infrastructure hierarchy"
             >
               <GitFork className="w-3.5 h-3.5" />
               <span>Hierarchy</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLayout('circle')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                activeLayout === 'circle'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+              title="Circular: Uniform ring layout"
+            >
+              <Focus className="w-3.5 h-3.5" />
+              <span>Circle</span>
             </button>
           </div>
 
@@ -889,7 +687,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
               onChange={(e) => setFilterCategory(e.target.value)}
               className="h-7 px-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 font-mono focus:border-indigo-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
             >
-              <option value="ALL">All Types</option>
+              <option value="ALL">All Categories</option>
               <option value="ORGANIZATION">Organizations</option>
               <option value="PERSON">Persons / Actors</option>
               <option value="THREAT_INDICATOR">Threat Indicators</option>
@@ -899,7 +697,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* Toggle Unlinked Entities */}
+          {/* Toggle Unlinked Isolated Entities */}
           {unlinkedCount > 0 && (
             <button
               type="button"
@@ -909,12 +707,34 @@ export const GraphStudioComponent: React.FC<Props> = ({
                   ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300'
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300'
               }`}
-              title="Toggle visibility of isolated entities with no mapped relationships"
+              title="Toggle visibility of isolated background entities with no mapped connections"
             >
               {showUnlinked ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-slate-400" />}
               <span>Unlinked ({unlinkedCount})</span>
             </button>
           )}
+
+          {/* Pathfinding Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setPathfindingMode((prev) => !prev);
+              if (pathfindingMode && cyRef.current) {
+                cyRef.current.elements().removeClass('highlighted faded');
+                setPathSource(null);
+                setPathTarget(null);
+              }
+            }}
+            className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-xs font-mono transition-colors ${
+              pathfindingMode
+                ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/60 dark:border-amber-800 dark:text-amber-300 font-bold'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300'
+            }`}
+            title="Shortest path finder between two target entities"
+          >
+            <Route className="w-3.5 h-3.5" />
+            <span>Pathfinder</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -925,27 +745,65 @@ export const GraphStudioComponent: React.FC<Props> = ({
               type="text"
               placeholder="Find entity..."
               value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
+              onChange={(e) => {
+                setSearchFilter(e.target.value);
+                const q = e.target.value.toLowerCase().trim();
+                const cy = cyRef.current;
+                if (cy && q) {
+                  const match = cy.nodes().filter((n) => n.data('label')?.toLowerCase().includes(q));
+                  if (match.length > 0) {
+                    cy.center(match);
+                    cy.elements().removeClass('highlighted faded');
+                    match.addClass('highlighted');
+                  }
+                }
+              }}
               className="h-7 pl-7 pr-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 w-36"
             />
           </div>
 
-          {/* Canvas Stats Pill */}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300">
-            <span>{nodes.length} nodes</span>
+          {/* Visible Nodes / Edges Counter */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300">
+            <span>{filteredEntities.length} nodes</span>
             <span className="text-slate-400">•</span>
-            <span>{edges.length} edges</span>
+            <span>{relationships.length} edges</span>
           </div>
 
-          {/* Fit View Action */}
-          <button
-            type="button"
-            onClick={handleFitView}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 dark:border-slate-800 dark:hover:bg-slate-800 dark:text-slate-300 transition-colors"
-            title="Fit graph to viewport"
-          >
-            <Compass className="w-4 h-4" />
-          </button>
+          {/* Canvas Navigation Controls */}
+          <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-800 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => cyRef.current?.zoom(cyRef.current.zoom() * 1.25)}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => cyRef.current?.zoom(cyRef.current.zoom() * 0.8)}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => cyRef.current?.fit(undefined, 50)}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300"
+              title="Fit View"
+            >
+              <Compass className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleExportPNG}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300"
+              title="Export High-Resolution PNG for Investigation Report"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {/* Toggle Inspector */}
           <button
@@ -956,7 +814,6 @@ export const GraphStudioComponent: React.FC<Props> = ({
                 ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300'
                 : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300'
             }`}
-            title="Toggle Inspector Sidebar"
           >
             <Info className="w-3.5 h-3.5" />
             <span>Inspector</span>
@@ -964,87 +821,101 @@ export const GraphStudioComponent: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Canvas & Inspector Layout */}
+      {/* Pathfinder Sub-Bar */}
+      {pathfindingMode && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-lg bg-amber-50/80 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50 text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <Route className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="font-bold text-amber-900 dark:text-amber-200">Shortest Path Analyzer:</span>
+            <span>Select Source & Target to discover intelligence traversal route.</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={pathSource || ''}
+              onChange={(e) => setPathSource(e.target.value)}
+              className="h-7 px-2 rounded bg-white border border-amber-300 text-xs dark:bg-slate-900 dark:border-slate-800"
+            >
+              <option value="">Select Origin Entity...</option>
+              {filteredEntities.map((e) => {
+                const id = e.id || `node_${(e.value || (e as any).name || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+                return (
+                  <option key={id} value={id}>
+                    {e.value || (e as any).name}
+                  </option>
+                );
+              })}
+            </select>
+            <span className="text-amber-600">→</span>
+            <select
+              value={pathTarget || ''}
+              onChange={(e) => setPathTarget(e.target.value)}
+              className="h-7 px-2 rounded bg-white border border-amber-300 text-xs dark:bg-slate-900 dark:border-slate-800"
+            >
+              <option value="">Select Target Entity...</option>
+              {filteredEntities.map((e) => {
+                const id = e.id || `node_${(e.value || (e as any).name || '').toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+                return (
+                  <option key={id} value={id}>
+                    {e.value || (e as any).name}
+                  </option>
+                );
+              })}
+            </select>
+            <button
+              type="button"
+              onClick={handleFindPath}
+              disabled={!pathSource || !pathTarget}
+              className="h-7 px-3 rounded bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white font-bold transition-colors cursor-pointer"
+            >
+              Compute Route
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Graph Canvas and Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 relative">
-        {/* Canvas Area: Expands to 4 cols when inspector is closed */}
         <div
           className={`${
             inspectorOpen ? 'lg:col-span-3' : 'lg:col-span-4'
-          } h-[680px] rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090d16] relative overflow-hidden transition-all duration-200`}
+          } h-[680px] rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#090d16] relative overflow-hidden transition-all duration-200 shadow-2xs`}
         >
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            onEdgeClick={onEdgeClick}
-            nodeTypes={nodeTypes}
-            onInit={(instance) => {
-              reactFlowInstanceRef.current = instance;
-            }}
-            fitView
-            minZoom={0.25}
-            maxZoom={2.0}
-            defaultEdgeOptions={{
-              type: 'smoothstep',
-            }}
-          >
-            <Background gap={28} size={1} color="#cbd5e1" className="opacity-40" />
-            <Controls className="!bg-white dark:!bg-slate-900 !border !border-slate-200 dark:!border-slate-800 !rounded-lg !shadow-xs" />
-            {showMinimap && (
-              <MiniMap
-                className="!bg-white dark:!bg-slate-900 !border !border-slate-200 dark:!border-slate-800 !rounded-lg !shadow-xs"
-                nodeColor={(n) => {
-                  const cat = getEntityCategory(n.data?.type);
-                  if (cat === 'ORGANIZATION') return '#6366f1';
-                  if (cat === 'PERSON') return '#f59e0b';
-                  if (cat === 'THREAT_INDICATOR') return '#f43f5e';
-                  if (cat === 'IP') return '#3b82f6';
-                  return '#94a3b8';
-                }}
-              />
-            )}
-          </ReactFlow>
-
-          {/* Minimap Toggle Floating Button */}
-          <button
-            type="button"
-            onClick={() => setShowMinimap((prev) => !prev)}
-            className="absolute bottom-3 right-3 px-2 py-1 rounded bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-300 shadow-2xs hover:bg-slate-50 transition-colors"
-          >
-            {showMinimap ? 'Hide Minimap' : 'Show Minimap'}
-          </button>
+          {/* Cytoscape Container */}
+          <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
           {/* Minimalist Legend Overlay */}
           <div className="absolute bottom-3 left-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] font-mono flex items-center gap-3 shadow-2xs select-none">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
               <span className="text-slate-600 dark:text-slate-400">Org</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
               <span className="text-slate-600 dark:text-slate-400">Person</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
-              <span className="text-slate-600 dark:text-slate-400">Threat</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              <span className="text-slate-600 dark:text-slate-400">Threat/IOC</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
               <span className="text-slate-600 dark:text-slate-400">IP</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-teal-500 inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" />
               <span className="text-slate-600 dark:text-slate-400">Email</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+              <span className="text-slate-600 dark:text-slate-400">Doc</span>
             </div>
           </div>
         </div>
 
-        {/* Collapsible Right Inspector Panel */}
+        {/* Collapsible Inspector Panel */}
         {inspectorOpen && (
           <div className="lg:col-span-1 rounded-xl border border-slate-200 bg-white p-3.5 space-y-3.5 shadow-2xs dark:border-slate-800 dark:bg-[#0f1422] max-h-[680px] overflow-y-auto">
-            {selectedEdge ? (
+            {selectedEdgeData ? (
               /* Edge Inspector */
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1056,7 +927,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedEdge(null)}
+                    onClick={() => setSelectedEdgeData(null)}
                     className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
                   >
                     ✕
@@ -1066,21 +937,21 @@ export const GraphStudioComponent: React.FC<Props> = ({
                 <div>
                   <span className="text-slate-400 uppercase text-[10px] block font-mono">Connection Type</span>
                   <p className="font-mono font-bold text-slate-900 dark:text-white mt-0.5 text-sm uppercase">
-                    {selectedEdge.label || selectedEdge.data?.relationship_type || 'CONNECTED'}
+                    {selectedEdgeData.relationship_type || selectedEdgeData.label || 'CONNECTED'}
                   </p>
                 </div>
 
                 <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 space-y-1 font-mono text-[11px]">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">From:</span>
+                    <span className="text-slate-400">Source:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]">
-                      {selectedEdge.data?.source_entity_value || selectedEdge.source}
+                      {selectedEdgeData.source_entity_value || selectedEdgeData.source_id || selectedEdgeData.source}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">To:</span>
+                    <span className="text-slate-400">Target:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]">
-                      {selectedEdge.data?.target_entity_value || selectedEdge.target}
+                      {selectedEdgeData.target_entity_value || selectedEdgeData.target_id || selectedEdgeData.target}
                     </span>
                   </div>
                 </div>
@@ -1088,25 +959,25 @@ export const GraphStudioComponent: React.FC<Props> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 font-mono text-xs">Evidence Basis</span>
                   <Badge
-                    variant={selectedEdge.data?.basis === 'DIRECT_OBSERVATION' ? 'success' : 'warning'}
+                    variant={selectedEdgeData.basis === 'DIRECT_OBSERVATION' ? 'success' : 'warning'}
                     className="font-mono text-[10px] uppercase"
                   >
-                    {selectedEdge.data?.basis || (selectedEdge.data?.is_inferred ? 'INFERRED' : 'DIRECT OBSERVATION')}
+                    {selectedEdgeData.basis || (selectedEdgeData.is_inferred ? 'INFERRED' : 'DIRECT OBSERVATION')}
                   </Badge>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 font-mono text-xs">Confidence</span>
                   <Badge variant="mono" className="font-mono text-[10px]">
-                    {Math.round((selectedEdge.data?.confidence || 0.9) * 100)}%
+                    {Math.round((selectedEdgeData.confidence || 0.9) * 100)}%
                   </Badge>
                 </div>
 
-                {selectedEdge.data?.evidence_ids && selectedEdge.data.evidence_ids.length > 0 && (
+                {selectedEdgeData.evidence_ids && selectedEdgeData.evidence_ids.length > 0 && (
                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <span className="text-slate-400 uppercase text-[10px] block font-mono">Supporting Evidence</span>
                     <div className="flex flex-wrap gap-1">
-                      {selectedEdge.data.evidence_ids.map((evId: string, idx: number) => (
+                      {selectedEdgeData.evidence_ids.map((evId: string, idx: number) => (
                         <span
                           key={idx}
                           className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800"
@@ -1185,17 +1056,17 @@ export const GraphStudioComponent: React.FC<Props> = ({
                   </div>
 
                   {/* Feedback Banner */}
-                  {expansionFeedback && (
+                  {feedback && (
                     <div
                       className={`p-2 rounded-lg border text-[11px] font-mono ${
-                        expansionFeedback.type === 'success'
+                        feedback.type === 'success'
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                          : expansionFeedback.type === 'error'
+                          : feedback.type === 'error'
                           ? 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
                           : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800'
                       }`}
                     >
-                      {expansionFeedback.message}
+                      {feedback.message}
                     </div>
                   )}
 
@@ -1239,7 +1110,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
             })() : (
               <div className="text-center py-8 space-y-2 text-slate-400">
                 <Network className="w-7 h-7 mx-auto opacity-50" />
-                <p className="text-xs font-mono">Select a node or connection on the canvas to inspect provenance.</p>
+                <p className="text-xs font-mono">Select any node or connection on the canvas to inspect provenance.</p>
               </div>
             )}
           </div>

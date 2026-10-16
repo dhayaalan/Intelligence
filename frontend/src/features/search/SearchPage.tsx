@@ -2316,9 +2316,11 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             {activeTab === 'graph' && (
               <div className="p-4 sm:p-5 space-y-4">
                 <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                  <span>AUTONOMOUS KNOWLEDGE LINK ANALYSIS (DISINFOLAB NETWORK TOPOLOGY)</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    INVESTIGATIVE LINK ANALYSIS & KNOWLEDGE GRAPH
+                  </span>
                   <span>
-                    {searchResult.entities.length} NODES • {searchResult.relationships?.length || 0} RELATIONSHIPS
+                    {searchResult.entities.length} TOTAL ENTITIES • {searchResult.relationships?.length || 0} RELATIONSHIPS
                   </span>
                 </div>
                 <GraphStudioComponent
