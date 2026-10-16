@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
     MONGODB_DATABASE: str = os.getenv("MONGODB_DATABASE", "sential_db")
     
+    # Dedicated Relationship Graph Database: Neo4j
+    NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
+    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "sential_neo4j_secret")
+    NEO4J_MAX_CONNECTION_LIFETIME: int = int(os.getenv("NEO4J_MAX_CONNECTION_LIFETIME", "300"))
+    NEO4J_MAX_CONNECTION_POOL_SIZE: int = int(os.getenv("NEO4J_MAX_CONNECTION_POOL_SIZE", "50"))
+    NEO4J_CONNECTION_TIMEOUT: float = float(os.getenv("NEO4J_CONNECTION_TIMEOUT", "5.0"))
+    
     # Redis Cache & Background Jobs
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     

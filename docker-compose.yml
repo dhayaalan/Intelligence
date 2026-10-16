@@ -22,6 +22,8 @@ networks:
 volumes:
   mongodb_data:
     name: intelligence_mongodb_data
+  neo4j_data:
+    name: intelligence_neo4j_data
   redis_data:
     name: intelligence_redis_data
   minio_data:
@@ -50,7 +52,34 @@ services:
       start_period: 10s
 
   # ----------------------------------------------------------------------------
-  # 2. Backend - FastAPI Core Intelligence Platform
+  # 2. Neo4j - Dedicated Relationship Graph Database
+  # ----------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5.20.0-community
+    container_name: intelligence-neo4j
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_AUTH:-neo4j/sential_neo4j_secret}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=1024m
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # ----------------------------------------------------------------------------
+  # 3. Backend - FastAPI Core Intelligence Platform
   # ----------------------------------------------------------------------------
   backend:
     build:
@@ -69,6 +98,9 @@ services:
       - APP_NAME=Sential Intelligence Platform
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-sential_db}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-sential_neo4j_secret}
       - SECRET_KEY=${SECRET_KEY}
       - INITIAL_SUPER_ADMIN_EMAIL=${INITIAL_SUPER_ADMIN_EMAIL:-superadmin@sential.io}
       - INITIAL_SUPER_ADMIN_PASSWORD=${INITIAL_SUPER_ADMIN_PASSWORD:-}
@@ -80,6 +112,8 @@ services:
       - ZAP_API_KEY=${ZAP_API_KEY:-changeme}
     depends_on:
       mongodb:
+        condition: service_healthy
+      neo4j:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]

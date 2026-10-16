@@ -55,10 +55,24 @@ async def startup_event():
     # 2. Bootstrap Secure Super Admin only (NO fake business data, NO demo tenants)
     await bootstrap_super_admin()
     
+    # 3. Initialize Neo4j graph database schema and indexes
+    try:
+        from app.infrastructure.neo4j.client import neo4j_client
+        if await neo4j_client.verify_connectivity():
+            await neo4j_client.init_schema()
+            app_logger.info("Neo4j relationship graph service initialized with constraints.")
+    except Exception as e:
+        app_logger.warning(f"Neo4j initialization non-critical deferred: {e}")
+
     app_logger.info("Sential Platform successfully started. Core is ready with MongoDB.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    try:
+        from app.infrastructure.neo4j.client import neo4j_client
+        await neo4j_client.close()
+    except Exception:
+        pass
     await close_mongo_connection()
 
 @app.get("/health")
@@ -94,6 +108,14 @@ async def readiness_check(response: Response):
     except Exception as e:
         db_details = "error"
 
+    neo4j_status = "unavailable"
+    try:
+        from app.infrastructure.neo4j.client import neo4j_client
+        if await neo4j_client.verify_connectivity():
+            neo4j_status = "connected"
+    except Exception:
+        neo4j_status = "error"
+
     # In production, database connectivity is required for readiness
     is_ready = db_connected if settings.APP_ENV == "production" else True
     modules_count = len(module_registry.list_all_modules())
@@ -105,6 +127,7 @@ async def readiness_check(response: Response):
         return {
             "status": "unready",
             "database": db_details,
+            "graph_database": neo4j_status,
             "modules_registered": modules_count,
             "environment": settings.APP_ENV
         }
@@ -112,6 +135,7 @@ async def readiness_check(response: Response):
     return {
         "status": "ready",
         "database": db_details,
+        "graph_database": neo4j_status,
         "modules_registered": modules_count,
         "environment": settings.APP_ENV
     }

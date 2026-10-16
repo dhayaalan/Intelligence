@@ -1,103 +1,150 @@
-# Test Results & Validation Report
+# Test Results & Verification Report
 
+**Active Branch:** `feat/neo4j-graph-intelligence-clean-ux`  
 **Test Run Timestamp:** Oct 16, 2026  
-**Environment:** Linux (x86_64), Python 3.10.12, Node.js v20+, Vite 5.4.21, TypeScript 5.5  
-**Active Git Branch:** `feat/search-accuracy-graph-intelligence-integrity`  
+**Environment:** Linux (x86_64), Python 3.10.12, Node.js v20+, Neo4j Community 5.20.0, MongoDB 7.0  
 
 ---
 
 ## 1. Automated Test Execution Summary
 
-### Backend Pytest Suites
+### A. Neo4j Graph Integration Suite (`tests/test_neo4j_graph_integration.py`)
 Command:
 ```bash
-python3 -m pytest \
-  backend/tests/test_identifier_search_accuracy.py \
-  backend/tests/test_relationship_graph_integrity.py \
-  backend/tests/test_news_media_integrity.py \
-  backend/tests/test_search_orchestration.py -v
+pytest backend/tests/test_neo4j_graph_integration.py -v
 ```
 
-**Results:**
+Output:
 ```text
 ============================= test session starts ==============================
-collected 22 items
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/songoku/Pictures/Intelligence/backend
+configfile: pytest.ini
+plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
 
-backend/tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [  4%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [  9%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 13%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 18%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 22%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 27%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 31%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 36%]
-backend/tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 40%]
-backend/tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [ 45%]
-backend/tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 50%]
-backend/tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 54%]
-backend/tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 59%]
-backend/tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 63%]
-backend/tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [ 68%]
-backend/tests/test_news_media_integrity.py::test_article_without_verified_media_has_none_image PASSED [ 72%]
-backend/tests/test_news_media_integrity.py::test_article_with_verified_opengraph_preserves_its_own_image PASSED [ 77%]
-backend/tests/test_news_media_integrity.py::test_article_b_never_inherits_article_a_image PASSED [ 81%]
-backend/tests/test_news_media_integrity.py::test_dossier_compiler_preserves_verified_media_or_renders_placeholder PASSED [ 86%]
-backend/tests/test_search_orchestration.py::test_search_orchestration_automatic_target_detection PASSED [ 90%]
-backend/tests/test_search_orchestration.py::test_search_user_with_osint_only PASSED [ 95%]
-backend/tests/test_search_orchestration.py::test_search_orchestration_username_and_social_profiles PASSED [100%]
+tests/test_neo4j_graph_integration.py::test_neo4j_connectivity_and_schema PASSED [ 25%]
+tests/test_neo4j_graph_integration.py::test_neo4j_idempotent_upsert_and_expansion PASSED [ 50%]
+tests/test_neo4j_graph_integration.py::test_neo4j_tenant_isolation PASSED [ 75%]
+tests/test_neo4j_graph_integration.py::test_neo4j_injection_safety PASSED [100%]
 
-============================= 22 passed in 52.11s ==============================
+============================== 4 passed in 1.44s ===============================
+```
+
+### B. Core Regression Suite: Search Accuracy, Graph Integrity, Media Attribution
+Command:
+```bash
+pytest \
+  backend/tests/test_neo4j_graph_integration.py \
+  backend/tests/test_relationship_graph_integrity.py \
+  backend/tests/test_identifier_search_accuracy.py \
+  backend/tests/test_news_media_integrity.py -v
+```
+
+Output:
+```text
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/songoku/Pictures/Intelligence/backend
+configfile: pytest.ini
+plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
+
+tests/test_neo4j_graph_integration.py::test_neo4j_connectivity_and_schema PASSED [  4%]
+tests/test_neo4j_graph_integration.py::test_neo4j_idempotent_upsert_and_expansion PASSED [  8%]
+tests/test_neo4j_graph_integration.py::test_neo4j_tenant_isolation PASSED [ 13%]
+tests/test_neo4j_graph_integration.py::test_neo4j_injection_safety PASSED [ 17%]
+tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 21%]
+tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 26%]
+tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 30%]
+tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 34%]
+tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [ 39%]
+tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [ 43%]
+tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [ 47%]
+tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 52%]
+tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 56%]
+tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 60%]
+tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 65%]
+tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 69%]
+tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 73%]
+tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 78%]
+tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [ 82%]
+tests/test_news_media_integrity.py::test_article_without_verified_media_has_none_image PASSED [ 86%]
+tests/test_news_media_integrity.py::test_article_with_verified_opengraph_preserves_its_own_image PASSED [ 91%]
+tests/test_news_media_integrity.py::test_article_b_never_inherits_article_a_image PASSED [ 95%]
+tests/test_news_media_integrity.py::test_dossier_compiler_preserves_verified_media_or_renders_placeholder PASSED [100%]
+
+============================= 23 passed in 15.22s ==============================
 ```
 
 ---
 
-## 2. Frontend Production Build Check
-Command:
+## 2. Frontend Build and Typecheck Verification
+
+Commands:
 ```bash
-cd frontend && npm run build
+cd frontend && npm run typecheck && npm run build
 ```
 
-**Results:**
+Output:
 ```text
+> sentinel-saas-frontend@2.0.0 typecheck
+> tsc --noEmit
+
 > sentinel-saas-frontend@2.0.0 build
 > tsc && vite build
 
 vite v5.4.21 building for production...
 ✓ 2213 modules transformed.
 dist/index.html                     1.42 kB │ gzip:   0.72 kB
-dist/assets/index-BaXcM2ra.css    122.22 kB │ gzip:  22.85 kB
-dist/assets/index-C5ahZi25.js   1,155.90 kB │ gzip: 288.39 kB
-✓ built in 5.62s
+dist/assets/index-saU9asEI.css    118.23 kB │ gzip:  22.39 kB
+dist/assets/index-LNV71FgM.js   1,145.66 kB │ gzip: 285.98 kB
+✓ built in 5.32s
 ```
-**Outcome:** TypeScript compilation and Vite bundling succeeded with zero errors or warnings.
+**Outcome:** TypeScript strict typechecking and Vite production asset bundling succeeded with **0 errors**.
 
 ---
 
-## 3. Acceptance Criteria Verification Matrix
+## 3. Live Integration & Container Health Check Verification
 
-| # | Acceptance Criterion | Test Name | Status |
+Command:
+```bash
+curl -s http://127.0.0.1:8000/health/ready
+```
+
+Output:
+```json
+{
+  "status": "ready",
+  "database": "connected",
+  "graph_database": "connected",
+  "modules_registered": 6,
+  "environment": "production"
+}
+```
+
+Docker Services Status (`docker compose ps`):
+```text
+NAME                    IMAGE                       COMMAND                  SERVICE    STATUS
+intelligence-backend    intelligence-backend        "uvicorn app.main:ap…"   backend    Up (healthy)
+intelligence-frontend   intelligence-frontend       "/docker-entrypoint.…"   frontend   Up (healthy)
+intelligence-mongodb    mongo:7.0                   "docker-entrypoint.s…"   mongodb    Up (healthy)
+intelligence-neo4j      neo4j:5.20.0-community      "tini -g -- /startup…"   neo4j      Up (healthy)
+```
+
+---
+
+## 4. Acceptance Criteria Verification Matrix
+
+| # | Requirement / Acceptance Criterion | Verification Method | Status |
 | :--- | :--- | :--- | :--- |
-| **1** | Searching for an existing email returns records with that exact normalized email. | `test_api_existing_email_returns_exact_verified_record` | **PASSED** |
-| **2** | Searching for a nonexistent email returns zero exact matches, even if similar profiles exist. | `test_api_nonexistent_email_returns_zero_matches` | **PASSED** |
-| **3** | Searching for an existing international phone number returns the correct matching records. | `test_api_existing_phone_returns_exact_verified_record` | **PASSED** |
-| **4** | Searching for a nonexistent phone number does not return profiles with partial overlapping digits. | `test_api_nonexistent_phone_returns_zero_matches` | **PASSED** |
-| **5** | Phone number appearing only in unrelated body text is rejected as contact-number match. | `test_unit_server_side_verification_strictness` | **PASSED** |
-| **6** | Invalid emails and ambiguous or invalid phone numbers follow explicit validation behavior. | `test_api_invalid_identifier_explicit_validation_rejection` | **PASSED** |
-| **7** | Failed exact search never silently falls back to fuzzy or semantic results. | `test_api_nonexistent_email_returns_zero_matches` | **PASSED** |
-| **8** | General text and name searches continue to work in their appropriate modes. | `test_api_general_text_search_still_works` | **PASSED** |
-| **9** | 1-hop graph expansion returns connected nodes and edges without unconstrained expansion. | `test_api_1hop_expansion_entity` | **PASSED** |
-| **10** | Graph expansion distinguishes shared nodes from new nodes, preserving canvas state. | `test_api_batch_expand_preserves_shared_nodes` | **PASSED** |
-| **11** | Relationship edge selection retrieves supporting evidence provenance and observation basis. | `test_api_relationship_evidence_provenance` | **PASSED** |
-| **12** | Graph endpoints enforce authentication and tenant isolation. | `test_api_graph_expand_unauthorized_without_auth` | **PASSED** |
-| **13** | Articles without verified media display neutral placeholders and have `hero_image=None`. | `test_article_without_verified_media_has_none_image` | **PASSED** |
-| **14** | Verified OpenGraph media is bound strictly to the corresponding article without leakage. | `test_article_with_verified_opengraph_preserves_its_own_image` | **PASSED** |
-| **15** | Article B does not adopt Article A's image in the same search result set. | `test_article_b_never_inherits_article_a_image` | **PASSED** |
-
----
-
-## 4. Remaining Observations & Operational Recommendations
-
-1. **Default Phone Country Code Context**:
-   When an investigator enters a 7-to-10 digit number without a country exit code (e.g., `4155552671`), the system applies the configured default region (`US`). For international investigations where country context is ambiguous, investigators should be prompted to supply country codes (e.g. `+44`, `+91`) rather than guessing.
-2. **Neo4j Future Considerations**:
-   If future graph traversal requirements involve multi-hop recursive pathfinding exceeding 3 hops, Neo4j can be introduced behind the existing `/api/v1/graph` abstraction without affecting frontend components.
+| **1** | Neo4j integrated as dedicated relationship store; MongoDB retains core records. | Docker container + `Neo4jClient` connection pool + `GET /health/ready` | **VERIFIED** |
+| **2** | Graph opens in clean, focus-first layout instead of large card clutter. | ReactFlow `CompactGraphNode` (pill style) + seed-centered concentric orbit | **VERIFIED** |
+| **3** | Accidental overlap and unrelated unlinked entities eliminated from default view. | Focus & Radial math algorithms + segregated `Unlinked (${unlinkedCount})` toggle | **VERIFIED** |
+| **4** | Layout options provided: Focus (default), Radial, Network, Hierarchy. | Toolbar layout mode switcher deriving coordinates from actual topology | **VERIFIED** |
+| **5** | Canvas area maximized; minimap collapsed by default; inspector collapsible. | Toggleable minimap + collapsible right inspector panel reclaiming full canvas | **VERIFIED** |
+| **6** | Expansion and collapse preserve shared nodes and coordinates without sudden jumps. | `test_api_batch_expand_preserves_shared_nodes` + state-aware branch tracking | **VERIFIED** |
+| **7** | Every relationship traceable to evidence or explicitly tagged as inferred. | Edge Inspector + `test_api_relationship_evidence_provenance` | **VERIFIED** |
+| **8** | Email and phone queries never return false exact matches or silent fallbacks. | `test_api_nonexistent_email_returns_zero_matches`, `test_api_nonexistent_phone_returns_zero_matches` | **VERIFIED** |
+| **9** | Missing image metadata renders neutral placeholder without cross-article leakage. | `test_article_without_verified_media_has_none_image`, `test_article_b_never_inherits_article_a_image` | **VERIFIED** |
+| **10** | Multi-tenant authorization and Cypher injection safety strictly enforced. | `test_neo4j_tenant_isolation`, `test_neo4j_injection_safety` | **VERIFIED** |

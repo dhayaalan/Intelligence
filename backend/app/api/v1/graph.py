@@ -47,7 +47,41 @@ async def expand_entity_1hop(
     """
     tenant_id = current_user.tenant_id
 
-    # 1. Expand relationships bounded to 1 hop
+    # 1. Try Neo4j graph traversal first
+    try:
+        from app.infrastructure.neo4j.service import neo4j_graph_service
+        neo4j_res = await neo4j_graph_service.expand_entity_1hop(
+            tenant_id=tenant_id,
+            entity_id_or_val=entity_id,
+            limit=limit,
+            relationship_types=relationship_types,
+            min_confidence=min_confidence,
+            investigation_id=investigation_id
+        )
+        if neo4j_res and neo4j_res.get("edges"):
+            # Enrich nodes with MongoDB entity records for full metadata
+            all_ents = await entity_repo.list_by_tenant(tenant_id, investigation_id=investigation_id)
+            ent_lookup = {str(e.get("id", "")).lower(): e for e in all_ents}
+            ent_lookup.update({str(e.get("value", "")).lower(): e for e in all_ents})
+
+            enriched_nodes = []
+            for n in neo4j_res["nodes"]:
+                nid = str(n.get("id", "")).lower()
+                nval = str(n.get("value", "")).lower()
+                doc = ent_lookup.get(nid) or ent_lookup.get(nval)
+                if doc:
+                    merged = dict(doc)
+                    merged.update(n)
+                    enriched_nodes.append(merged)
+                else:
+                    enriched_nodes.append(n)
+            neo4j_res["nodes"] = enriched_nodes
+            return neo4j_res
+    except Exception as e:
+        from app.core.logging import app_logger
+        app_logger.warning(f"Neo4j 1-hop traversal exception: {e}")
+
+    # 2. Fallback to MongoDB / memory repository
     expansion = await relationship_repo.expand_entity_1hop(
         tenant_id=tenant_id,
         entity_id_or_val=entity_id,
@@ -244,4 +278,34 @@ async def get_relationship_evidence(
         "is_inferred": rel.get("is_inferred", False),
         "inference_method": rel.get("inference_method"),
         "confidence": rel.get("confidence", 0.9)
+    }
+
+@router.post("/sync", response_model=Dict[str, Any])
+async def sync_graph_store(
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Idempotently syncs/backfills entity and relationship records from MongoDB into Neo4j.
+    """
+    from app.infrastructure.neo4j.service import neo4j_graph_service
+    res = await neo4j_graph_service.sync_from_mongodb(current_user.tenant_id)
+    return {
+        "status": "success",
+        "tenant_id": current_user.tenant_id,
+        "synced": res
+    }
+
+@router.get("/status", response_model=Dict[str, Any])
+async def get_graph_status(
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Returns graph database status, engine version, and connectivity.
+    """
+    from app.infrastructure.neo4j.client import neo4j_client
+    ping_res = await neo4j_client.ping()
+    return {
+        "neo4j": ping_res,
+        "engine": "Neo4j Community 5.20.0" if ping_res.get("status") == "healthy" else "MongoDB In-Memory (Fallback)",
+        "is_healthy": ping_res.get("status") == "healthy"
     }

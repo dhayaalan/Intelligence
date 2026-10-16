@@ -1,79 +1,160 @@
-# Relationship Graph Architecture & Persistence Design
+# Relationship Graph Architecture & Neo4j Integration Design
 
-## 1. Persistence Layer Architecture: Neo4j Evaluation vs MongoDB
+## 1. Dedicated Graph Database Architecture: Neo4j Integration
 
-### Architectural Assessment
+### Architectural Separation of Responsibilities
 
-The prompt mandated an evaluation of **Neo4j as a dedicated graph persistence and traversal layer** versus improving the existing database architecture:
+To achieve scalable relationship intelligence and prevent graph visualization clutter, the platform utilizes **Neo4j as the dedicated relationship graph persistence and traversal engine**, operating alongside **MongoDB 7.0 as the authoritative system of record**.
 
-1. **Current Infrastructure Context**:
-   - The platform relies on **MongoDB 7.0** running as a production container (`intelligence-mongodb` exposed on port 27018) via Docker Compose.
-   - Primary collections already exist for `entities`, `relationships`, `evidence`, `cases`, and `investigations`.
-   - The platform backend is asynchronous Python (FastAPI with Motor and PyMongo drivers).
-   - Tenancy boundaries are strictly partitioned on `tenant_id` across every document.
-
-2. **Neo4j Evaluation Results**:
-   - **Strengths**: Native property graph storage, Cypher query language, efficient deep multi-hop pathfinding ($k \ge 3$).
-   - **Trade-offs & Constraints in this Environment**:
-     - Introducing Neo4j requires provisioning a dedicated JVM container (minimum 1.5–2GB RAM), configuring Bolt authentication, managing dual-writes between MongoDB (system of record) and Neo4j, and handling distributed transaction failures.
-     - The investigator workflow operates primarily on **bounded 1-hop expansions**, neighborhood traversals, and typed entity inspections rather than global graph path computations.
-   - **Architectural Decision**:
-     - **Primary Graph Layer in MongoDB with Idempotent Schema Setup**: We improved the graph traversal engine directly in MongoDB using indexed document-based relationship modeling with compound indexes (`(tenant_id, source_id)`, `(tenant_id, target_id)`, `(tenant_id, relationship_type)`).
-     - **Dedicated Graph APIs**: Abstracted graph traversal behind clean, versioned REST endpoints (`/api/v1/graph/expand`, `/api/v1/graph/relationships/{id}/evidence`, `/api/v1/entities/{id}/expand`).
-     - **Neo4j Upgrade Path**: If multi-hop global shortest-path algorithms are required in the future, the dedicated API contract will allow swapping the persistence adapter without modifying the frontend or orchestrator.
+| System Component | Role & Scope of Authority |
+| :--- | :--- |
+| **MongoDB 7.0** | Authoritative store of record for investigations, dossiers, raw OSINT source documents, evidence texts, user credentials, tenancy configurations, and case metadata. |
+| **Neo4j 5.20** | High-performance property graph database storing canonical entities (`(:Entity)`), directed typed relationships (`-[:INVESTIGATION_REL]->`), graph topology, path traversals, and multi-hop relationship provenance. |
+| **Backend API** | FastAPI service enforcing multi-tenant isolation, query parameterization, Cypher injection prevention, bounded traversal limits, and transparent fallback to MongoDB if Neo4j is offline. |
+| **Frontend UI** | ReactFlow-based investigator studio rendering compact, uncluttered nodes, focus-first seed layouts, branch expansion/collapse, and evidence inspectors. |
 
 ---
 
-## 2. Graph Data Model & Evidence Provenance
+## 2. Neo4j Infrastructure & Deployment Configuration
 
-### Entities
-- **Stable ID**: Formatted as `ent_<hash>` or UUID.
-- **Entity Types**: `person`, `organization`, `email`, `phone`, `domain`, `ip`, `username`, `article`, `location`.
-- **Properties**: `tenant_id`, `type`, `value`, `confidence`, `sources`, `metadata`.
+### Docker Compose Service Definition
 
-### Typed Relationships
-Every relationship has typed semantics and clear epistemic classification:
-- **Relationship Types**: `OWNS`, `AFFILIATED_WITH`, `RESOLVES_TO`, `HOSTED_ON`, `COMMUNICATED_WITH`, `MENTIONED_IN`, `SUBSIDIARY_OF`, `ASSOCIATED_WITH`.
-- **Basis Distinction**:
-  - `DIRECT_OBSERVATION`: Relationships directly corroborated by telemetry, WHOIS registrations, corporate registries, DNS zone files, or official publications.
-  - `INFERRED`: Hypothesized connections derived from co-occurrence or similarity algorithms.
-- **Provenance Attributes**:
-  - `evidence_ids`: Array of stable evidence record references (`["ev_whois_01", "ev_registry_02"]`).
-  - `source`: Primary origin provider or document.
-  - `confidence`: Calibrated score (0.0 to 1.0).
-  - `first_seen` / `last_seen`: ISO-8601 observation timestamps.
+Neo4j is provisioned as `intelligence-neo4j` in `docker-compose.yml`:
 
-### Elimination of Synthetic Edges
-- Removed all arbitrary `CO_OCCURS_IN_INVESTIGATION` $O(N^2)$ cross-product edge generation in `backend/app/entities/resolver.py`.
-- Removed all `e-synth-...` hardcoded mock edge generators in `frontend/src/features/graph/GraphStudioComponent.tsx`.
+```yaml
+neo4j:
+  image: neo4j:5.20.0-community
+  container_name: intelligence-neo4j
+  restart: unless-stopped
+  environment:
+    - NEO4J_AUTH=neo4j/sential_neo4j_secret
+    - NEO4J_PLUGINS=["apoc"]
+    - NEO4J_dbms_memory_heap_initial__size=512m
+    - NEO4J_dbms_memory_heap_max__size=1024m
+    - NEO4J_dbms_memory_pagecache_size=512m
+  ports:
+    - "127.0.0.1:7474:7474" # Browser & HTTP API
+    - "127.0.0.1:7687:7687" # Bolt Binary Protocol
+  volumes:
+    - neo4j_data:/data
+  healthcheck:
+    test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+```
 
----
+### Connection Management & Pooling
 
-## 3. Idempotent Graph Writes & Deduplication
-
-In `RelationshipRepository.save()`:
-- Writes use MongoDB `$set` with `upsert=True` keyed on `{"id": rel_id, "tenant_id": tenant_id}` or composite keys `{"source_id": s, "target_id": t, "relationship_type": type, "tenant_id": tenant_id}`.
-- Repeated ingestion scans update `last_seen` timestamps and merge new `evidence_ids` without duplicating edges on the investigator canvas.
-
----
-
-## 4. State-Aware 1-Hop Expansion & Collapse Interaction Model
-
-### Expansion Algorithm (`POST /api/v1/graph/expand` & `GET /api/v1/graph/expand`)
-1. **Seed Isolation**: Traversal begins strictly from the requested seed entity ID.
-2. **Hop Bound**: Only relationships directly connected (1 hop) to the seed are returned. Traversal depth defaults to 1, avoiding unconstrained graph explosion.
-3. **Canvas De-duplication**:
-   - The backend checks `visible_node_ids` sent by the frontend.
-   - Nodes already present on the canvas are classified as `shared_nodes`, while new entities are classified as `new_nodes`.
-4. **Shared Node Retention on Collapse**:
-   - When an investigator collapses branch $B$, only nodes and edges exclusively introduced by branch $B$ that have no other active connections to visible branches are pruned.
-   - Shared nodes (e.g. an organization shared by multiple individuals) remain intact on the canvas.
-5. **Position Stability**: Existing node layout coordinates are preserved during incremental expansions; auto-relayout is only triggered upon explicit investigator request.
+The backend manages Neo4j connections through `Neo4jClient` (`backend/app/infrastructure/neo4j/client.py`):
+- **Asynchronous Driver**: Uses `neo4j.AsyncGraphDatabase` with connection pooling (`max_connection_pool_size=50`, `max_connection_lifetime=3600`, `connection_timeout=15.0`).
+- **Event-Loop Resiliency**: Implements running-loop validation so async tests and worker coroutines cleanly instantiate drivers without loop attachment collisions.
+- **Health Checks & Observability**: Exposes `/health/ready` and `/api/v1/graph/status` endpoints reporting Bolt connectivity status and server engine version.
 
 ---
 
-## 5. Security & Tenant Isolation
+## 3. Graph Schema Constraints & Indexes
 
-- Every graph query requires a valid JWT with `current_user` injected via FastAPI dependency.
-- All database queries filter on `tenant_id == current_user.tenant_id`.
-- Attempts to expand an entity belonging to another tenant or access evidence cross-tenant return `404 Not Found` or `403 Forbidden`.
+Upon startup or migration, `neo4j_client.init_schema()` idempotently enforces the following Cypher constraints and indexes:
+
+```cypher
+-- Unique entity constraint scoped to stable entity ID
+CREATE CONSTRAINT entity_id_unique IF NOT EXISTS 
+FOR (e:Entity) REQUIRE e.id IS UNIQUE;
+
+-- Tenant partitioning index
+CREATE INDEX entity_tenant_idx IF NOT EXISTS 
+FOR (e:Entity) ON (e.tenant_id);
+
+-- Composite tenant + normalized value index for sub-millisecond seed discovery
+CREATE INDEX entity_tenant_val_idx IF NOT EXISTS 
+FOR (e:Entity) ON (e.tenant_id, e.value);
+
+-- Entity classification index
+CREATE INDEX entity_type_idx IF NOT EXISTS 
+FOR (e:Entity) ON (e.tenant_id, e.type);
+
+-- Relationship constraint for stable relationship ID
+CREATE CONSTRAINT rel_id_unique IF NOT EXISTS 
+FOR ()-[r:INVESTIGATION_REL]-() REQUIRE r.id IS UNIQUE;
+```
+
+---
+
+## 4. Entity and Relationship Data Model
+
+### Entity Nodes (`(:Entity)`)
+
+Every entity in the graph is represented with the following properties:
+- `id` (string, unique): Canonical identifier (e.g. `ent_alice_sec`).
+- `tenant_id` (string): Mandatory tenant isolation key.
+- `value` (string): Primary label or identifier (e.g. `Alice Sec`, `example.com`).
+- `type` (string): Semantic entity type (`person`, `organization`, `email`, `phone`, `domain`, `ip`, `document`, `threat_indicator`).
+- `confidence` (float): Analyst or algorithm confidence score (0.0 to 1.0).
+- `sources` (list of strings): Correlating source providers (`["whois", "shodan"]`).
+- `metadata` (JSON string): Additional verified key-value attributes.
+- `last_seen` (datetime): Timestamp of latest corroboration.
+
+### Directed Typed Relationships (`-[r]->`)
+
+Connections represent verifiable relationships between entities:
+- `id` (string): Stable edge ID (e.g. `rel_alice_owns_darkinfra`).
+- `tenant_id` (string): Tenant boundary key.
+- `type` (string): Canonical relationship type (`OWNS`, `AFFILIATED_WITH`, `RESOLVES_TO`, `HOSTED_ON`, `COMMUNICATED_WITH`, `MENTIONED_IN`, etc.).
+- `basis` (string): Epistemic classification:
+  - `DIRECT_OBSERVATION`: Confirmed by authoritative technical records (WHOIS, DNS, TLS certificates, corporate registries).
+  - `INFERRED`: Derived via algorithmic association (co-occurrence, text extraction).
+- `is_inferred` (boolean): Flag explicitly indicating inferred connections.
+- `inference_method` (string): Explanation if inferred (e.g. `nlp_entity_co_occurrence`).
+- `confidence` (float): Edge confidence score (0.0 to 1.0).
+- `evidence_ids` (list of strings): Foreign keys referencing supporting evidence records in MongoDB (`["ev_whois_proof_01"]`).
+- `source` (string): Origin system or provider.
+- `investigation_id` (string): Case/investigation scope.
+
+---
+
+## 5. Parameterized Cypher & Security Rules
+
+### Cypher Injection Prevention
+
+Dynamic relationship types or labels are never concatenated from raw user input. `Neo4jGraphService` enforces a strict allowlist:
+
+```python
+ALLOWED_REL_TYPES = {
+    "OWNS", "AFFILIATED_WITH", "RESOLVES_TO", "HOSTED_ON", "COMMUNICATED_WITH",
+    "MENTIONED_IN", "SUBSIDIARY_OF", "ASSOCIATED_WITH", "FOUNDER", "CHAIR",
+    "PRESIDENT", "DIRECTOR", "LEADERSHIP", "MEMBER", "CO_FOUNDER", "SPONSORS",
+    "USES", "POWERED_BY", "PROJECT_OF", "WORKS_WITH", "EXPOSED_BY", "THREAT",
+    "ATTRIBUTED_TO", "MALICIOUS", "INVESTIGATION_REL", "CO_OCCURS", "RELATED"
+}
+```
+
+Any unknown or unsanitized input defaults to `RELATED`. All query values (`tenant_id`, `clean_val`, `limit`, `min_conf`) are strictly passed as Cypher query parameters.
+
+### Bounded 1-Hop Traversal Cypher
+
+```cypher
+MATCH (s:Entity)
+WHERE s.tenant_id = $tenant_id 
+  AND (s.id = $clean_val OR toLower(s.value) = toLower($clean_val))
+MATCH (s)-[r]-(t:Entity)
+WHERE r.tenant_id = $tenant_id
+  AND ($min_conf IS NULL OR r.confidence >= $min_conf)
+  AND ($inv_id = '' OR r.investigation_id = $inv_id OR r.investigation_id = '')
+RETURN properties(s) AS s, properties(r) AS r, properties(t) AS t, type(r) AS rel_type,
+       startNode(r).id AS start_id, endNode(r).id AS end_id
+LIMIT $limit
+```
+
+---
+
+## 6. Synchronization & MongoDB Backfill Strategy
+
+### Idempotent Backfill API (`POST /api/v1/graph/sync`)
+
+To ensure MongoDB and Neo4j stay synchronized without uncontrolled dual writes:
+1. `Neo4jGraphService.sync_from_mongodb(tenant_id)` retrieves existing entity and relationship records from MongoDB.
+2. Entities are upserted into Neo4j using `MERGE (e:Entity {id: $id, tenant_id: $tenant_id})`.
+3. Relationships are merged using `MERGE (s)-[r:INVESTIGATION_REL {id: $rel_id, tenant_id: $tenant_id}]->(t)`.
+4. The migration is idempotent, safe to re-run repeatedly, and preserves all `evidence_ids` and timestamps.
+5. In case of Neo4j service disruption, backend API routes seamlessly fall back to MongoDB repositories without returning fabricated data.
