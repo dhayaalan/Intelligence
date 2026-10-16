@@ -167,12 +167,22 @@ export const GraphStudioComponent: React.FC<Props> = ({
     };
   }, [entities, relationships]);
 
-  // Set initial selected entity
+  // Update selected entity when rootCandidate or entities change
   useEffect(() => {
-    if (!selectedEntity && rootCandidate) {
+    const isCurrentEntityValid =
+      selectedEntity &&
+      entities.some(
+        (e) =>
+          (e.value || (e as any).name || e.id) ===
+          (selectedEntity.value || (selectedEntity as any).name || selectedEntity.id)
+      );
+
+    if (!isCurrentEntityValid) {
       setSelectedEntity(rootCandidate);
     }
-  }, [rootCandidate, selectedEntity]);
+    setSelectedEdgeData(null);
+    setExpandedBranches({});
+  }, [entities, rootCandidate]);
 
   // 2. Filter Entities
   const { filteredEntities, unlinkedCount } = useMemo(() => {
