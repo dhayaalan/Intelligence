@@ -198,6 +198,40 @@ class EntityRepository(BaseMongoRepository):
                 items = [d for d in items if d.get("investigation_id") == investigation_id]
             return items
 
+    async def find_by_identifier(self, tenant_id: str, identifier_type: str, canonical_value: str) -> List[Dict[str, Any]]:
+        """
+        Directly queries MongoDB for an exact verified identifier (email or phone)
+        without arbitrary 1000-record truncation. Also checks memory cache.
+        """
+        target_type = identifier_type.lower()
+        items = []
+        if self.collection is not None:
+            query = {
+                "tenant_id": tenant_id,
+                "$or": [
+                    {"type": target_type, "value": canonical_value},
+                    {"type": target_type, "value": {"$regex": f"^{re.escape(canonical_value)}$", "$options": "i"}},
+                    {"value": canonical_value}
+                ]
+            }
+            cursor = self.collection.find(query, {"_id": 0})
+            docs = await cursor.to_list(length=100)
+            if docs:
+                items.extend(docs)
+
+        with memory_cache._lock:
+            for d in memory_cache.entities.values():
+                t_id = d.get("tenant_id")
+                if t_id and t_id != tenant_id and t_id not in ["tenant_global", "global"]:
+                    continue
+                d_val = str(d.get("value", "")).strip()
+                d_type = str(d.get("type", "")).lower()
+                if (d_type == target_type or not d_type) and d_val.lower() == canonical_value.lower():
+                    if not any(it.get("id") == d.get("id") for it in items):
+                        items.append(d)
+
+        return items
+
     async def save(self, tenant_id: str, entity_data: Dict[str, Any]) -> None:
         ent_id = entity_data["id"]
         entity_data["tenant_id"] = tenant_id
@@ -224,6 +258,40 @@ class RelationshipRepository(BaseMongoRepository):
                 return items
         with memory_cache._lock:
             return [d for d in memory_cache.relationships.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
+
+    async def find_by_entity_values(self, tenant_id: str, values: List[str]) -> List[Dict[str, Any]]:
+        """Finds relationships where either source or target matches any of the values."""
+        clean_vals = [v.strip().lower() for v in values if v]
+        if not clean_vals:
+            return []
+        items = []
+        if self.collection is not None:
+            query = {
+                "tenant_id": tenant_id,
+                "$or": [
+                    {"source_val": {"$in": values}},
+                    {"target_val": {"$in": values}},
+                    {"source_entity_value": {"$in": values}},
+                    {"target_entity_value": {"$in": values}}
+                ]
+            }
+            cursor = self.collection.find(query, {"_id": 0})
+            docs = await cursor.to_list(length=100)
+            if docs:
+                items.extend(docs)
+
+        with memory_cache._lock:
+            for d in memory_cache.relationships.values():
+                t_id = d.get("tenant_id")
+                if t_id and t_id != tenant_id and t_id not in ["tenant_global", "global"]:
+                    continue
+                s_val = str(d.get("source_val") or d.get("source_entity_value", "")).strip().lower()
+                t_val = str(d.get("target_val") or d.get("target_entity_value", "")).strip().lower()
+                if s_val in clean_vals or t_val in clean_vals:
+                    if not any(it.get("id") == d.get("id") for it in items):
+                        items.append(d)
+
+        return items
 
     async def get_by_id(self, tenant_id: str, rel_id: str) -> Optional[Dict[str, Any]]:
         if self.collection is not None:
