@@ -71,12 +71,19 @@ class YouTubeCollector:
             app_logger.warning(f"Error fetching YouTube oEmbed for {vid}: {e}")
 
         # 2. Extract genuine page telemetry if present in HTML meta tags
-        description = f"Public video broadcast '{title}' by {author}."
+        description = ""
         views = 0
         likes = 0
         comments_cnt = 0
         duration_s = 0
         tags = ["youtube", "video"]
+        pub_date: Optional[str] = None
+        channel_id: Optional[str] = None
+
+        if "channel/" in author_url:
+            channel_id = author_url.split("channel/")[-1].split("/")[0].split("?")[0]
+        elif "@" in author_url:
+            channel_id = f"@{author_url.split('@')[-1].split('/')[0].split('?')[0]}"
 
         try:
             async with httpx.AsyncClient(
@@ -90,6 +97,16 @@ class YouTubeCollector:
                     if desc_meta and desc_meta.get("content"):
                         description = desc_meta["content"]
 
+                    # Extract genuine channelId if present in microdata
+                    chan_meta = soup.find("meta", {"itemprop": "channelId"})
+                    if chan_meta and chan_meta.get("content"):
+                        channel_id = chan_meta["content"]
+
+                    # Extract genuine publication timestamp
+                    date_published_meta = soup.find("meta", {"itemprop": "datePublished"}) or soup.find("meta", {"itemprop": "uploadDate"})
+                    if date_published_meta and date_published_meta.get("content"):
+                        pub_date = date_published_meta["content"]
+
                     # Extract interaction count if available in microdata
                     interaction_meta = soup.find("meta", {"itemprop": "interactionCount"})
                     if interaction_meta and interaction_meta.get("content"):
@@ -100,7 +117,7 @@ class YouTubeCollector:
         except Exception as e:
             app_logger.debug(f"Error reading public YouTube page for {vid}: {e}")
 
-        channel_id = re.sub(r'[^a-zA-Z0-9_]', '', author.lower()) or "channel_id"
+        collected_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         return YouTubeMetadata(
             video_id=vid,
@@ -113,28 +130,30 @@ class YouTubeCollector:
             view_count=views,
             like_count=likes,
             comment_count=comments_cnt,
-            upload_date=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            upload_date=pub_date,
+            published_at=pub_date,
+            collected_at=collected_at,
+            transcript_status="TRANSCRIPT_UNAVAILABLE",
             description=description,
             thumbnail_url=thumbnail_url,
             tags=tags
         )
 
     async def get_subtitles(self, video_id: str, lang: str = "en") -> Optional[YouTubeSubtitleTrack]:
-        """Returns structured subtitles track for authentic video."""
+        """
+        Retrieves authentic YouTube subtitles track for video.
+        When genuine subtitles or transcripts are not accessible via permitted APIs,
+        returns an honest TRANSCRIPT_UNAVAILABLE state with zero synthetic or placeholder text.
+        """
         vid = self.extract_video_id(video_id) or video_id
-        # Structured telemetry segment
-        segments = [
-            YouTubeSubtitleSegment(
-                start_seconds=0.0,
-                duration_seconds=5.0,
-                text=f"Official broadcast recording for video item {vid}."
-            )
-        ]
+        # When authentic subtitles cannot be retrieved via authorized sources,
+        # return strict TRANSCRIPT_UNAVAILABLE status without placeholder segments.
         return YouTubeSubtitleTrack(
             language=lang,
-            is_auto_generated=True,
-            segments=segments,
-            full_text=f"Official broadcast recording for video item {vid}."
+            is_auto_generated=False,
+            status="TRANSCRIPT_UNAVAILABLE",
+            segments=[],
+            full_text=""
         )
 
     async def get_comments(self, video_id: str, limit: int = 20) -> List[YouTubeComment]:

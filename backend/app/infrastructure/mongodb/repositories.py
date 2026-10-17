@@ -188,10 +188,13 @@ class EntityRepository(BaseMongoRepository):
         if investigation_id:
             query["investigation_id"] = investigation_id
         if self.collection is not None:
-            cursor = self.collection.find(query, {"_id": 0})
-            items = await cursor.to_list(length=1000)
-            if items:
-                return items
+            try:
+                cursor = self.collection.find(query, {"_id": 0})
+                items = await cursor.to_list(length=1000)
+                if items:
+                    return items
+            except Exception:
+                pass
         with memory_cache._lock:
             items = [d for d in memory_cache.entities.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
             if investigation_id:
@@ -206,18 +209,21 @@ class EntityRepository(BaseMongoRepository):
         target_type = identifier_type.lower()
         items = []
         if self.collection is not None:
-            query = {
-                "tenant_id": tenant_id,
-                "$or": [
-                    {"type": target_type, "value": canonical_value},
-                    {"type": target_type, "value": {"$regex": f"^{re.escape(canonical_value)}$", "$options": "i"}},
-                    {"value": canonical_value}
-                ]
-            }
-            cursor = self.collection.find(query, {"_id": 0})
-            docs = await cursor.to_list(length=100)
-            if docs:
-                items.extend(docs)
+            try:
+                query = {
+                    "tenant_id": tenant_id,
+                    "$or": [
+                        {"type": target_type, "value": canonical_value},
+                        {"type": target_type, "value": {"$regex": f"^{re.escape(canonical_value)}$", "$options": "i"}},
+                        {"value": canonical_value}
+                    ]
+                }
+                cursor = self.collection.find(query, {"_id": 0})
+                docs = await cursor.to_list(length=100)
+                if docs:
+                    items.extend(docs)
+            except Exception:
+                pass
 
         with memory_cache._lock:
             for d in memory_cache.entities.values():
@@ -252,10 +258,13 @@ class RelationshipRepository(BaseMongoRepository):
 
     async def list_by_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
         if self.collection is not None:
-            cursor = self.collection.find({"tenant_id": tenant_id}, {"_id": 0})
-            items = await cursor.to_list(length=1000)
-            if items:
-                return items
+            try:
+                cursor = self.collection.find({"tenant_id": tenant_id}, {"_id": 0})
+                items = await cursor.to_list(length=1000)
+                if items:
+                    return items
+            except Exception:
+                pass
         with memory_cache._lock:
             return [d for d in memory_cache.relationships.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
 
@@ -266,19 +275,22 @@ class RelationshipRepository(BaseMongoRepository):
             return []
         items = []
         if self.collection is not None:
-            query = {
-                "tenant_id": tenant_id,
-                "$or": [
-                    {"source_val": {"$in": values}},
-                    {"target_val": {"$in": values}},
-                    {"source_entity_value": {"$in": values}},
-                    {"target_entity_value": {"$in": values}}
-                ]
-            }
-            cursor = self.collection.find(query, {"_id": 0})
-            docs = await cursor.to_list(length=100)
-            if docs:
-                items.extend(docs)
+            try:
+                query = {
+                    "tenant_id": tenant_id,
+                    "$or": [
+                        {"source_val": {"$in": values}},
+                        {"target_val": {"$in": values}},
+                        {"source_entity_value": {"$in": values}},
+                        {"target_entity_value": {"$in": values}}
+                    ]
+                }
+                cursor = self.collection.find(query, {"_id": 0})
+                docs = await cursor.to_list(length=100)
+                if docs:
+                    items.extend(docs)
+            except Exception:
+                pass
 
         with memory_cache._lock:
             for d in memory_cache.relationships.values():
@@ -295,9 +307,12 @@ class RelationshipRepository(BaseMongoRepository):
 
     async def get_by_id(self, tenant_id: str, rel_id: str) -> Optional[Dict[str, Any]]:
         if self.collection is not None:
-            doc = await self.collection.find_one({"id": rel_id, "tenant_id": tenant_id}, {"_id": 0})
-            if doc:
-                return doc
+            try:
+                doc = await self.collection.find_one({"id": rel_id, "tenant_id": tenant_id}, {"_id": 0})
+                if doc:
+                    return doc
+            except Exception:
+                pass
         with memory_cache._lock:
             rel = memory_cache.relationships.get(rel_id)
             if rel and (not rel.get("tenant_id") or rel.get("tenant_id") in [tenant_id, "tenant_global", "global"]):
@@ -328,29 +343,32 @@ class RelationshipRepository(BaseMongoRepository):
 
         # 1. Query Mongo collection if online
         if self.collection is not None:
-            q: Dict[str, Any] = {
-                "tenant_id": tenant_id,
-                "$or": [
-                    {"source_id": entity_id_or_val},
-                    {"target_id": entity_id_or_val},
-                    {"source_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}},
-                    {"target_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}}
-                ]
-            }
-            if investigation_id:
-                q["investigation_id"] = investigation_id
-            if relationship_types:
-                q["relationship_type"] = {"$in": relationship_types}
-            if min_confidence is not None:
-                q["confidence"] = {"$gte": min_confidence}
+            try:
+                q: Dict[str, Any] = {
+                    "tenant_id": tenant_id,
+                    "$or": [
+                        {"source_id": entity_id_or_val},
+                        {"target_id": entity_id_or_val},
+                        {"source_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}},
+                        {"target_entity_value": {"$regex": f"^{re.escape(entity_id_or_val)}$", "$options": "i"}}
+                    ]
+                }
+                if investigation_id:
+                    q["investigation_id"] = investigation_id
+                if relationship_types:
+                    q["relationship_type"] = {"$in": relationship_types}
+                if min_confidence is not None:
+                    q["confidence"] = {"$gte": min_confidence}
 
-            cursor = self.collection.find(q, {"_id": 0}).limit(limit + 1)
-            docs = await cursor.to_list(length=limit + 1)
-            for d in docs:
-                r_id = d.get("id") or f"{d.get('source_id')}-{d.get('target_id')}"
-                if r_id not in seen_ids:
-                    seen_ids.add(r_id)
-                    rels.append(d)
+                cursor = self.collection.find(q, {"_id": 0}).limit(limit + 1)
+                docs = await cursor.to_list(length=limit + 1)
+                for d in docs:
+                    r_id = d.get("id") or f"{d.get('source_id')}-{d.get('target_id')}"
+                    if r_id not in seen_ids:
+                        seen_ids.add(r_id)
+                        rels.append(d)
+            except Exception as e:
+                app_logger.warning(f"Error querying async mongo in expand_entity_1hop: {e}")
 
         # 2. Check memory cache and investigation embedded relationships
         with memory_cache._lock:

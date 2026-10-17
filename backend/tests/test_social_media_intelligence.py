@@ -186,4 +186,8 @@ def test_api_youtube_investigation(client: TestClient, super_admin_headers):
     data = res.json()
     assert data["metadata"]["video_id"] == "wb_DPZnYx04"
     assert data["subtitles"] is not None
-    assert len(data["subtitles"]["segments"]) > 0
+    # Subtitle honesty: When authentic captions are not accessible, status must be TRANSCRIPT_UNAVAILABLE
+    # and placeholder/synthetic segments must never be fabricated.
+    assert data["subtitles"]["status"] == "TRANSCRIPT_UNAVAILABLE"
+    assert len(data["subtitles"]["segments"]) == 0
+    assert data["metadata"]["transcript_status"] == "TRANSCRIPT_UNAVAILABLE"

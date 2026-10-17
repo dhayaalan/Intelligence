@@ -112,7 +112,7 @@ class SearchOrchestrator:
                 "SOCIAL MEDIA INTELLIGENCE": ["social_media_intelligence"] + extra_pluggable_modules,
                 "DIGITAL INFRASTRUCTURE": ["threat_intelligence", "osint"] + extra_pluggable_modules,
                 "PEOPLE & IDENTITIES": ["osint", "social_media_intelligence", "news_intelligence"] + extra_pluggable_modules,
-                "GEO INTELLIGENCE": ["news_intelligence", "osint"] + extra_pluggable_modules,
+                "GEO INTELLIGENCE": ["geo_intelligence", "news_intelligence", "osint"] + extra_pluggable_modules,
                 "MEDIA": ["news_intelligence", "social_media_intelligence", "osint"] + extra_pluggable_modules,
                 "EVIDENCE": ["news_intelligence", "social_media_intelligence", "osint", "threat_intelligence"] + extra_pluggable_modules,
             }
@@ -515,44 +515,60 @@ class SearchOrchestrator:
                 "action_target": query
             })
 
-        investigative_leads: List[Dict[str, Any]] = [
-            {
-                "id": "lead_01",
+        # Generate investigative leads ONLY when substantiated by real evidence
+        investigative_leads: List[Dict[str, Any]] = []
+        real_ev_ids = [getattr(ev, 'id', None) for ev in all_evidence if getattr(ev, 'id', None)]
+
+        if len(articles) >= 2 and len(publishers) >= 2:
+            investigative_leads.append({
+                "id": f"lead_wire_{uuid.uuid4().hex[:6]}",
                 "lead": "Examine Source Independence Across Reporting Outlets",
                 "why_it_matters": "Syndicated press releases often mimic multiple independent confirmations. Tracing wire origins prevents false corroborated confidence.",
-                "evidence_refs": [getattr(ev, 'id', None) or getattr(ev, 'hash', 'EV-001') for ev in all_evidence[:3]],
+                "evidence_refs": real_ev_ids[:3],
                 "confidence": "HIGH",
                 "recommended_action": "Compare original wire timestamps against derivative republished versions."
-            },
-            {
-                "id": "lead_02",
+            })
+
+        has_media_evidence = any("image" in str(getattr(ev, 'source', '')).lower() or getattr(ev, 'hash', None) for ev in all_evidence)
+        if has_media_evidence:
+            investigative_leads.append({
+                "id": f"lead_media_{uuid.uuid4().hex[:6]}",
                 "lead": "Verify First Known Appearance and Media Provenance",
                 "why_it_matters": "Historical reuse of images or footage in new contexts represents a primary disinformation vector.",
-                "evidence_refs": [getattr(ev, 'id', None) or getattr(ev, 'hash', 'EV-002') for ev in all_evidence[1:4]],
+                "evidence_refs": real_ev_ids[:3],
                 "confidence": "MEDIUM",
                 "recommended_action": "Audit perceptual hashes and timeline intervals to detect recycled media."
-            },
-            {
-                "id": "lead_03",
-                "lead": "Cross-Reference Discovered Entities with Case Registry",
-                "why_it_matters": "Discovered actors may share historical overlap with active threat actor dossiers.",
-                "evidence_refs": [],
-                "confidence": "HIGH",
-                "recommended_action": "Promote correlated entities to active case investigation."
-            }
-        ]
+            })
+
+        single_source_entities = [e for e in corr_entities if len(e.sources) == 1]
+        if single_source_entities:
+            investigative_leads.append({
+                "id": f"lead_corroborate_{uuid.uuid4().hex[:6]}",
+                "lead": f"Corroborate {len(single_source_entities)} Single-Source Observables",
+                "why_it_matters": "Single-source intelligence carries elevated false-positive risk and should not be relied upon without cross-engine verification.",
+                "evidence_refs": real_ev_ids[:3],
+                "confidence": "MEDIUM",
+                "recommended_action": "Execute secondary pivot lookups across adjacent threat and OSINT probers."
+            })
+
+        # Calculate actual contradictions and unverified claims from evidence
+        real_contradictions = len([
+            r for r in corr_relationships 
+            if str(getattr(r, 'relationship_type', '')).upper() in ["CONTRADICTS", "CONTRADICTED"]
+        ])
+        real_unverified_claims = len([e for e in corr_entities if e.confidence < 0.8])
 
         investigation_snapshot = {
             "relevant_findings_count": len(key_findings),
             "entities_count": len(corr_entities),
             "relationships_count": len(corr_relationships),
             "evidence_count": len(all_evidence),
-            "sources_count": max(1, len(unique_sources)),
+            "sources_count": len(unique_sources),
             "news_stories_count": len(articles),
             "social_profiles_count": len(social_profiles),
             "high_priority_leads_count": len(investigative_leads),
-            "potential_contradictions_count": 2 if len(articles) > 3 else (1 if len(articles) > 1 else 0),
-            "unverified_claims_count": max(1, len([e for e in corr_entities if e.confidence < 0.8]))
+            "potential_contradictions_count": real_contradictions,
+            "unverified_claims_count": real_unverified_claims
         }
 
         pipeline_trace = [
@@ -627,6 +643,87 @@ class SearchOrchestrator:
             "details": f"CCI: {cci_score}% • {len(suggested_pivots)} secondary investigative pivots generated"
         })
 
+        # 8. [MULTI-STAGE] Automated Multi-Hop Bounded Pivot Execution
+        executed_pivots: List[Dict[str, Any]] = []
+        if (not is_identifier or len(corr_entities) > 0) and request.options.get("auto_pivot", True) and suggested_pivots:
+            pvt_start = time.time()
+            max_depth = request.options.get("max_hop_depth", 2)
+            max_pivots_to_run = min(request.options.get("max_pivots", 2), 2)
+            
+            for pvt in suggested_pivots[:max_pivots_to_run]:
+                p_query = pvt.get("pivot_query")
+                if not p_query or p_query.lower() == effective_query.lower():
+                    continue
+                p_mods = pvt.get("target_modules", ["osint"])
+                valid_mods = [m for m in p_mods if m in effective_module_ids and module_registry.is_module_enabled(m)]
+                if not valid_mods:
+                    continue
+
+                child_entities = []
+                for mod_id in valid_mods:
+                    mod = module_registry.get_module(mod_id)
+                    if not mod:
+                        continue
+                    try:
+                        child_ctx = SearchContext(
+                            search_id=f"{search_id}_pvt_{pvt.get('pivot_id', '0')}",
+                            tenant_id=tenant_id,
+                            user_id=user.id,
+                            query=p_query,
+                            target_type=pvt.get("pivot_target_type", "domain"),
+                            options={"hop_depth": 2, "parent_entity": pvt.get("parent_entity_value")}
+                        )
+                        child_res = await asyncio.wait_for(mod.search(child_ctx), timeout=5.0)
+                        if child_res and child_res.entities:
+                            for ce in child_res.entities:
+                                if not any(existing.value.lower() == ce.value.lower() for existing in corr_entities):
+                                    corr_entities.append(ce)
+                                    child_entities.append(ce.value)
+                            if child_res.relationships:
+                                corr_relationships.extend(child_res.relationships)
+                            if child_res.evidence:
+                                all_evidence.extend(child_res.evidence)
+                    except Exception as p_ex:
+                        app_logger.debug(f"Pivot execution non-critical failure: {p_ex}")
+
+                if child_entities:
+                    rel_type_str = str(pvt.get("relationship", "RELATED_TO")).upper()
+                    try:
+                        r_type = RelationshipType(rel_type_str)
+                    except ValueError:
+                        r_type = RelationshipType.RELATED_TO
+                        
+                    pivot_rel = RelationshipPayload(
+                        id=f"rel_pvt_{uuid.uuid4().hex[:8]}",
+                        source_entity_value=pvt.get("parent_entity_value", effective_query),
+                        target_entity_value=p_query,
+                        relationship_type=r_type,
+                        confidence=float(pvt.get("confidence", 0.9)),
+                        basis="MULTI_HOP_PIVOT_DISCOVERY",
+                        methodology="automated_stage2_pivot",
+                        sources=pvt.get("sources", ["Pivot Engine"]),
+                        metadata={"pivot_id": pvt.get("pivot_id"), "why_it_matters": pvt.get("why_it_matters")}
+                    )
+                    corr_relationships.append(pivot_rel)
+
+                executed_pivots.append({
+                    "pivot_id": pvt.get("pivot_id"),
+                    "pivot_query": p_query,
+                    "target_modules": valid_mods,
+                    "relationship": pvt.get("relationship"),
+                    "parent_entity": pvt.get("parent_entity_value"),
+                    "status": "COMPLETED" if child_entities else "SUCCESS_EMPTY",
+                    "entities_discovered": child_entities
+                })
+
+            if executed_pivots:
+                pipeline_trace.append({
+                    "stage": "Automated Multi-Stage Pivot Execution",
+                    "status": "completed",
+                    "duration_ms": round((time.time() - pvt_start) * 1000, 2),
+                    "details": f"Executed {len(executed_pivots)} secondary investigative hops; discovered {sum(len(ep['entities_discovered']) for ep in executed_pivots)} additional entities"
+                })
+
         if is_identifier and len(corr_entities) == 0:
             key_findings = []
             investigative_leads = []
@@ -662,6 +759,12 @@ class SearchOrchestrator:
             collection_completeness_index=cci_score,
             coverage_telemetry=coverage_telemetry,
             suggested_pivots=suggested_pivots,
+            executed_pivots=executed_pivots,
+            multi_stage_metadata={
+                "auto_pivot_enabled": request.options.get("auto_pivot", True),
+                "hops_executed": 2 if executed_pivots else 1,
+                "executed_pivots_count": len(executed_pivots)
+            },
             search_mode=search_mode,
             active_search_mode_label=active_search_mode_label,
             is_exact_identifier=is_identifier,

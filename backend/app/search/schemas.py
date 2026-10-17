@@ -41,6 +41,8 @@ class SearchResponse(BaseModel):
     collection_completeness_index: Optional[float] = None  # 0.0 to 100.0 (CCI)
     coverage_telemetry: Optional[Dict[str, Any]] = None
     suggested_pivots: List[Dict[str, Any]] = Field(default_factory=list)
+    executed_pivots: List[Dict[str, Any]] = Field(default_factory=list)
+    multi_stage_metadata: Optional[Dict[str, Any]] = None
     search_mode: str = "TEXT_SEARCH"
     active_search_mode_label: str = "Text search"
     is_exact_identifier: bool = False

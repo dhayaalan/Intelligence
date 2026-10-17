@@ -14,6 +14,7 @@ class SearchMode(str, Enum):
 class IdentifierType(str, Enum):
     EMAIL = "EMAIL"
     PHONE = "PHONE"
+    VEHICLE_PLATE = "VEHICLE_PLATE"
     NOT_AN_IDENTIFIER = "NOT_AN_IDENTIFIER"
 
 # RFC 5322 compliant email regex
@@ -239,6 +240,28 @@ def classify_query_intent_and_mode(
                 "validation_error": err
             }
     
+    # Check if query is a vehicle plate registration (e.g. "plate:BD51SMR" or matching plate syntax with digits and letters)
+    is_explicit_plate = q.lower().startswith("plate:") or q.lower().startswith("registration:")
+    clean_plate_candidate = q.split(":", 1)[1].strip() if is_explicit_plate else q
+    if is_explicit_plate or (len(clean_plate_candidate) >= 5 and len(clean_plate_candidate) <= 12 and any(c.isdigit() for c in clean_plate_candidate) and any(c.isalpha() for c in clean_plate_candidate) and not any(c in clean_plate_candidate for c in ["@", ".", "/", "\\"])):
+        from app.modules.osint.providers.vehicle_intelligence import vehicle_registration_provider
+        matched_fmt = vehicle_registration_provider.match_plate_format(clean_plate_candidate)
+        if matched_fmt or is_explicit_plate:
+            return {
+                "search_mode": SearchMode.EXACT_IDENTIFIER.value,
+                "active_search_mode_label": f"Exact vehicle plate search ({matched_fmt.jurisdiction if matched_fmt else 'Standard'})",
+                "identifier_type": IdentifierType.VEHICLE_PLATE.value,
+                "is_identifier": True,
+                "normalized_value": clean_plate_candidate.upper(),
+                "raw_query": q,
+                "details": {
+                    "plate_number": clean_plate_candidate.upper(),
+                    "jurisdiction": matched_fmt.jurisdiction if matched_fmt else "UNKNOWN",
+                    "description": matched_fmt.description if matched_fmt else "Vehicle plate registration"
+                },
+                "validation_error": None
+            }
+
     # General non-identifier queries
     req_upper = (requested_mode or "").upper()
     is_natural_question = any(q.lower().startswith(w) for w in ["what ", "who ", "why ", "how ", "where ", "which "]) or q.endswith("?")

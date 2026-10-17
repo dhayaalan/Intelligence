@@ -17,7 +17,7 @@ from app.modules.social_media_intelligence.crawler_engine import (
     CollectorStatus,
 )
 
-GRAPH_API_VERSION = "v18.0"
+GRAPH_API_VERSION = os.getenv("META_GRAPH_API_VERSION", "v21.0")
 GRAPH_API_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 
