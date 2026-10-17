@@ -23,6 +23,7 @@ from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRec
 from app.search.normalization import (
     classify_query_intent_and_mode, verify_identifier_match, SearchMode, IdentifierType
 )
+from app.search.media_extractor import media_pipeline
 from app.modules.osint.pivot_engine import pivot_engine
 from app.core.provider_registry.registry import provider_registry
 
@@ -1108,6 +1109,13 @@ class SearchOrchestrator:
                 "message": f"Zero exact identifier records matched '{normalized_identifier or query}'. Fallback to fuzzy or semantic search was not performed."
             }
 
+        # 9. Extract and normalize all source-backed media (Images and Videos)
+        normalized_media = media_pipeline.extract_media(
+            entities=corr_entities,
+            evidence_list=all_evidence,
+            target_query=effective_query
+        )
+
         response = SearchResponse(
             search_id=search_id,
             query=query,
@@ -1124,6 +1132,7 @@ class SearchOrchestrator:
             entities=corr_entities,
             relationships=corr_relationships,
             evidence=all_evidence,
+            media=normalized_media,
             investigation_snapshot=investigation_snapshot,
             key_findings=key_findings,
             investigative_leads=investigative_leads,

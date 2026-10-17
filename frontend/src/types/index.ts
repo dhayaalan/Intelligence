@@ -221,6 +221,27 @@ export interface ModuleJobStatusRecord {
   error?: string;
 }
 
+export interface MediaRecord {
+  id: string;
+  media_type: 'image' | 'video';
+  url: string;
+  thumbnail_url?: string;
+  title?: string;
+  description?: string;
+  source_provider: string;
+  source_platform?: string;
+  parent_id?: string;
+  parent_type?: string;
+  parent_title?: string;
+  publication_date?: string;
+  collection_date?: string;
+  verification_status: string;
+  canonical_source_url?: string;
+  provenance?: string;
+  evidence_ids: string[];
+  metadata?: Record<string, any>;
+}
+
 export interface SearchResponse {
   search_id: string;
   query: string;
@@ -235,6 +256,7 @@ export interface SearchResponse {
   entities: Entity[];
   relationships: Relationship[];
   evidence: Evidence[];
+  media?: MediaRecord[];
   investigation_snapshot?: InvestigationSnapshot;
   key_findings?: KeyFindingItem[];
   investigative_leads?: InvestigativeLeadItem[];
@@ -245,6 +267,7 @@ export interface SearchResponse {
     entities_count: number;
     relationships_count: number;
     evidence_count: number;
+    providers?: Record<string, any>;
   };
   executed_at: string;
 }
