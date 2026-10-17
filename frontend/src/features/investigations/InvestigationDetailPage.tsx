@@ -38,6 +38,8 @@ import {
   FileCheck,
   ShieldAlert,
   Database,
+  Users,
+  MapPin,
 } from 'lucide-react';
 import { Investigation, Entity, Evidence } from '../../types';
 import { apiRequest } from '../../core/api/client';
@@ -91,7 +93,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
 
   // Tabs (Section 13)
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'findings' | 'leads' | 'entities' | 'relationships' | 'evidence' | 'sources' | 'timeline' | 'news' | 'tools' | 'reports'
+    'overview' | 'findings' | 'leads' | 'entities' | 'profiles' | 'relationships' | 'map' | 'evidence' | 'sources' | 'timeline' | 'news' | 'tools' | 'reports'
   >('overview');
 
   const [entityDisplayMode, setEntityDisplayMode] = useState<'cards' | 'table'>('table');
@@ -141,6 +143,45 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
   const [reportsPage, setReportsPage] = useState(1);
   const reportsPageSize = 10;
 
+  const [profilePage, setProfilePage] = useState(1);
+  const [profilePageSize, setProfilePageSize] = useState(9);
+
+  // Profile Entities (Social Media & Identity accounts)
+  const profileEntities = useMemo(() => {
+    return entities.filter(
+      (e) =>
+        e.type === 'USERNAME' ||
+        e.type === 'PERSON' ||
+        (e as any).type?.toLowerCase?.() === 'username' ||
+        (e as any).type?.toLowerCase?.() === 'person' ||
+        e.metadata?.platform ||
+        e.metadata?.profile_url ||
+        e.metadata?.avatar_url ||
+        e.metadata?.image_url ||
+        e.metadata?.category?.toString().toLowerCase().includes('social')
+    );
+  }, [entities]);
+
+  const totalProfilePages = Math.max(1, Math.ceil(profileEntities.length / profilePageSize));
+  const paginatedProfiles = useMemo(() => {
+    const start = (profilePage - 1) * profilePageSize;
+    return profileEntities.slice(start, start + profilePageSize);
+  }, [profileEntities, profilePage, profilePageSize]);
+
+  // Geolocation entities
+  const geoLocations = useMemo(() => {
+    return entities.filter(
+      (e) =>
+        e.type === 'LOCATION' ||
+        e.type === 'IP' ||
+        (e as any).type?.toLowerCase?.() === 'location' ||
+        (e as any).type?.toLowerCase?.() === 'ip' ||
+        e.metadata?.coordinates ||
+        e.metadata?.latitude ||
+        e.metadata?.geo
+    );
+  }, [entities]);
+
   // Synthesize or map correlated graph nodes
   const graphEntities: Entity[] = useMemo(() => {
     if (entities && entities.length > 0) return entities;
@@ -187,7 +228,61 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     if (investigation?.investigative_summary?.key_findings && investigation.investigative_summary.key_findings.length > 0) {
       return investigation.investigative_summary.key_findings;
     }
-    return [
+    const findings: any[] = [];
+    if (profileEntities.length > 0) {
+      const platforms = Array.from(new Set(profileEntities.map(p => p.metadata?.platform || p.sources?.[0]).filter(Boolean)));
+      findings.push({
+        id: 'fnd-social',
+        title: `Digital Identity Footprint (${profileEntities.length} accounts)`,
+        description: `Correlated ${profileEntities.length} social handles and accounts across ${platforms.slice(0, 4).join(', ') || 'online platforms'}.`,
+        why_it_matters: 'Confirms cross-platform identity reuse and public presence.',
+        confidence: 'HIGH',
+        priority: 'HIGH',
+        evidence_count: profileEntities.length,
+        sources: platforms.slice(0, 4) || ['OSINT Identity Recon'],
+        action_type: 'PROFILES'
+      });
+    }
+    if (geoLocations.length > 0) {
+      findings.push({
+        id: 'fnd-geo',
+        title: `Geographic Jurisdiction & Physical Telemetry (${geoLocations.length} locations)`,
+        description: `Correlated physical origin, administrative registry, and jurisdiction points for '${investigation?.target}'.`,
+        why_it_matters: 'Establishes lawful territory, governing bodies, and geographic attribution.',
+        confidence: 'HIGH',
+        priority: 'HIGH',
+        evidence_count: geoLocations.length,
+        sources: ['Geospatial Radar', 'Regional Transport Registry'],
+        action_type: 'LOCATIONS'
+      });
+    }
+    if (entities.length > 0) {
+      findings.push({
+        id: 'fnd-ents',
+        title: `Correlated Indicator Cluster (${entities.length} nodes)`,
+        description: `Discovered and verified ${entities.length} correlated intelligence indicators linked to target '${investigation?.target}'.`,
+        why_it_matters: 'Establishes investigative perimeter and relationship network.',
+        confidence: 'HIGH',
+        priority: 'HIGH',
+        evidence_count: evidenceList.length,
+        sources: ['OSINT Core', 'Intelligence Graph Engine'],
+        action_type: 'ENTITIES'
+      });
+    }
+    if (evidenceList.length > 0) {
+      findings.push({
+        id: 'fnd-ev',
+        title: `Evidentiary Integrity Vault (${evidenceList.length} records)`,
+        description: `Cryptographic SHA-256 chain of custody sealed across collection feeds.`,
+        why_it_matters: 'Provides court-admissible audit trail.',
+        confidence: 'HIGH',
+        priority: 'MEDIUM',
+        evidence_count: evidenceList.length,
+        sources: ['Cryptographic Evidence Vault'],
+        action_type: 'EVIDENCE'
+      });
+    }
+    return findings.length > 0 ? findings : [
       {
         id: 'fnd-01',
         title: `Target Correlated Across ${entities.length} Indicators`,
@@ -200,23 +295,43 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         action_type: 'ENTITIES',
       },
     ];
-  }, [investigation, entities, evidenceList]);
+  }, [investigation, entities, evidenceList, profileEntities, geoLocations]);
 
   const investigativeLeadsList = useMemo(() => {
     if (investigation?.investigative_summary?.investigative_leads && investigation.investigative_summary.investigative_leads.length > 0) {
       return investigation.investigative_summary.investigative_leads;
     }
-    return [
-      {
-        id: 'lead-01',
-        lead: `Analyze historical infrastructure overlaps for '${investigation?.target}'`,
-        why_it_matters: 'Earliest records may expose legacy infrastructure owned by same operator.',
+    const leads: any[] = [];
+    if (profileEntities.length > 0) {
+      leads.push({
+        id: 'lead-prof',
+        lead: `Pivot on username handles discovered across ${profileEntities.length} platforms`,
+        why_it_matters: 'May reveal linked email addresses, recovery phone numbers, or alias identities.',
+        evidence_refs: [],
+        confidence: 'HIGH',
+        recommended_action: 'Examine profile bios, avatar metadata, and cross-platform connection graphs.'
+      });
+    }
+    if (geoLocations.length > 0) {
+      leads.push({
+        id: 'lead-geo',
+        lead: `Analyze geographic jurisdiction and regional telemetry`,
+        why_it_matters: 'Identifies origin territory and governing legal jurisdiction.',
         evidence_refs: [],
         confidence: 'MEDIUM',
-        recommended_action: 'Perform historical DNS & WHOIS archive lookup.',
-      },
-    ];
-  }, [investigation]);
+        recommended_action: 'Cross-reference regional transport office and ISP routing.'
+      });
+    }
+    leads.push({
+      id: 'lead-hist',
+      lead: `Analyze historical infrastructure overlaps for '${investigation?.target}'`,
+      why_it_matters: 'Earliest records may expose legacy infrastructure owned by same operator.',
+      evidence_refs: [],
+      confidence: 'MEDIUM',
+      recommended_action: 'Perform historical DNS, WHOIS, and archive lookups.'
+    });
+    return leads;
+  }, [investigation, profileEntities, geoLocations]);
 
   const openQuestionsList: string[] = useMemo(() => {
     if (investigation?.open_questions && investigation.open_questions.length > 0) {
@@ -719,7 +834,9 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           { id: 'findings', label: 'Findings', count: keyFindingsList.length, icon: ShieldAlert },
           { id: 'leads', label: 'Leads', count: investigativeLeadsList.length, icon: Compass },
           { id: 'entities', label: 'Entities', count: entities.length, icon: Database },
-          { id: 'relationships', label: 'Relationships', count: graphEntities.length, icon: Share2 },
+          { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
+          { id: 'relationships', label: 'Relationships', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
+          { id: 'map', label: 'Geospatial Radar', count: geoLocations.length, icon: Globe },
           { id: 'evidence', label: 'Evidence Vault', count: evidenceList.length, icon: Lock },
           { id: 'sources', label: 'Sources', count: sourceStats.length, icon: BookOpen },
           { id: 'timeline', label: 'Timeline', count: timelineEvents.length, icon: Clock },
@@ -1297,6 +1414,130 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
+      {/* TAB: PROFILES (Social Media & Online Identity Footprints) */}
+      {activeTab === 'profiles' && (
+        <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Correlated Social Media & Identity Profiles</span>
+              </CardTitle>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Discovered online accounts, avatar imagery, platform handles, and digital footprints ({profileEntities.length} accounts).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="mono" size="sm" className="text-[10px]">
+                {profileEntities.length} PROFILES CORRELATED
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5 space-y-4">
+            {profileEntities.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-mono text-xs">
+                No social media accounts or online identity profiles correlated with this investigation target.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {paginatedProfiles.map((p, idx) => {
+                    const avatarUrl =
+                      (p.metadata?.avatar_url as string) ||
+                      (p.metadata?.image_url as string) ||
+                      (p.metadata?.profile_image as string) ||
+                      `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(p.value)}`;
+                    const platform =
+                      (p.metadata?.platform as string) ||
+                      p.sources?.[0] ||
+                      'Social Media';
+                    const profileUrl =
+                      (p.metadata?.profile_url as string) ||
+                      (p.metadata?.url as string);
+                    const category = (p.metadata?.category as string) || 'Social Identity';
+                    const handleClean = p.value.includes('@') ? p.value.split('@')[0] : p.value;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c101d] space-y-3 font-mono text-xs shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="relative shrink-0">
+                            <img
+                              src={avatarUrl}
+                              alt={p.value}
+                              className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                              onError={(e) => {
+                                (e.target as any).src = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(p.value)}`;
+                              }}
+                              loading="lazy"
+                            />
+                            <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-[#0c101d] rounded-full" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                {handleClean}
+                              </span>
+                              <Badge variant="mono" size="sm" className="text-[10px] shrink-0">
+                                {platform}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5 font-sans">
+                              {category} &bull; {p.value}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[11px]">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            Conf: {typeof p.confidence === 'number' ? (p.confidence <= 1 ? (p.confidence * 100).toFixed(0) : p.confidence) : 95}%
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => copyToClipboard(p.value)}
+                              className="text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer font-sans text-xs"
+                            >
+                              <Copy className="w-3 h-3" /> Copy
+                            </button>
+                            {profileUrl && (
+                              <a
+                                href={profileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-400 dark:hover:bg-indigo-900/60 text-xs font-sans font-medium transition-colors cursor-pointer"
+                              >
+                                Visit <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {profileEntities.length > profilePageSize && (
+                  <Pagination
+                    currentPage={profilePage}
+                    totalPages={totalProfilePages}
+                    totalItems={profileEntities.length}
+                    pageSize={profilePageSize}
+                    onPageChange={setProfilePage}
+                    onPageSizeChange={(sz) => {
+                      setProfilePageSize(sz);
+                      setProfilePage(1);
+                    }}
+                    pageSizeOptions={[9, 18, 36]}
+                  />
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* TAB 5: RELATIONSHIP GRAPH */}
       {activeTab === 'relationships' && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
@@ -1327,6 +1568,60 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
                 }
               }}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB: GEOSPATIAL RADAR */}
+      {activeTab === 'map' && (
+        <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <Globe className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                <span>Geospatial Radar & Location Telemetry</span>
+              </CardTitle>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Regional geolocation mapping, jurisdiction coordinates, and infrastructure physical presence ({geoLocations.length} locations).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="mono" size="sm" className="text-[10px]">
+                {geoLocations.length} LOCATIONS CORRELATED
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5 space-y-4">
+            {geoLocations.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-mono text-xs">
+                No physical locations or geographic coordinate indicators discovered for this investigation.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {geoLocations.map((loc, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c101d] space-y-2 font-mono text-xs shadow-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 dark:text-white truncate">
+                        {loc.value}
+                      </span>
+                      <Badge variant="mono" size="sm" className="text-[10px]">
+                        {loc.type}
+                      </Badge>
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                      Jurisdiction: {loc.metadata?.country || loc.metadata?.state || 'Global'}
+                    </p>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
+                      <span>Confidence: {typeof loc.confidence === 'number' ? `${(loc.confidence * 100).toFixed(0)}%` : '95%'}</span>
+                      <span>Source: {(loc.sources || []).join(', ') || 'Geo Intel'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

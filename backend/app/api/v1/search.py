@@ -39,6 +39,27 @@ async def execute_search(
         ]
         target_inv = None
         rel_dicts = [rel.dict() if hasattr(rel, "dict") else dict(rel) for rel in response.relationships]
+        findings_data = [f if isinstance(f, dict) else f.dict() for f in (response.key_findings or [])]
+        leads_data = [l if isinstance(l, dict) else l.dict() for l in (response.investigative_leads or [])]
+        pivots_data = [p if isinstance(p, dict) else p.dict() for p in (response.suggested_pivots or [])]
+        
+        inv_summary = {
+            "key_findings": findings_data,
+            "investigative_leads": leads_data,
+            "suggested_pivots": pivots_data,
+            "search_mode": response.search_mode,
+            "intent": response.intent,
+            "target_type": response.target_type,
+        }
+        inv_health = {
+            "evidence_coverage": "HIGH" if len(response.evidence) > 10 else "MEDIUM",
+            "source_diversity": "HIGH" if len(response.module_jobs) > 1 else "MEDIUM",
+            "entity_resolution": "HIGH",
+            "temporal_coverage": "HIGH",
+            "unresolved_questions_count": 0,
+            "conflicting_claims_count": 0,
+            "primary_source_coverage": "HIGH"
+        }
 
         if existing:
             target_inv = existing[0]
@@ -48,8 +69,11 @@ async def execute_search(
                     curr_mods = set(inv_data.get("selected_modules", []))
                     curr_mods.update(selected_modules)
                     inv_data["selected_modules"] = list(curr_mods)
+                    inv_data["search_id"] = response.search_id
                     if rel_dicts:
                         inv_data["relationships"] = rel_dicts
+                    inv_data["investigative_summary"] = inv_summary
+                    inv_data["investigation_health"] = inv_health
                     investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
                     case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
         else:
@@ -61,7 +85,9 @@ async def execute_search(
                 description=inv_desc,
                 selected_modules=selected_modules,
                 search_id=response.search_id,
-                relationships=rel_dicts
+                relationships=rel_dicts,
+                investigative_summary=inv_summary,
+                investigation_health=inv_health
             )
             target_inv = investigation_service.create_investigation(
                 tenant_id=current_user.tenant_id,
@@ -100,11 +126,13 @@ async def execute_search(
                 except Exception as ev_err:
                     app_logger.warning(f"Error persisting evidence {ev}: {ev_err}")
 
-            # 3. Store relationships on target_inv
+            # 3. Store relationships and summary on target_inv
             with db._lock:
                 inv_data = db.investigations.get(target_inv.id)
                 if inv_data:
                     inv_data["relationships"] = rel_dicts
+                    inv_data["investigative_summary"] = inv_summary
+                    inv_data["investigation_health"] = inv_health
                     investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
                     case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
 

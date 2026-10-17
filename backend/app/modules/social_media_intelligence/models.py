@@ -83,6 +83,7 @@ class YouTubeSubtitleSegment(BaseModel):
 class YouTubeSubtitleTrack(BaseModel):
     language: str
     is_auto_generated: bool
+    status: str = "AVAILABLE"  # "AVAILABLE", "TRANSCRIPT_UNAVAILABLE", "RESTRICTED"
     segments: List[YouTubeSubtitleSegment] = Field(default_factory=list)
     full_text: str = ""
 
@@ -102,15 +103,18 @@ class YouTubeMetadata(BaseModel):
     url: str
     title: str
     channel_title: str
-    channel_id: str
+    channel_id: Optional[str] = None
     channel_url: str
-    duration_seconds: int
-    view_count: int
-    like_count: int
-    comment_count: int
-    upload_date: str
-    description: str
-    thumbnail_url: str
+    duration_seconds: int = 0
+    view_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
+    upload_date: Optional[str] = None
+    published_at: Optional[str] = None
+    collected_at: Optional[str] = None
+    transcript_status: str = "TRANSCRIPT_UNAVAILABLE"
+    description: str = ""
+    thumbnail_url: str = ""
     tags: List[str] = Field(default_factory=list)
 
 

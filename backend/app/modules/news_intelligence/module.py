@@ -48,9 +48,26 @@ class NewsIntelligenceModule(IntelligenceModule):
         """
         Executes query-bound search and converts to normalized module results.
         """
+        opts = context.options or {}
+        raw_sm = str(opts.get("search_mode", "SEMANTIC")).upper()
+        try:
+            sm = SearchMode(raw_sm)
+        except ValueError:
+            sm = SearchMode.SEMANTIC
+
         req = NewsSearchRequest(
             query=context.query,
-            search_mode=SearchMode.SEMANTIC
+            search_mode=sm,
+            min_relevance=float(opts.get("min_relevance", 50.0)),
+            date_filter=opts.get("date_filter") or opts.get("time_range"),
+            location_filter=opts.get("location_filter"),
+            source_filter=opts.get("source_filter"),
+            language_filter=opts.get("language_filter", "en"),
+            countries=opts.get("countries", []),
+            languages=opts.get("languages", []),
+            is_worldwide=bool(opts.get("is_worldwide", False)),
+            compare_countries=bool(opts.get("compare_countries", False)),
+            event_location_filter=opts.get("event_location_filter")
         )
         user = UserRecord(
             id=context.user_id or "system_user",
@@ -140,13 +157,15 @@ class NewsIntelligenceModule(IntelligenceModule):
                 }
             ))
 
-            # Map relationships
+            # Map relationships with strict evidentiary basis
             if pub_name and item.title:
                 relationships.append(RelationshipPayload(
                     source_entity_value=pub_name,
                     target_entity_value=item.title,
                     relationship_type=RelationshipType.PUBLISHED,
                     confidence=0.95,
+                    basis="EXPLICIT_SOURCE_STATEMENT",
+                    methodology="byline_attribution",
                     sources=[self.manifest.id]
                 ))
             if item.title:
@@ -155,6 +174,9 @@ class NewsIntelligenceModule(IntelligenceModule):
                     target_entity_value=context.query,
                     relationship_type=RelationshipType.REPORTS_ON,
                     confidence=item.relevance_score / 100.0,
+                    basis="SOURCE_REPORTED",
+                    methodology="hybrid_retrieval_ranking",
+                    uncertainty_notes=item.search_explanation,
                     sources=[self.manifest.id]
                 ))
 
