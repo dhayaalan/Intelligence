@@ -268,6 +268,30 @@ class RelationshipRepository(BaseMongoRepository):
         with memory_cache._lock:
             return [d for d in memory_cache.relationships.values() if not d.get("tenant_id") or d.get("tenant_id") in [tenant_id, "tenant_global", "global"]]
 
+    async def list_by_investigation(self, tenant_id: str, investigation_id: str) -> List[Dict[str, Any]]:
+        items = []
+        if self.collection is not None:
+            try:
+                cursor = self.collection.find({"tenant_id": tenant_id, "investigation_id": investigation_id}, {"_id": 0})
+                docs = await cursor.to_list(length=500)
+                if docs:
+                    items.extend(docs)
+            except Exception:
+                pass
+        with memory_cache._lock:
+            for d in memory_cache.relationships.values():
+                t_id = d.get("tenant_id")
+                if t_id and t_id != tenant_id and t_id not in ["tenant_global", "global"]:
+                    continue
+                if d.get("investigation_id") == investigation_id:
+                    if not any(it.get("id") == d.get("id") for it in items):
+                        items.append(d)
+            if not items:
+                inv = memory_cache.investigations.get(investigation_id)
+                if inv and (not inv.get("tenant_id") or inv.get("tenant_id") in [tenant_id, "tenant_global", "global"]):
+                    items = inv.get("relationships", [])
+        return items
+
     async def find_by_entity_values(self, tenant_id: str, values: List[str]) -> List[Dict[str, Any]]:
         """Finds relationships where either source or target matches any of the values."""
         clean_vals = [v.strip().lower() for v in values if v]

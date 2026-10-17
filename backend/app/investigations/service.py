@@ -42,6 +42,7 @@ class InvestigationService:
             selected_modules=request.selected_modules or ["osint", "threat_intelligence"],
             search_id=request.search_id,
             relationships=request.relationships or [],
+            media=request.media or [],
             investigative_summary=request.investigative_summary,
             investigation_health=request.investigation_health,
             created_by=user_id,
@@ -305,6 +306,20 @@ class InvestigationService:
                 return False
             if evidence_id not in data.get("evidence_ids", []):
                 data.setdefault("evidence_ids", []).append(evidence_id)
+                investigation_repo._sync_write({"id": investigation_id, "tenant_id": tenant_id}, data)
+                case_repo._sync_write({"id": investigation_id, "tenant_id": tenant_id}, data)
+            return True
+
+    @staticmethod
+    def link_media(tenant_id: str, investigation_id: str, media_item: dict) -> bool:
+        with db._lock:
+            data = db.investigations.get(investigation_id)
+            if not data or data.get("tenant_id") != tenant_id:
+                return False
+            media_list = data.setdefault("media", [])
+            m_url = media_item.get("url")
+            if not any(m.get("url") == m_url for m in media_list if isinstance(m, dict)):
+                media_list.append(media_item)
                 investigation_repo._sync_write({"id": investigation_id, "tenant_id": tenant_id}, data)
                 case_repo._sync_write({"id": investigation_id, "tenant_id": tenant_id}, data)
             return True

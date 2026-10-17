@@ -171,10 +171,29 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Default to OVERVIEW as per Investigator Workspace standard
+  // Default to OVERVIEW as per Investigator Workspace standard (7 sections + legacy aliases)
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'all' | 'entities' | 'findings' | 'leads' | 'news' | 'profiles' | 'images' | 'videos' | 'infrastructure' | 'locations' | 'graph' | 'map' | 'evidence'
+    | 'overview'
+    | 'all'
+    | 'profiles'
+    | 'media'
+    | 'news_intel'
+    | 'relationships'
+    | 'timeline_evidence'
+    | 'entities'
+    | 'findings'
+    | 'infrastructure'
+    | 'leads'
+    | 'news'
+    | 'images'
+    | 'videos'
+    | 'graph'
+    | 'map'
+    | 'locations'
+    | 'evidence'
   >('overview');
+  const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaRecord | null>(null);
 
   const [entityDisplayMode, setEntityDisplayMode] = useState<'cards' | 'table'>('cards');
@@ -288,8 +307,6 @@ export const SearchPage: React.FC<SearchPageProps> = ({
       setTargetType('IMAGE');
       setImageOcrEntities([
         { value: baseName, type: 'IMAGE_ARTIFACT' },
-        { value: '185.220.101.42', type: 'IP_ADDRESS' },
-        { value: 'malware-drop.org', type: 'DOMAIN' },
       ]);
     };
     reader.readAsDataURL(file);
@@ -388,25 +405,33 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     }
   };
 
-  // Geo locations from discovered IPs or metadata
+  // Geo locations from genuine source-backed coordinates only
   const geoLocations: GeoLocationItem[] = useMemo(() => {
     if (!searchResult) return [];
     return searchResult.entities
-      .filter((e) => e.type.toLowerCase().includes('ip') || e.metadata?.latitude || e.metadata?.lat)
-      .map((e, idx) => ({
-        id: e.id || `geo-${idx}`,
-        name: e.value,
-        type: e.type,
-        ip: e.value,
-        city: (e.metadata?.city as string) || 'Identified Node',
-        country: (e.metadata?.country as string) || 'Global Network',
-        lat: Number(e.metadata?.latitude || e.metadata?.lat) || 37.7749 + (idx % 5) * 2,
-        lng: Number(e.metadata?.longitude || e.metadata?.lng) || -122.4194 + (idx % 5) * 3,
-        threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
-        source: e.sources?.[0] || 'Infrastructure Telemetry',
-        timestamp: e.first_seen || new Date().toISOString(),
-        details: JSON.stringify(e.metadata || {}),
-      }));
+      .filter((e) => {
+        const rawLat = Number(e.metadata?.latitude ?? e.metadata?.lat);
+        const rawLng = Number(e.metadata?.longitude ?? e.metadata?.lng);
+        return !isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0;
+      })
+      .map((e, idx) => {
+        const lat = Number(e.metadata?.latitude ?? e.metadata?.lat);
+        const lng = Number(e.metadata?.longitude ?? e.metadata?.lng);
+        return {
+          id: e.id || `geo-${idx}`,
+          name: e.value,
+          type: e.type,
+          ip: e.value,
+          city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
+          country: (e.metadata?.country as string) || '',
+          lat,
+          lng,
+          threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
+          source: e.sources?.[0] || 'Infrastructure Telemetry',
+          timestamp: e.first_seen || (e.metadata?.timestamp as string) || '',
+          details: JSON.stringify(e.metadata || {}),
+        };
+      });
   }, [searchResult]);
 
   // Filter entities
@@ -611,107 +636,53 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [searchResult]);
 
-  // Key Findings fallback
+  // Key Findings (source-backed only)
   const keyFindings: KeyFindingItem[] = useMemo(() => {
-    if (searchResult?.key_findings && searchResult.key_findings.length > 0) {
-      return searchResult.key_findings as KeyFindingItem[];
-    }
-    if (!searchResult) return [];
-    const list: KeyFindingItem[] = [];
-    const highConf = searchResult.entities.filter((e) => (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80);
-    if (highConf.length > 0) {
-      list.push({
-        id: 'fnd_high_relevance',
-        title: `High-Relevance Indicators (${highConf.length} entities)`,
-        description: `Discovered ${highConf.length} verified indicators correlating to target '${searchResult.query}'.`,
-        why_it_matters: 'Verified indicators serve as core corroboration anchors for active case attribution.',
-        confidence: 'HIGH',
-        priority: 'HIGH',
-        evidence_count: highConf.length,
-        sources: Array.from(new Set(highConf.flatMap((e) => e.sources || []))).slice(0, 5),
-        action_type: 'ENTITIES',
-      });
-    }
-    return list;
+    return (searchResult?.key_findings || []) as KeyFindingItem[];
   }, [searchResult]);
 
-  // Investigative Leads fallback
+  // Investigative Leads (source-backed only)
   const investigativeLeads: InvestigativeLeadItem[] = useMemo(() => {
-    if (searchResult?.investigative_leads && searchResult.investigative_leads.length > 0) {
-      return searchResult.investigative_leads as InvestigativeLeadItem[];
-    }
-    if (!searchResult) return [];
-    return [
-      {
-        id: 'lead_01',
-        lead: `Cross-reference earliest source appearances for '${searchResult.query}'`,
-        why_it_matters: 'Earliest timestamps provide temporal anchoring to establish reporting provenance.',
-        evidence_refs: [],
-        confidence: 'MEDIUM',
-        recommended_action: 'Trace earliest publication and inspect archive snapshots.',
-      },
-    ];
+    return (searchResult?.investigative_leads || []) as InvestigativeLeadItem[];
   }, [searchResult]);
 
-  // Investigation Snapshot metrics
+  // Investigation Snapshot metrics (truthful derivations without fabricated floors)
   const snapshot: InvestigationSnapshot = useMemo(() => {
     if (searchResult?.investigation_snapshot) {
       return searchResult.investigation_snapshot;
     }
+    const lowConfEntities = searchResult?.entities.filter((e) => {
+      const conf = (e.confidence || 0) > 1 ? (e.confidence || 0) / 100 : (e.confidence || 0);
+      return conf < 0.7;
+    }) || [];
     return {
       relevant_findings_count: keyFindings.length,
       entities_count: searchResult?.entities.length || 0,
       relationships_count: searchResult?.relationships.length || 0,
       evidence_count: searchResult?.evidence.length || 0,
-      sources_count: Math.max(1, sourceStats.length),
+      sources_count: sourceStats.length,
       news_stories_count: newsArticles.length,
       high_priority_leads_count: investigativeLeads.length,
-      potential_contradictions_count: newsArticles.length > 3 ? 2 : newsArticles.length > 1 ? 1 : 0,
-      unverified_claims_count: Math.max(
-        1,
-        searchResult?.entities.filter((e) => (e.confidence || 0) < 0.8 && (e.confidence || 0) < 80).length || 0
-      ),
+      potential_contradictions_count: 0,
+      unverified_claims_count: lowConfEntities.length,
     };
   }, [searchResult, keyFindings, investigativeLeads, newsArticles, sourceStats]);
 
-  // Pipeline Trace stages
+  // Pipeline Trace stages (actual execution telemetry only)
   const pipelineStages: PipelineTraceStage[] = useMemo(() => {
     if (searchResult?.pipeline_trace && searchResult.pipeline_trace.length > 0) {
       return searchResult.pipeline_trace as PipelineTraceStage[];
     }
-    return [
-      {
-        stage: 'Query Parser & Intent Detection',
-        status: 'completed',
-        duration_ms: 5.2,
-        details: `Intent: ${searchResult?.intent || 'GENERAL_RESEARCH'} • Target Type: ${searchResult?.target_type || 'KEYWORD'}`,
-      },
-      {
-        stage: 'Scope & Engine Routing',
-        status: 'completed',
-        duration_ms: 8.4,
-        details: `Active Scopes: ${selectedScopes.join(', ')} • Engine governor engaged`,
-      },
-      {
-        stage: 'Multi-Module Intelligence Collection',
-        status: 'completed',
-        duration_ms: searchResult?.stats?.total_duration_ms || 420,
-        details: `${searchResult?.module_jobs.length || 3} module jobs executed`,
-      },
-      {
-        stage: 'Entity Resolution & Deduplication',
-        status: 'completed',
-        duration_ms: 7.1,
-        details: `${searchResult?.entities.length || 0} entities correlated`,
-      },
-      {
-        stage: 'Evidentiary Correlation & Lead Synthesis',
-        status: 'completed',
-        duration_ms: 11.5,
-        details: `${keyFindings.length} findings synthesized • ${investigativeLeads.length} leads generated`,
-      },
-    ];
-  }, [searchResult, selectedScopes, keyFindings, investigativeLeads]);
+    if (searchResult?.module_jobs && searchResult.module_jobs.length > 0) {
+      return searchResult.module_jobs.map((job) => ({
+        stage: job.module,
+        status: (job.status === 'success' || job.status === 'completed' ? 'completed' : (job.status === 'failed' ? 'failed' : 'running')) as 'completed' | 'failed' | 'running',
+        duration_ms: job.duration_ms || 0,
+        details: `${job.entity_count || 0} entities • ${job.evidence_count || 0} evidence`,
+      }));
+    }
+    return [];
+  }, [searchResult]);
 
   // Pagination slices
   const paginatedEntities = useMemo(() => {
@@ -847,66 +818,74 @@ export const SearchPage: React.FC<SearchPageProps> = ({
               </Button>
             </div>
 
-            {/* Query Operators Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 font-mono text-xs">
-              <div className="flex flex-wrap items-center gap-1 text-[11px]">
-                <span className="text-slate-400 uppercase text-[10px] mr-1">Query Operators:</span>
-                {[
-                  { label: 'EXACT', op: 'EXACT' },
-                  { label: 'FUZZY', op: 'FUZZY' },
-                  { label: 'AND', op: 'AND' },
-                  { label: 'OR', op: 'OR' },
-                  { label: 'NOT', op: 'NOT' },
-                  { label: '+INCLUDE', op: '+' },
-                  { label: '-EXCLUDE', op: '-' },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => handleInsertOperator(item.op)}
-                    className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600 transition-colors cursor-pointer text-[10px] font-semibold"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+            {/* Advanced Options Toggle */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer transition-colors"
+              >
+                <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+                <span>{showAdvancedOptions ? 'Hide Advanced Options' : 'Advanced Search Options & Scopes'}</span>
+              </button>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {selectedScopes.includes('ALL INTELLIGENCE') ? 'Universal Intelligence Active' : `${selectedScopes.length} Scopes Active`}
+              </span>
             </div>
 
-            {/* Explicit Intelligence Scope Selector (Section 6) */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5 font-mono text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                  <Sliders className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Search Scope:</span>
+            {showAdvancedOptions && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800/80 animate-in fade-in duration-150">
+                {/* Query Operators Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                  <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                    <span className="text-slate-400 uppercase text-[10px] mr-1">Query Operators:</span>
+                    {[
+                      { label: 'EXACT', op: 'EXACT' },
+                      { label: 'FUZZY', op: 'FUZZY' },
+                      { label: 'AND', op: 'AND' },
+                      { label: 'OR', op: 'OR' },
+                      { label: 'NOT', op: 'NOT' },
+                      { label: '+INCLUDE', op: '+' },
+                      { label: '-EXCLUDE', op: '-' },
+                    ].map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => handleInsertOperator(item.op)}
+                        className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600 transition-colors cursor-pointer text-[10px] font-semibold"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {selectedScopes.includes('ALL INTELLIGENCE')
-                    ? 'All 42 Engines Armed • Adaptive Intent Routing'
-                    : `${selectedScopes.length} Scopes Active`}
-                </span>
+
+                {/* Explicit Intelligence Scope Selector */}
+                <div className="space-y-1.5 font-mono text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {AVAILABLE_SCOPES.map((sc) => {
+                      const isSelected = selectedScopes.includes(sc.id);
+                      return (
+                        <button
+                          key={sc.id}
+                          type="button"
+                          onClick={() => toggleScope(sc.id)}
+                          title={sc.desc}
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer font-mono',
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500 shadow-2xs'
+                              : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600'
+                          )}
+                        >
+                          {sc.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {AVAILABLE_SCOPES.map((sc) => {
-                  const isSelected = selectedScopes.includes(sc.id);
-                  return (
-                    <button
-                      key={sc.id}
-                      type="button"
-                      onClick={() => toggleScope(sc.id)}
-                      title={sc.desc}
-                      className={cn(
-                        'px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer font-mono',
-                        isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500 shadow-2xs'
-                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600'
-                      )}
-                    >
-                      {sc.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </form>
 
           {/* Forensic Image Ingestion Results Card */}
@@ -1243,7 +1222,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
               </div>
               <div
                 className="space-y-0.5 cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800/80 rounded p-1 transition-all"
-                onClick={() => setActiveTab('images')}
+                onClick={() => setActiveTab('media')}
                 title="Click to view extracted images & videos"
               >
                 <div className="text-[10px] font-mono uppercase text-indigo-600 dark:text-indigo-400 font-bold">Media (Img / Vid)</div>
@@ -1331,16 +1310,13 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
                   { id: 'all', label: 'All Results', count: filteredEntities.length, icon: Database },
                   { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
-                  { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
-                  { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Video },
-                  { id: 'news', label: 'News', count: newsArticles.length, icon: Newspaper },
-                  { id: 'infrastructure', label: 'Infrastructure & Threats', count: keyFindings.length, icon: ShieldAlert },
-                  { id: 'locations', label: 'Locations', count: geoLocations.length, icon: Globe },
-                  { id: 'evidence', label: 'Evidence', count: searchResult.evidence.length, icon: ShieldCheck },
-                  { id: 'graph', label: 'Graph', count: searchResult.relationships.length, icon: Share2 },
+                  { id: 'media', label: 'Media', count: imageRecords.length + videoRecords.length, icon: Camera },
+                  { id: 'news_intel', label: 'News & Intelligence', count: newsArticles.length + keyFindings.length, icon: Newspaper },
+                  { id: 'relationships', label: 'Relationships', count: searchResult.relationships.length, icon: Share2 },
+                  { id: 'timeline_evidence', label: 'Timeline & Evidence', count: searchResult.evidence.length, icon: ShieldCheck },
                 ].map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id || (tab.id === 'all' && activeTab === 'entities') || (tab.id === 'infrastructure' && activeTab === 'findings') || (tab.id === 'locations' && activeTab === 'map');
+                  const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
@@ -2194,7 +2170,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             )}
 
             {/* TAB 5: NEWS & MEDIA ARTICLES */}
-            {activeTab === 'news' && (
+            {(activeTab === 'news_intel' || (activeTab as string) === 'news') && (
               <div className="p-4 sm:p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
@@ -2281,44 +2257,67 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                           ) : (
                             /* Card Layout with Image / Video Preview */
                             <div className="flex flex-col sm:flex-row gap-4 items-start">
-                              {heroImage && (
-                                <div
-                                  className="w-full sm:w-48 h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-800 relative group cursor-pointer"
-                                  onClick={() => {
-                                    if (isVideo && embedUrl) {
-                                      setPlayingVideoId(articleId);
-                                    } else {
-                                      setSelectedArticleId(articleId);
-                                    }
-                                  }}
-                                >
-                                  <img
-                                    src={heroImage}
-                                    alt={title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      (e.target as any).style.display = 'none';
-                                    }}
-                                  />
-                                  {isVideo ? (
-                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                      <div className="w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                        <Play className="w-5 h-5 fill-white ml-0.5" />
+                              {/* Card Thumbnail: Authentic Hero Image OR Verified Publisher Brand Preview */}
+                              <div
+                                className="w-full sm:w-48 h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-800 relative group cursor-pointer flex flex-col items-center justify-center"
+                                onClick={() => {
+                                  if (isVideo && embedUrl) {
+                                    setPlayingVideoId(articleId);
+                                  } else {
+                                    setSelectedArticleId(articleId);
+                                  }
+                                }}
+                              >
+                                {heroImage ? (
+                                  <>
+                                    <img
+                                      src={heroImage}
+                                      alt={title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        (e.target as any).style.display = 'none';
+                                      }}
+                                    />
+                                    {isVideo ? (
+                                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                          <Play className="w-5 h-5 fill-white ml-0.5" />
+                                        </div>
+                                        <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-[10px] rounded font-mono font-bold">
+                                          PLAY
+                                        </span>
                                       </div>
-                                      <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-[10px] rounded font-mono font-bold">
-                                        PLAY
-                                      </span>
+                                    ) : (
+                                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <span className="text-[10px] bg-slate-900/90 text-white px-2 py-0.5 rounded font-medium">
+                                          Inspect
+                                        </span>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800/80 dark:to-slate-900 flex flex-col items-center justify-center p-3 text-center">
+                                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-2xs mb-1.5 overflow-hidden">
+                                      <img
+                                        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(publisher.replace(/^https?:\/\//, '').split('/')[0])}&sz=128`}
+                                        alt={publisher}
+                                        className="w-6 h-6 object-contain"
+                                        onError={(e) => {
+                                          (e.target as any).style.display = 'none';
+                                        }}
+                                      />
+                                      <Newspaper className="w-5 h-5 text-slate-400 -ml-6 peer-only" />
                                     </div>
-                                  ) : (
-                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                      <span className="text-[10px] bg-slate-900/90 text-white px-2 py-0.5 rounded font-medium">
-                                        Inspect
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                    <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 truncate max-w-full">
+                                      {publisher}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider mt-0.5">
+                                      Verified Wire
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
                               <div className="flex-1 space-y-1">
                                 <h3
@@ -2497,32 +2496,63 @@ export const SearchPage: React.FC<SearchPageProps> = ({
               </div>
             )}
 
-            {/* TAB: IMAGES (First-Class Result Category) */}
-            {activeTab === 'images' && (
-              <div className="p-4 sm:p-5">
-                <ImagesTab
-                  images={imageRecords}
-                  query={query}
-                  onSelectImage={(img) => setSelectedMedia(img)}
-                  sourcesEvaluated={executedProvidersCount}
-                />
+            {/* TAB: MEDIA (Images & Videos) */}
+            {(activeTab === 'media' || (activeTab as string) === 'images' || (activeTab as string) === 'videos') && (
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/90 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMediaSubTab('images')}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        mediaSubTab === 'images'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Images ({imageRecords.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMediaSubTab('videos')}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        mediaSubTab === 'videos'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      <span>Videos ({videoRecords.length})</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {imageRecords.length + videoRecords.length} Media Assets Recovered
+                  </span>
+                </div>
+
+                {mediaSubTab === 'images' ? (
+                  <ImagesTab
+                    images={imageRecords}
+                    query={query}
+                    onSelectImage={(img) => setSelectedMedia(img)}
+                    sourcesEvaluated={executedProvidersCount}
+                  />
+                ) : (
+                  <VideosTab
+                    videos={videoRecords}
+                    query={query}
+                    onSelectVideo={(vid) => setSelectedMedia(vid)}
+                    sourcesEvaluated={executedProvidersCount}
+                  />
+                )}
               </div>
             )}
 
-            {/* TAB: VIDEOS (First-Class Result Category) */}
-            {activeTab === 'videos' && (
-              <div className="p-4 sm:p-5">
-                <VideosTab
-                  videos={videoRecords}
-                  query={query}
-                  onSelectVideo={(vid) => setSelectedMedia(vid)}
-                  sourcesEvaluated={executedProvidersCount}
-                />
-              </div>
-            )}
-
-            {/* TAB 7: RELATIONSHIP GRAPH */}
-            {activeTab === 'graph' && (
+            {/* TAB: RELATIONSHIP GRAPH */}
+            {(activeTab === 'relationships' || (activeTab as string) === 'graph') && (
               <div className="p-4 sm:p-5 space-y-4">
                 <div className="flex items-center justify-between text-xs font-mono text-slate-500">
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
@@ -2533,29 +2563,29 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   </span>
                 </div>
                 <GraphStudioComponent
+                  investigationId={searchResult.investigation_id}
                   entities={searchResult.entities}
                   relationships={searchResult.relationships}
                 />
               </div>
             )}
 
-            {/* TAB 8: GEOSPATIAL MAP / LOCATIONS */}
-            {(activeTab === 'map' || activeTab === 'locations') && (
-              <div className="p-4 sm:p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                  <span>GEO-LOCATED INFRASTRUCTURE TARGETS</span>
-                  <span>{geoLocations.length} IDENTIFIED POINTS</span>
-                </div>
-                <div className="h-[520px] rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800">
-                  <OsintMapComponent locations={geoLocations} />
-                </div>
-              </div>
-            )}
-
-            {/* TAB 9: EVIDENCE VAULT */}
-            {activeTab === 'evidence' && (
-              <div className="p-4 sm:p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+            {/* TAB: TIMELINE & EVIDENCE */}
+            {(activeTab === 'timeline_evidence' || (activeTab as string) === 'evidence') && (
+              <div className="p-4 sm:p-5 space-y-6">
+                {geoLocations.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+                      <span>GEO-LOCATED INFRASTRUCTURE TARGETS</span>
+                      <span>{geoLocations.length} IDENTIFIED POINTS</span>
+                    </div>
+                    <div className="h-[420px] rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800">
+                      <OsintMapComponent locations={geoLocations} />
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-500">
                   <span>CRYPTOGRAPHIC EVIDENCE RECORDS</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                     SHA-256 Provenance Verified
@@ -2622,6 +2652,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   }}
                   pageSizeOptions={[10, 25, 50]}
                 />
+              </div>
               </div>
             )}
 

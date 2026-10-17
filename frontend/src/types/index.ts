@@ -89,6 +89,7 @@ export interface Investigation {
   entity_ids: string[];
   evidence_ids: string[];
   relationships?: any[];
+  media?: MediaRecord[];
   timeline: TimelineEvent[];
   notes: InvestigationNote[];
   investigative_summary?: {
@@ -218,6 +219,8 @@ export interface ModuleJobStatusRecord {
   status: string;
   duration_ms: number;
   sources: string[];
+  entity_count?: number;
+  evidence_count?: number;
   error?: string;
 }
 

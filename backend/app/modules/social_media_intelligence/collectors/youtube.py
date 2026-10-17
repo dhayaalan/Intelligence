@@ -339,7 +339,94 @@ class YouTubeCollector:
         except Exception as e:
             app_logger.debug(f"Public YouTube discovery completed with no results: {e}")
 
+        # 4. Direct Channel Scraping (Videos, Shorts, and Community Image Posts)
+        if " " not in clean_q or clean_q.startswith("@"):
+            channel_posts = await self.get_channel_posts(clean_q.lstrip("@"))
+            if channel_posts:
+                return channel_posts
+
         return []
+
+    async def get_channel_posts(self, username: str) -> List[SocialPost]:
+        """Discovers videos, shorts, and authentic community posts/images from a creator channel."""
+        clean_user = username.strip().lstrip("@")
+        if not clean_user:
+            return []
+
+        channel_url = f"https://www.youtube.com/@{clean_user}"
+        posts: List[SocialPost] = []
+        try:
+            async with httpx.AsyncClient(
+                timeout=6.0,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"}
+            ) as client:
+                resp = await client.get(channel_url)
+                if resp.status_code == 200:
+                    html = resp.text
+                    # Extract channel title
+                    channel_title = clean_user
+                    m_title = re.search(r'\"channelMetadataRenderer\":\{.*?\"title\":\"([^\"]+)\"', html)
+                    if m_title:
+                        channel_title = m_title.group(1)
+
+                    # 1. Extract genuine video IDs from channel
+                    vids = list(dict.fromkeys(re.findall(r'\"videoId\":\"([a-zA-Z0-9_-]{11})\"', html)))[:3]
+                    for vid in vids:
+                        meta = await self.get_video_metadata(vid)
+                        if meta:
+                            posts.append(
+                                SocialPost(
+                                    id=f"yt_{meta.video_id}",
+                                    platform=SocialPlatformType.YOUTUBE,
+                                    author=meta.channel_title or channel_title,
+                                    author_id=meta.channel_id,
+                                    text=f"{meta.title}\n\n{meta.description[:280]}",
+                                    created_at=meta.upload_date,
+                                    url=meta.url,
+                                    views_count=meta.view_count,
+                                    likes_count=meta.like_count,
+                                    channel_name=meta.channel_title or channel_title,
+                                    media_urls=[meta.thumbnail_url] if meta.thumbnail_url else [],
+                                    entities=meta.tags,
+                                    credibility_score=None
+                                )
+                            )
+
+                    # 2. Extract community backstage posts & attached images
+                    post_matches = re.finditer(r'\"backstagePostRenderer\":\{(.*?)\"actionButtons\"', html, re.DOTALL)
+                    for pm in post_matches:
+                        p_text = pm.group(1)
+                        m_id = re.search(r'\"postId\":\"([^\"]+)\"', p_text)
+                        post_id = m_id.group(1) if m_id else ""
+
+                        text_runs = re.findall(r'\"text\":\"([^\"]+)\"', p_text)
+                        text_content = ' '.join(text_runs[:4]) if text_runs else f"Community post from @{clean_user}"
+
+                        m_img = re.search(r'\"backstageImageRenderer\":\{.*?\"thumbnails\":\[\{.*?\"url\":\"([^\"]+)\"', p_text)
+                        img_url = m_img.group(1) if m_img else ""
+                        if img_url and img_url.startswith("//"):
+                            img_url = "https:" + img_url
+
+                        if post_id or img_url:
+                            posts.append(
+                                SocialPost(
+                                    id=f"yt_post_{post_id or uuid.uuid4().hex[:8]}",
+                                    platform=SocialPlatformType.YOUTUBE,
+                                    author=channel_title,
+                                    author_id=clean_user,
+                                    text=text_content,
+                                    created_at=datetime.now(timezone.utc).isoformat(),
+                                    url=f"https://www.youtube.com/post/{post_id}" if post_id else channel_url,
+                                    channel_name=channel_title,
+                                    media_urls=[img_url] if img_url else [],
+                                    entities=[clean_user, "YouTube Community"],
+                                    credibility_score=None
+                                )
+                            )
+        except Exception as e:
+            app_logger.debug(f"Channel activity extraction caught: {e}")
+
+        return posts
 
 
 youtube_collector = YouTubeCollector()

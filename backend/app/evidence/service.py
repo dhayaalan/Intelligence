@@ -33,6 +33,24 @@ class EvidenceService:
     @staticmethod
     def list_evidence(tenant_id: str, investigation_id: Optional[str] = None, search_id: Optional[str] = None) -> List[EvidenceRecord]:
         with db._lock:
+            if investigation_id:
+                col = evidence_repo.sync_collection
+                if col is not None:
+                    try:
+                        inv_data = db.investigations.get(investigation_id, {})
+                        linked_ids = set(inv_data.get("evidence_ids", []))
+                        inv_search_id = inv_data.get("search_id")
+                        or_conds = [{"investigation_id": investigation_id}]
+                        if linked_ids:
+                            or_conds.append({"id": {"$in": list(linked_ids)}})
+                        if inv_search_id:
+                            or_conds.append({"search_id": inv_search_id})
+                        q = {"tenant_id": tenant_id, "$or": or_conds}
+                        for edoc in col.find(q, {"_id": 0}):
+                            if edoc.get("id"):
+                                db.evidence[edoc["id"]] = edoc
+                    except Exception:
+                        pass
             records = [EvidenceRecord(**d) for d in db.evidence.values() if d.get("tenant_id") == tenant_id]
             if investigation_id:
                 inv_data = db.investigations.get(investigation_id, {})
