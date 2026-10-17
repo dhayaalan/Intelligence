@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:category": "node src/features/graph/getEntityCategory.test.cjs",
+    "test": "npm run test:category"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

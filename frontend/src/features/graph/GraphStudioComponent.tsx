@@ -63,40 +63,19 @@ export interface HoverTooltipData {
   y: number;
 }
 
-export const getEntityCategory = (type: string = ''): string => {
-  const t = type.toUpperCase();
-  if (['VEHICLE', 'CAR', 'AUTOMOBILE', 'PLATE', 'VEHICLE_PLATE', 'ASSET'].includes(t)) return 'VEHICLE';
-  if (['LOCATION', 'GEO', 'COORDINATES', 'PLACE', 'CITY', 'COUNTRY', 'STATE', 'REGION'].includes(t)) return 'LOCATION';
-  if (['PERSON', 'THREAT_ACTOR', 'USERNAME', 'AUTHOR', 'ACTOR'].includes(t)) return 'PERSON';
-  if (['ORGANIZATION', 'ORG', 'COMPANY', 'GROUP', 'NGO', 'FOUNDATION', 'TERROR_GROUP', 'GOVERNMENT', 'AUTHORITY', 'REGISTRY'].includes(t)) return 'ORGANIZATION';
-  if (['VULNERABILITY', 'CVE', 'THREAT_INDICATOR', 'MALWARE', 'THREAT'].includes(t)) return 'THREAT_INDICATOR';
-  if (['IP', 'IPV4', 'IPV6'].includes(t)) return 'IP';
-  if (['HASH', 'SHA256', 'MD5'].includes(t)) return 'HASH';
-  if (['EMAIL'].includes(t)) return 'EMAIL';
-  if (['URL', 'DOCUMENT', 'ARTICLE', 'NEWS'].includes(t)) return 'DOCUMENT';
-  return 'DOMAIN';
-};
-
-export const extractEntityAvatar = (ent: any): string | null => {
-  if (!ent) return null;
-  const meta = ent.metadata || {};
-  const direct =
-    meta.avatar_url ||
-    meta.image_url ||
-    meta.profile_image ||
-    meta.profile_pic ||
-    meta.thumbnail_url ||
-    meta.avatar ||
-    meta.image ||
-    null;
-  if (direct && typeof direct === 'string') return direct.trim();
-  return null;
-};
+import { getEntityCategory, extractEntityAvatar } from './categoryUtils';
+export { getEntityCategory, extractEntityAvatar };
 
 // Generates crisp, clean SVG icons to render directly inside circular graph nodes
 const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string => {
   let content = '';
   switch (category) {
+    case 'PHONE':
+      content = `<path d="M12 7h6l2.5 5.5-3.5 2.5c2.3 4.6 6 8.3 10.6 10.6l2.5-3.5 5.5 2.5v6c0 1.7-1.3 3-3 3C18 36 12 30 7 15c-0.1-1.7 1.3-3 3-3z" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      break;
+    case 'EMAIL':
+      content = `<rect x="6" y="10" width="36" height="26" rx="4" stroke="${color}" stroke-width="3" fill="none"/><path d="M7 13l17 12 17-12" stroke="${color}" stroke-width="3" stroke-linecap="round" fill="none"/>`;
+      break;
     case 'VEHICLE':
       content = `<path d="M7 26l3-9a3 3 0 0 1 2.8-2h22.4a3 3 0 0 1 2.8 2l3 9M5 26h38a3 3 0 0 1 3 3v7a2 2 0 0 1-2 2h-3a4 4 0 0 1-8 0H14a4 4 0 0 1-8 0H4a2 2 0 0 1-2-2v-7a3 3 0 0 1 3-3z" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="38" r="2.5" fill="${color}"/><circle cx="38" cy="38" r="2.5" fill="${color}"/><line x1="14" y1="21" x2="34" y2="21" stroke="${color}" stroke-width="2"/>`;
       break;
@@ -115,15 +94,31 @@ const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string
     case 'IP':
       content = `<rect x="6" y="8" width="36" height="12" rx="3" stroke="${color}" stroke-width="3" fill="none"/><rect x="6" y="26" width="36" height="12" rx="3" stroke="${color}" stroke-width="3" fill="none"/><circle cx="13" cy="14" r="2.5" fill="${color}"/><circle cx="13" cy="32" r="2.5" fill="${color}"/><line x1="24" y1="14" x2="35" y2="14" stroke="${color}" stroke-width="2.5"/><line x1="24" y1="32" x2="35" y2="32" stroke="${color}" stroke-width="2.5"/>`;
       break;
-    case 'EMAIL':
-      content = `<rect x="6" y="10" width="36" height="26" rx="4" stroke="${color}" stroke-width="3" fill="none"/><path d="M7 13l17 12 17-12" stroke="${color}" stroke-width="3" stroke-linecap="round" fill="none"/>`;
+    case 'VIDEO':
+      content = `<rect x="6" y="9" width="36" height="30" rx="6" stroke="${color}" stroke-width="3" fill="none"/><polygon points="20,17 32,24 20,31" fill="${color}"/>`;
       break;
+    case 'POST':
+      content = `<path d="M8 10h32a3 3 0 0 1 3 3v18a3 3 0 0 1-3 3H16l-8 7V13a3 3 0 0 1 3-3z" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      break;
+    case 'IMAGE':
+      content = `<rect x="6" y="8" width="36" height="32" rx="4" stroke="${color}" stroke-width="2.5" fill="none"/><circle cx="16" cy="18" r="4" fill="${color}"/><path d="M42 30l-10-10L10 40h32v-10z" fill="${color}" opacity="0.7"/>`;
+      break;
+    case 'ARTICLE':
     case 'DOCUMENT':
-      content = `<path d="M12 6h18a2 2 0 0 1 2 2v28a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" stroke="${color}" stroke-width="3" fill="none"/><line x1="16" y1="14" x2="26" y2="14" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="16" y1="20" x2="26" y2="20" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="16" y1="26" x2="22" y2="26" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+      content = `<path d="M10 6h28a2 2 0 0 1 2 2v32a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" stroke="${color}" stroke-width="2.5" fill="none"/><line x1="15" y1="14" x2="33" y2="14" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="15" y1="22" x2="33" y2="22" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="15" y1="30" x2="25" y2="30" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+      break;
+    case 'EVIDENCE':
+      content = `<path d="M24 5l16 6v14c0 10-16 18-16 18S8 35 8 25V11l16-6z" stroke="${color}" stroke-width="2.5" fill="none"/><path d="M17 24l5 5 10-10" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      break;
+    case 'KEYWORD':
+      content = `<line x1="10" y1="18" x2="38" y2="18" stroke="${color}" stroke-width="2.5"/><line x1="10" y1="30" x2="38" y2="30" stroke="${color}" stroke-width="2.5"/><line x1="18" y1="10" x2="14" y2="38" stroke="${color}" stroke-width="2.5"/><line x1="30" y1="10" x2="26" y2="38" stroke="${color}" stroke-width="2.5"/>`;
       break;
     case 'DOMAIN':
-    default:
       content = `<circle cx="24" cy="24" r="17" stroke="${color}" stroke-width="3" fill="none"/><ellipse cx="24" cy="24" rx="7.5" ry="17" stroke="${color}" stroke-width="2.5" fill="none"/><line x1="7" y1="24" x2="41" y2="24" stroke="${color}" stroke-width="2.5"/>`;
+      break;
+    case 'UNKNOWN':
+    default:
+      content = `<circle cx="24" cy="24" r="16" stroke="${color}" stroke-width="2.5" stroke-dasharray="4 3" fill="none"/><circle cx="24" cy="24" r="5" fill="${color}"/>`;
       break;
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">${content}</svg>`;
@@ -131,15 +126,24 @@ const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string
 };
 
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; glow: string; text: string }> = {
-  VEHICLE: { bg: '#8b5cf6', border: '#7c3aed', glow: 'rgba(139, 92, 246, 0.4)', text: '#ffffff' },
-  LOCATION: { bg: '#06b6d4', border: '#0891b2', glow: 'rgba(6, 182, 212, 0.4)', text: '#ffffff' },
-  ORGANIZATION: { bg: '#6366f1', border: '#4f46e5', glow: 'rgba(99, 102, 241, 0.4)', text: '#ffffff' },
+  PHONE: { bg: '#0284c7', border: '#0369a1', glow: 'rgba(2, 132, 199, 0.4)', text: '#ffffff' },
+  EMAIL: { bg: '#0d9488', border: '#0f766e', glow: 'rgba(13, 148, 136, 0.4)', text: '#ffffff' },
   PERSON: { bg: '#f59e0b', border: '#d97706', glow: 'rgba(245, 158, 11, 0.4)', text: '#ffffff' },
-  THREAT_INDICATOR: { bg: '#f43f5e', border: '#e11d48', glow: 'rgba(244, 63, 94, 0.4)', text: '#ffffff' },
-  IP: { bg: '#3b82f6', border: '#2563eb', glow: 'rgba(59, 130, 246, 0.4)', text: '#ffffff' },
-  EMAIL: { bg: '#14b8a6', border: '#0d9488', glow: 'rgba(20, 184, 166, 0.4)', text: '#ffffff' },
-  DOCUMENT: { bg: '#10b981', border: '#059669', glow: 'rgba(16, 185, 129, 0.4)', text: '#ffffff' },
+  ORGANIZATION: { bg: '#6366f1', border: '#4f46e5', glow: 'rgba(99, 102, 241, 0.4)', text: '#ffffff' },
+  VEHICLE: { bg: '#8b5cf6', border: '#7c3aed', glow: 'rgba(139, 92, 246, 0.4)', text: '#ffffff' },
   DOMAIN: { bg: '#64748b', border: '#475569', glow: 'rgba(100, 116, 139, 0.4)', text: '#ffffff' },
+  IP: { bg: '#2563eb', border: '#1d4ed8', glow: 'rgba(37, 99, 235, 0.4)', text: '#ffffff' },
+  LOCATION: { bg: '#06b6d4', border: '#0891b2', glow: 'rgba(6, 182, 212, 0.4)', text: '#ffffff' },
+  ARTICLE: { bg: '#10b981', border: '#059669', glow: 'rgba(16, 185, 129, 0.4)', text: '#ffffff' },
+  DOCUMENT: { bg: '#10b981', border: '#059669', glow: 'rgba(16, 185, 129, 0.4)', text: '#ffffff' },
+  VIDEO: { bg: '#ef4444', border: '#dc2626', glow: 'rgba(239, 68, 68, 0.4)', text: '#ffffff' },
+  IMAGE: { bg: '#ec4899', border: '#db2777', glow: 'rgba(236, 72, 153, 0.4)', text: '#ffffff' },
+  POST: { bg: '#84cc16', border: '#65a30d', glow: 'rgba(132, 204, 22, 0.4)', text: '#ffffff' },
+  EVIDENCE: { bg: '#14b8a6', border: '#0d9488', glow: 'rgba(20, 184, 166, 0.4)', text: '#ffffff' },
+  THREAT_INDICATOR: { bg: '#f43f5e', border: '#e11d48', glow: 'rgba(244, 63, 94, 0.4)', text: '#ffffff' },
+  HASH: { bg: '#a855f7', border: '#9333ea', glow: 'rgba(168, 85, 247, 0.4)', text: '#ffffff' },
+  KEYWORD: { bg: '#71717a', border: '#52525b', glow: 'rgba(113, 113, 122, 0.4)', text: '#ffffff' },
+  UNKNOWN: { bg: '#94a3b8', border: '#64748b', glow: 'rgba(148, 163, 184, 0.4)', text: '#ffffff' },
 };
 
 const getEntityImage = (ent: any, category: string): string => {
@@ -1018,13 +1022,20 @@ export const GraphStudioComponent: React.FC<Props> = ({
           <div className="flex items-center gap-1 overflow-x-auto py-0.5">
             {[
               { id: 'ALL', label: 'All', color: '#6366f1' },
-              { id: 'VEHICLE', label: 'Vehicles', color: '#8b5cf6' },
-              { id: 'LOCATION', label: 'Locations', color: '#06b6d4' },
+              { id: 'PHONE', label: 'Phones', color: '#0284c7' },
+              { id: 'EMAIL', label: 'Emails', color: '#0d9488' },
               { id: 'PERSON', label: 'Identities', color: '#f59e0b' },
               { id: 'ORGANIZATION', label: 'Organizations', color: '#6366f1' },
+              { id: 'VEHICLE', label: 'Vehicles', color: '#8b5cf6' },
               { id: 'DOMAIN', label: 'Domains', color: '#64748b' },
-              { id: 'IP', label: 'IPs', color: '#3b82f6' },
+              { id: 'IP', label: 'IPs', color: '#2563eb' },
+              { id: 'LOCATION', label: 'Locations', color: '#06b6d4' },
+              { id: 'ARTICLE', label: 'Articles', color: '#10b981' },
+              { id: 'VIDEO', label: 'Videos', color: '#ef4444' },
+              { id: 'POST', label: 'Posts', color: '#84cc16' },
               { id: 'THREAT_INDICATOR', label: 'Threats', color: '#f43f5e' },
+              { id: 'KEYWORD', label: 'Keywords', color: '#71717a' },
+              { id: 'UNKNOWN', label: 'Other', color: '#94a3b8' },
             ]
               .filter((cat) => cat.id === 'ALL' || (categoryStats[cat.id] || 0) > 0)
               .map((cat) => {
@@ -1446,6 +1457,39 @@ export const GraphStudioComponent: React.FC<Props> = ({
               const category = getEntityCategory(selectedEntity.type);
               const displayName = selectedEntity.value || (selectedEntity as any).name || 'Entity';
 
+              // Determine precise evidentiary verification status
+              const srcList = selectedEntity.sources || [];
+              const isOnlySearchQuery = srcList.length === 1 && (srcList[0] === 'search_query' || srcList[0] === 'seed_input');
+              const isGraphLead = srcList.includes('relationship_graph') || Boolean((selectedEntity.metadata as any)?.is_graph_lead);
+              const isSeedTarget = Boolean((selectedEntity.metadata as any)?.is_search_target) || Boolean((selectedEntity.metadata as any)?.is_seed_input);
+              const verificationStatus = (selectedEntity.metadata as any)?.verification_status;
+
+              let statusLabel = 'Confidence Unassessed';
+              let statusVariant: 'outline' | 'mono' | 'success' | 'warning' = 'mono';
+
+              if (isOnlySearchQuery || isSeedTarget || verificationStatus === 'UNASSESSED') {
+                statusLabel = 'Unassessed Seed Input';
+                statusVariant = 'warning';
+              } else if (isGraphLead) {
+                statusLabel = 'Uncorroborated Graph Lead';
+                statusVariant = 'mono';
+              } else if (selectedEntity.confidence != null && selectedEntity.confidence > 0) {
+                const pct = Math.round(selectedEntity.confidence * 100);
+                if (srcList.some((s: string) => s.toLowerCase().includes('registry') || s.toLowerCase().includes('itu') || s.toLowerCase().includes('telecom') || s.toLowerCase().includes('database'))) {
+                  statusLabel = `Registry Corroborated (${pct}%)`;
+                  statusVariant = 'success';
+                } else if (pct >= 85) {
+                  statusLabel = `High Confidence (${pct}%)`;
+                  statusVariant = 'success';
+                } else {
+                  statusLabel = `Corroborated (${pct}%)`;
+                  statusVariant = 'mono';
+                }
+              } else {
+                statusLabel = 'Confidence Not Assessed';
+                statusVariant = 'mono';
+              }
+
               return (
                 <div className="space-y-4 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1471,12 +1515,12 @@ export const GraphStudioComponent: React.FC<Props> = ({
                     <p className="font-bold text-slate-900 dark:text-white text-sm font-sans break-words leading-tight">
                       {displayName}
                     </p>
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       <Badge variant="outline" className="font-mono text-[10px] uppercase">
                         {category}
                       </Badge>
-                      <Badge variant={(selectedEntity.confidence != null && selectedEntity.confidence >= 0.85) ? 'success' : 'mono'} className="font-mono text-[10px]">
-                        {selectedEntity.confidence != null ? `${Math.round(selectedEntity.confidence * 100)}% confidence` : 'Unrated Confidence'}
+                      <Badge variant={statusVariant} className="font-mono text-[10px]">
+                        {statusLabel}
                       </Badge>
                     </div>
                   </div>

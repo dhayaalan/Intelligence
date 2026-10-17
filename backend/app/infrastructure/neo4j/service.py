@@ -51,8 +51,11 @@ class Neo4jGraphService:
 
         ent_id = entity_data.get("id") or f"ent_{entity_data.get('value', '')}"
         val = str(entity_data.get("value", ""))
-        e_type = str(entity_data.get("type", "entity")).lower()
-        conf = float(entity_data.get("confidence", 1.0))
+        raw_t = entity_data.get("type", "entity")
+        e_type = str(raw_t.value if hasattr(raw_t, "value") else raw_t).lower()
+        if e_type.startswith("entitytype."):
+            e_type = e_type.replace("entitytype.", "")
+        conf = float(entity_data.get("confidence")) if entity_data.get("confidence") is not None else None
         sources = list(entity_data.get("sources", []))
         meta_json = json.dumps(entity_data.get("metadata", {}))
 

@@ -273,6 +273,26 @@ class PivotDiscoveryEngine:
                 )
                 seen_queries.add(cve_val.lower())
 
+            # 8. Location / Jurisdiction Pivot -> Geospatial Intelligence & Regional News
+            elif e_type in ["location", "geo", "jurisdiction", "place", "city", "country"] and val_lower != original_query.lower() and len(val) >= 2:
+                pivots.append(
+                    PivotCandidate(
+                        pivot_id=f"pvt_{hashlib.md5(val.encode()).hexdigest()[:8]}",
+                        pivot_query=val,
+                        pivot_target_type="LOCATION",
+                        pivot_type="geospatial_intelligence",
+                        target_modules=["geo_intelligence", "news_intelligence"],
+                        relationship="RESOLVES_TO" if str(parent_type).upper() in ["PHONE", "IP", "VEHICLE"] else "LOCATED_AT",
+                        parent_entity_value=parent_val,
+                        parent_entity_type=parent_type,
+                        confidence=confidence,
+                        recommended_action=f"Correlate geographic observations, boundaries, and regional news in '{val}'.",
+                        why_it_matters="Identifies spatial presence, regional incident reports, and jurisdictional boundaries.",
+                        sources=sources or ["Geographic Intelligence"]
+                    )
+                )
+                seen_queries.add(val_lower)
+
         # Sort by confidence descending and limit
         pivots.sort(key=lambda p: p.confidence, reverse=True)
         return [p.dict() for p in pivots[:max_pivots]]
