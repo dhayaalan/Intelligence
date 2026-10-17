@@ -212,6 +212,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const detectedTargetType = useMemo(() => {
     const q = query.trim();
     if (!q) return null;
+    if (/^(?:[A-Z]{2}\s?[0-9]{1,2}\s?[A-Z]{0,3}\s?[0-9]{4}|[A-Z]{2}[0-9]{2}\s?[A-Z]{3}|[1-9A-Z]{1}[A-Z0-9]{4,6})$/i.test(q)) return 'VEHICLE_PLATE';
     if (/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(q)) return 'IP_ADDRESS';
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q)) return 'EMAIL';
     if (/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/.*)?$/.test(q)) return 'DOMAIN';
@@ -1235,7 +1236,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'leads', label: 'Leads', count: investigativeLeads.length, icon: Compass },
                   { id: 'news', label: 'News & Media', count: newsArticles.length, icon: Newspaper },
                   { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
-                  { id: 'graph', label: 'Relationship Graph', count: searchResult.entities.length, icon: Share2 },
+                  { id: 'graph', label: 'Relationship Graph', count: searchResult.relationships.length, icon: Share2 },
                   { id: 'map', label: 'Geospatial Radar', count: geoLocations.length, icon: Globe },
                   { id: 'evidence', label: 'Evidence Vault', count: searchResult.evidence.length, icon: ShieldCheck },
                 ].map((tab) => {

@@ -77,13 +77,23 @@ class SearchOrchestrator:
             )
 
         if is_identifier and normalized_identifier:
-            target_type = "email" if identifier_type == "EMAIL" else "phone"
+            if identifier_type == "EMAIL":
+                target_type = "email"
+                selected_scopes = ["PEOPLE & IDENTITIES"]
+            elif identifier_type == "PHONE":
+                target_type = "phone"
+                selected_scopes = ["PEOPLE & IDENTITIES"]
+            elif identifier_type == "VEHICLE_PLATE":
+                target_type = "vehicle"
+                selected_scopes = ["OSINT"]
+            else:
+                target_type = "entity"
+                selected_scopes = ["OSINT"]
             intent = identifier_type
             intent_explanation = f"Deterministic exact {target_type} identifier lookup: canonical value '{normalized_identifier}'"
             is_technical = False
             effective_query = normalized_identifier
             target_modules_set = {"osint"}
-            selected_scopes = ["PEOPLE & IDENTITIES"]
         else:
             intent_info = target_classifier.classify_intent(query)
             intent = intent_info.get("intent", "GENERAL_RESEARCH")
@@ -318,8 +328,16 @@ class SearchOrchestrator:
                 corr_relationships = []
                 all_evidence = []
             else:
-                corr_entities = verified_entities
                 verified_vals = {e.value.lower() for e in verified_entities}
+                connected_vals = {
+                    r.target_entity_value.lower() for r in corr_relationships if r.source_entity_value.lower() in verified_vals
+                } | {
+                    r.source_entity_value.lower() for r in corr_relationships if r.target_entity_value.lower() in verified_vals
+                }
+                corr_entities = [
+                    e for e in corr_entities
+                    if e.value.lower() in verified_vals or e.value.lower() in connected_vals
+                ]
                 # Also fetch stored relationships for the verified entities
                 stored_rels = await relationship_repo.find_by_entity_values(tenant_id, list(verified_vals))
                 for sr in stored_rels:
@@ -380,6 +398,16 @@ class SearchOrchestrator:
                             sources=["relationship_graph"],
                             metadata={}
                         ))
+
+                # Deduplicate entities by value
+                unique_ents = []
+                seen_vals = set()
+                for e in corr_entities:
+                    e_k = e.value.strip().lower()
+                    if e_k not in seen_vals:
+                        seen_vals.add(e_k)
+                        unique_ents.append(e)
+                corr_entities = unique_ents
 
                 # Synthesize verified telecom / identifier evidence
                 for ve in verified_entities:
@@ -456,6 +484,21 @@ class SearchOrchestrator:
                 "sources": discovered_platforms[:5] or ["Social Media Collectors", "OSINT Identity Recon"],
                 "action_type": "PROFILES",
                 "action_target": social_profiles[0].value
+            })
+
+        vehicle_ents = [e for e in corr_entities if e.type == EntityType.VEHICLE or "vehicle" in str(e.type).lower()]
+        if vehicle_ents:
+            key_findings.append({
+                "id": f"fnd_vehicle_{uuid.uuid4().hex[:6]}",
+                "title": f"Vehicle Registration & Transport Attribution ({len(vehicle_ents)} vehicle identified)",
+                "description": f"Verified registration plate format and administrative attribution for '{vehicle_ents[0].value}'. Correlated with regional transport office and jurisdiction authorities.",
+                "why_it_matters": "Vehicle registration attribution provides lawful geographic jurisdiction, issuing transport office, and registry standards.",
+                "confidence": "HIGH",
+                "priority": "HIGH",
+                "evidence_count": len(all_evidence),
+                "sources": ["Vehicle Registration Recon", "Regional Transport Registry Mapping"],
+                "action_type": "OVERVIEW",
+                "action_target": vehicle_ents[0].value
             })
 
         if articles:

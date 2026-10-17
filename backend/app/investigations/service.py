@@ -41,6 +41,9 @@ class InvestigationService:
             target_type=request.target_type.strip(),
             selected_modules=request.selected_modules or ["osint", "threat_intelligence"],
             search_id=request.search_id,
+            relationships=request.relationships or [],
+            investigative_summary=request.investigative_summary,
+            investigation_health=request.investigation_health,
             created_by=user_id,
             timeline=[initial_event],
             created_at=now,
@@ -80,13 +83,16 @@ class InvestigationService:
             priority=priority
         )
 
-        if not data.get("investigative_summary"):
-            data["investigative_summary"] = {
-                "what_we_know": summary_res.what_we_know,
-                "what_we_dont_know": summary_res.what_we_dont_know,
-                "key_findings": summary_res.key_findings,
-                "investigative_leads": summary_res.investigative_leads,
-            }
+        existing_summary = data.get("investigative_summary") or {}
+        if not existing_summary.get("key_findings"):
+            existing_summary["key_findings"] = summary_res.key_findings
+        if not existing_summary.get("investigative_leads"):
+            existing_summary["investigative_leads"] = summary_res.investigative_leads
+        if not existing_summary.get("what_we_know"):
+            existing_summary["what_we_know"] = summary_res.what_we_know
+        if not existing_summary.get("what_we_dont_know"):
+            existing_summary["what_we_dont_know"] = summary_res.what_we_dont_know
+        data["investigative_summary"] = existing_summary
 
         if not data.get("open_questions"):
             data["open_questions"] = summary_res.open_questions

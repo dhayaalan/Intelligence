@@ -65,8 +65,10 @@ export interface HoverTooltipData {
 
 export const getEntityCategory = (type: string = ''): string => {
   const t = type.toUpperCase();
+  if (['VEHICLE', 'CAR', 'AUTOMOBILE', 'PLATE', 'VEHICLE_PLATE', 'ASSET'].includes(t)) return 'VEHICLE';
+  if (['LOCATION', 'GEO', 'COORDINATES', 'PLACE', 'CITY', 'COUNTRY', 'STATE', 'REGION'].includes(t)) return 'LOCATION';
   if (['PERSON', 'THREAT_ACTOR', 'USERNAME', 'AUTHOR', 'ACTOR'].includes(t)) return 'PERSON';
-  if (['ORGANIZATION', 'ORG', 'COMPANY', 'GROUP', 'NGO', 'FOUNDATION', 'TERROR_GROUP', 'GOVERNMENT'].includes(t)) return 'ORGANIZATION';
+  if (['ORGANIZATION', 'ORG', 'COMPANY', 'GROUP', 'NGO', 'FOUNDATION', 'TERROR_GROUP', 'GOVERNMENT', 'AUTHORITY', 'REGISTRY'].includes(t)) return 'ORGANIZATION';
   if (['VULNERABILITY', 'CVE', 'THREAT_INDICATOR', 'MALWARE', 'THREAT'].includes(t)) return 'THREAT_INDICATOR';
   if (['IP', 'IPV4', 'IPV6'].includes(t)) return 'IP';
   if (['HASH', 'SHA256', 'MD5'].includes(t)) return 'HASH';
@@ -95,6 +97,12 @@ export const extractEntityAvatar = (ent: any): string | null => {
 const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string => {
   let content = '';
   switch (category) {
+    case 'VEHICLE':
+      content = `<path d="M7 26l3-9a3 3 0 0 1 2.8-2h22.4a3 3 0 0 1 2.8 2l3 9M5 26h38a3 3 0 0 1 3 3v7a2 2 0 0 1-2 2h-3a4 4 0 0 1-8 0H14a4 4 0 0 1-8 0H4a2 2 0 0 1-2-2v-7a3 3 0 0 1 3-3z" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="38" r="2.5" fill="${color}"/><circle cx="38" cy="38" r="2.5" fill="${color}"/><line x1="14" y1="21" x2="34" y2="21" stroke="${color}" stroke-width="2"/>`;
+      break;
+    case 'LOCATION':
+      content = `<path d="M24 6c-6.627 0-12 5.373-12 12 0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12z" stroke="${color}" stroke-width="2.8" fill="none"/><circle cx="24" cy="18" r="4" fill="${color}"/>`;
+      break;
     case 'PERSON':
       content = `<circle cx="24" cy="15" r="7.5" fill="${color}"/><path d="M9 37c0-8.284 6.716-15 15-15s15 6.716 15 15" fill="${color}"/>`;
       break;
@@ -123,6 +131,8 @@ const getCategorySvgIcon = (category: string, color: string = '#ffffff'): string
 };
 
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; glow: string; text: string }> = {
+  VEHICLE: { bg: '#8b5cf6', border: '#7c3aed', glow: 'rgba(139, 92, 246, 0.4)', text: '#ffffff' },
+  LOCATION: { bg: '#06b6d4', border: '#0891b2', glow: 'rgba(6, 182, 212, 0.4)', text: '#ffffff' },
   ORGANIZATION: { bg: '#6366f1', border: '#4f46e5', glow: 'rgba(99, 102, 241, 0.4)', text: '#ffffff' },
   PERSON: { bg: '#f59e0b', border: '#d97706', glow: 'rgba(245, 158, 11, 0.4)', text: '#ffffff' },
   THREAT_INDICATOR: { bg: '#f43f5e', border: '#e11d48', glow: 'rgba(244, 63, 94, 0.4)', text: '#ffffff' },
@@ -254,8 +264,9 @@ export const GraphStudioComponent: React.FC<Props> = ({
 
   // Filtered entities for Cytoscape Canvas
   const filteredEntities = useMemo(() => {
-    const sourceList = showUnlinkedOnCanvas ? entities : connectedEntitiesList;
-    return sourceList.filter((e) => {
+    // If no relationships exist yet or user toggled unlinked on canvas, show all entities so the canvas is never empty
+    const sourceList = (showUnlinkedOnCanvas || connectedEntitiesList.length === 0) ? entities : connectedEntitiesList;
+    const filtered = sourceList.filter((e) => {
       if (filterCategory !== 'ALL' && getEntityCategory(e.type) !== filterCategory) return false;
       if (searchFilter.trim()) {
         const q = searchFilter.toLowerCase();
@@ -267,7 +278,13 @@ export const GraphStudioComponent: React.FC<Props> = ({
       }
       return true;
     });
-  }, [entities, connectedEntitiesList, showUnlinkedOnCanvas, filterCategory, searchFilter]);
+
+    // Ensure rootCandidate is always present if available
+    if (rootCandidate && !filtered.some(e => (e.value || (e as any).name || e.id) === (rootCandidate.value || (rootCandidate as any).name || rootCandidate.id))) {
+      filtered.unshift(rootCandidate);
+    }
+    return filtered;
+  }, [entities, connectedEntitiesList, showUnlinkedOnCanvas, filterCategory, searchFilter, rootCandidate]);
 
   // Filtered unlinked list for Unlinked Intelligence Tray
   const filteredUnlinkedTray = useMemo(() => {
@@ -1001,6 +1018,8 @@ export const GraphStudioComponent: React.FC<Props> = ({
           <div className="flex items-center gap-1 overflow-x-auto py-0.5">
             {[
               { id: 'ALL', label: 'All', color: '#6366f1' },
+              { id: 'VEHICLE', label: 'Vehicles', color: '#8b5cf6' },
+              { id: 'LOCATION', label: 'Locations', color: '#06b6d4' },
               { id: 'PERSON', label: 'Identities', color: '#f59e0b' },
               { id: 'ORGANIZATION', label: 'Organizations', color: '#6366f1' },
               { id: 'DOMAIN', label: 'Domains', color: '#64748b' },
@@ -1293,6 +1312,14 @@ export const GraphStudioComponent: React.FC<Props> = ({
 
           {/* Minimalist Legend Overlay */}
           <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200/90 dark:border-slate-800 text-[10px] font-mono flex items-center gap-3 shadow-xs select-none">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+              <span className="text-slate-600 dark:text-slate-400">Vehicle</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" />
+              <span className="text-slate-600 dark:text-slate-400">Location</span>
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
               <span className="text-slate-600 dark:text-slate-400">Org</span>

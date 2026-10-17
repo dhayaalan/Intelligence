@@ -18,6 +18,10 @@ class TargetClassifier:
     SHA1_REGEX = re.compile(r"^[a-fA-F0-9]{40}$")
     SHA256_REGEX = re.compile(r"^[a-fA-F0-9]{64}$")
     CVE_REGEX = re.compile(r"^CVE-\d{4}-\d{4,8}$", re.IGNORECASE)
+    VEHICLE_PLATE_REGEX = re.compile(
+        r"^(?:[A-Z]{2}\s?[0-9]{1,2}\s?[A-Z]{0,3}\s?[0-9]{4}|[A-Z]{2}[0-9]{2}\s?[A-Z]{3}|[1-9A-Z]{1}[A-Z0-9]{4,6}|[A-Z]{1,3}\s?[A-Z]{1,2}\s?[0-9]{1,4})$",
+        re.IGNORECASE
+    )
 
     # Known geopolitical, news & event keyword triggers
     EVENT_KEYWORDS = {
@@ -84,6 +88,12 @@ class TargetClassifier:
         if " " in q:
             return "keyword"
 
+        # Check Vehicle Registration Plate (e.g. TN34MA8562, DL01AB1234, BD51 SMR)
+        is_plate_prefix = q.lower().startswith("plate:") or q.lower().startswith("registration:")
+        clean_plate = q.split(":", 1)[1].strip() if is_plate_prefix else q
+        if is_plate_prefix or (cls.VEHICLE_PLATE_REGEX.match(clean_plate) and any(c.isdigit() for c in clean_plate) and any(c.isalpha() for c in clean_plate)):
+            return "vehicle"
+
         # Check username handle (@username)
         if q.startswith("@") or (len(q) >= 3 and q.isalnum()):
             return "username"
@@ -94,12 +104,25 @@ class TargetClassifier:
     def classify_intent(cls, query: str) -> Dict[str, Any]:
         """
         Classifies query intent into investigator-centric intelligence categories:
-        PERSON, ORGANIZATION, DOMAIN, IP, EMAIL, USERNAME, LOCATION, EVENT,
+        PERSON, ORGANIZATION, DOMAIN, IP, EMAIL, USERNAME, VEHICLE_PLATE, LOCATION, EVENT,
         NEWS_TOPIC, IOC, INFRASTRUCTURE, GENERAL_RESEARCH, MULTI_ENTITY_QUERY.
         """
         q = query.strip()
         q_lower = q.lower()
         tokens = [t.strip(",.:;!?") for t in q_lower.split() if t.strip(",.:;!?")]
+
+        # 0. Check Vehicle Registration Plate
+        is_plate_prefix = q.lower().startswith("plate:") or q.lower().startswith("registration:")
+        clean_plate = q.split(":", 1)[1].strip() if is_plate_prefix else q
+        if is_plate_prefix or (cls.VEHICLE_PLATE_REGEX.match(clean_plate) and any(c.isdigit() for c in clean_plate) and any(c.isalpha() for c in clean_plate)):
+            return {
+                "intent": "VEHICLE_PLATE",
+                "category": "ASSET",
+                "is_technical_target": False,
+                "explanation": f"Vehicle registration number plate ({clean_plate.upper()}). Routing to vehicle intelligence and lawful registry verification.",
+                "recommended_scopes": ["OSINT"],
+                "applicable_modules": ["osint"]
+            }
 
         # 1. Check URL
         if cls.URL_REGEX.match(q):

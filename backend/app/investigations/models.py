@@ -60,6 +60,8 @@ class InvestigationCreateRequest(BaseModel):
     selected_modules: List[str] = Field(default_factory=lambda: ["osint", "threat_intelligence"])
     search_id: Optional[str] = None
     relationships: List[Dict[str, Any]] = Field(default_factory=list)
+    investigative_summary: Optional[Dict[str, Any]] = None
+    investigation_health: Optional[Dict[str, Any]] = None
 
 class InvestigationUpdateRequest(BaseModel):
     title: Optional[str] = None

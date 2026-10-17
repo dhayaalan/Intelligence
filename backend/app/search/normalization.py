@@ -338,5 +338,17 @@ def verify_identifier_match(
             if norm_cp and norm_cp.e164 == queried_canonical:
                 return True
         return False
-        
+
+    elif identifier_type in [IdentifierType.VEHICLE_PLATE.value, "VEHICLE_PLATE", "VEHICLE"]:
+        clean_target = re.sub(r"[\s\-_:]", "", queried_canonical.strip().upper())
+        clean_rec = re.sub(r"[\s\-_:]", "", record_value.strip().upper())
+        if clean_target == clean_rec or clean_target in clean_rec or clean_rec in clean_target:
+            return True
+        plate_in_meta = meta.get("plate_number") or meta.get("plate")
+        if plate_in_meta:
+            clean_meta = re.sub(r"[\s\-_:]", "", str(plate_in_meta).strip().upper())
+            if clean_target == clean_meta:
+                return True
+        return False
+
     return False
