@@ -229,11 +229,18 @@ class YouTubeCollector:
     async def search_posts(self, query: str, limit: int = 15) -> List[SocialPost]:
         """
         Adapts YouTube search results into the universal SocialPost schema.
-        Authentic extraction: if query is a video ID or URL, resolves genuine video.
-        If keyword query, searches via YouTube oEmbed / public RSS if available,
-        or returns empty list with zero fake data injection.
+        Authentic extraction:
+        1. If query is a video ID or URL, resolves genuine video metadata.
+        2. If official YouTube Data API key is available, queries official search endpoint.
+        3. If keyword query, searches via public video discovery and resolves authentic oEmbed metadata.
+        Returns empty list with zero fake data or synthetic transcripts when unavailable.
         """
-        vid = self.extract_video_id(query)
+        clean_q = (query or "").strip()
+        if not clean_q:
+            return []
+
+        # 1. Direct Video ID or URL
+        vid = self.extract_video_id(clean_q)
         if vid:
             meta = await self.get_video_metadata(vid)
             if meta:
@@ -249,11 +256,88 @@ class YouTubeCollector:
                         views_count=meta.view_count,
                         likes_count=meta.like_count,
                         channel_name=meta.channel_title,
-                        media_urls=[meta.thumbnail_url],
+                        media_urls=[meta.thumbnail_url] if meta.thumbnail_url else [],
                         entities=meta.tags,
                         credibility_score=None
                     )
                 ]
+
+        # 2. Official YouTube Data API v3 search (if configured)
+        api_key = os.getenv("YOUTUBE_API_KEY", "")
+        if api_key:
+            try:
+                url = "https://www.googleapis.com/youtube/v3/search"
+                params = {
+                    "part": "snippet",
+                    "q": clean_q,
+                    "type": "video",
+                    "maxResults": min(limit, 15),
+                    "key": api_key
+                }
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    resp = await client.get(url, params=params)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        posts = []
+                        for item in data.get("items", []):
+                            v_id = item.get("id", {}).get("videoId")
+                            snippet = item.get("snippet", {})
+                            if v_id:
+                                posts.append(
+                                    SocialPost(
+                                        id=f"yt_{v_id}",
+                                        platform=SocialPlatformType.YOUTUBE,
+                                        author=snippet.get("channelTitle", "YouTube Channel"),
+                                        author_id=snippet.get("channelId"),
+                                        text=f"{snippet.get('title', '')}\n\n{snippet.get('description', '')[:280]}",
+                                        created_at=snippet.get("publishedAt"),
+                                        url=f"https://www.youtube.com/watch?v={v_id}",
+                                        channel_name=snippet.get("channelTitle"),
+                                        media_urls=[snippet.get("thumbnails", {}).get("high", {}).get("url") or f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg"],
+                                        entities=[],
+                                        credibility_score=None
+                                    )
+                                )
+                        if posts:
+                            return posts
+            except Exception as e:
+                app_logger.warning(f"Error querying YouTube Data API search: {e}")
+
+        # 3. Public Video Discovery Fallback with Authentic oEmbed Resolution
+        try:
+            search_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(clean_q)}"
+            async with httpx.AsyncClient(
+                timeout=6.0,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            ) as client:
+                page_resp = await client.get(search_url)
+                if page_resp.status_code == 200:
+                    found_vids = list(dict.fromkeys(re.findall(r'watch\?v=([a-zA-Z0-9_-]{11})', page_resp.text)))[:min(limit, 5)]
+                    posts = []
+                    for v_id in found_vids:
+                        meta = await self.get_video_metadata(v_id)
+                        if meta:
+                            posts.append(
+                                SocialPost(
+                                    id=f"yt_{meta.video_id}",
+                                    platform=SocialPlatformType.YOUTUBE,
+                                    author=meta.channel_title,
+                                    author_id=meta.channel_id,
+                                    text=f"{meta.title}\n\n{meta.description[:280]}",
+                                    created_at=meta.upload_date,
+                                    url=meta.url,
+                                    views_count=meta.view_count,
+                                    likes_count=meta.like_count,
+                                    channel_name=meta.channel_title,
+                                    media_urls=[meta.thumbnail_url] if meta.thumbnail_url else [],
+                                    entities=meta.tags,
+                                    credibility_score=None
+                                )
+                            )
+                    if posts:
+                        return posts
+        except Exception as e:
+            app_logger.debug(f"Public YouTube discovery completed with no results: {e}")
 
         return []
 

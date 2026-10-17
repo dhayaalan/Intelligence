@@ -1,7 +1,8 @@
 import asyncio
 import time
 import uuid
-from typing import Any, Dict, List
+import hashlib
+from typing import Any, Dict, List, Tuple
 from datetime import datetime
 from app.core.config import settings
 from app.core.database import db
@@ -14,7 +15,8 @@ from app.module_registry.registry import module_registry
 from app.module_sdk.models import (
     SearchContext, NormalizedModuleResult, EntityType, EntityPayload, RelationshipPayload, EvidencePayload, RelationshipType
 )
-from app.infrastructure.mongodb.repositories import entity_repo, relationship_repo, search_repo, evidence_repo
+from app.infrastructure.mongodb.repositories import entity_repo, relationship_repo, search_repo, evidence_repo, memory_cache
+from app.infrastructure.neo4j.service import neo4j_service
 from app.correlation.engine import correlation_engine
 from app.search.classifier import target_classifier
 from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord
@@ -157,10 +159,10 @@ class SearchOrchestrator:
         ))
 
         # 3. Determine authorized modules dynamically via multi-layer authorization
-        effective_module_ids = authorization_service.get_effective_modules_for_user(user)
+        user_authorized_modules = authorization_service.get_effective_modules_for_user(user)
         # Strict boundary enforcement: only modules that are authorized, selected, AND enabled in registry
         effective_module_ids = [
-            m for m in effective_module_ids 
+            m for m in user_authorized_modules 
             if m in target_modules_set and module_registry.is_module_enabled(m)
         ]
         
@@ -686,85 +688,113 @@ class SearchOrchestrator:
             "details": f"CCI: {cci_score}% • {len(suggested_pivots)} secondary investigative pivots generated"
         })
 
-        # 8. [MULTI-STAGE] Automated Multi-Hop Bounded Pivot Execution
+        # 8. [MULTI-STAGE] Automated Multi-Hop Bounded Recursive Pivot Execution
         executed_pivots: List[Dict[str, Any]] = []
         if (not is_identifier or len(corr_entities) > 0) and request.options.get("auto_pivot", True) and suggested_pivots:
             pvt_start = time.time()
-            max_depth = request.options.get("max_hop_depth", 2)
-            max_pivots_to_run = min(request.options.get("max_pivots", 2), 2)
+            max_depth = int(request.options.get("max_depth") or request.options.get("max_hop_depth") or 2)
+            max_total_pivots = min(int(request.options.get("max_pivots", 2)), 3)
+            visited_queries = {effective_query.strip().lower()}
             
-            for pvt in suggested_pivots[:max_pivots_to_run]:
-                p_query = pvt.get("pivot_query")
-                if not p_query or p_query.lower() == effective_query.lower():
+            # Queue item: (hop_depth, pivot_dict)
+            pivot_queue: List[Tuple[int, Dict[str, Any]]] = [(1, p) for p in suggested_pivots]
+            authorized_pivot_modules = set(user_authorized_modules)
+
+            while pivot_queue and len(executed_pivots) < max_total_pivots:
+                hop, pvt = pivot_queue.pop(0)
+                p_query = str(pvt.get("pivot_query", "")).strip()
+                if not p_query or p_query.lower() in visited_queries:
                     continue
+                visited_queries.add(p_query.lower())
+
                 p_mods = pvt.get("target_modules", ["osint"])
-                valid_mods = [m for m in p_mods if m in effective_module_ids and module_registry.is_module_enabled(m)]
+                valid_mods = [m for m in p_mods if m in authorized_pivot_modules and module_registry.is_module_enabled(m)]
                 if not valid_mods:
                     continue
 
-                child_entities = []
-                for mod_id in valid_mods:
-                    mod = module_registry.get_module(mod_id)
-                    if not mod:
-                        continue
+                child_entities_found: List[EntityPayload] = []
+                parent_val = pvt.get("parent_entity_value", effective_query)
+
+                async def _query_pivot_module(m_id: str):
+                    m = module_registry.get_module(m_id)
+                    if not m:
+                        return None
                     try:
                         child_ctx = SearchContext(
-                            search_id=f"{search_id}_pvt_{pvt.get('pivot_id', '0')}",
+                            search_id=f"{search_id}_pvt_{pvt.get('pivot_id', uuid.uuid4().hex[:6])}_{m_id[:4]}",
                             tenant_id=tenant_id,
                             user_id=user.id,
                             query=p_query,
-                            target_type=pvt.get("pivot_target_type", "domain"),
-                            options={"hop_depth": 2, "parent_entity": pvt.get("parent_entity_value")}
+                            target_type=pvt.get("pivot_target_type", "entity"),
+                            options={"hop_depth": hop + 1, "parent_entity": parent_val}
                         )
-                        child_res = await asyncio.wait_for(mod.search(child_ctx), timeout=5.0)
-                        if child_res and child_res.entities:
-                            for ce in child_res.entities:
-                                if not any(existing.value.lower() == ce.value.lower() for existing in corr_entities):
-                                    corr_entities.append(ce)
-                                    child_entities.append(ce.value)
-                            if child_res.relationships:
-                                corr_relationships.extend(child_res.relationships)
-                            if child_res.evidence:
-                                all_evidence.extend(child_res.evidence)
+                        return await asyncio.wait_for(m.search(child_ctx), timeout=2.5)
                     except Exception as p_ex:
-                        app_logger.debug(f"Pivot execution non-critical failure: {p_ex}")
+                        app_logger.debug(f"Pivot execution non-critical failure for module {m_id}: {p_ex}")
+                        return None
 
-                if child_entities:
-                    rel_type_str = str(pvt.get("relationship", "RELATED_TO")).upper()
-                    try:
-                        r_type = RelationshipType(rel_type_str)
-                    except ValueError:
-                        r_type = RelationshipType.RELATED_TO
-                        
-                    pivot_rel = RelationshipPayload(
-                        id=f"rel_pvt_{uuid.uuid4().hex[:8]}",
-                        source_entity_value=pvt.get("parent_entity_value", effective_query),
-                        target_entity_value=p_query,
-                        relationship_type=r_type,
-                        confidence=float(pvt.get("confidence", 0.9)),
-                        basis="MULTI_HOP_PIVOT_DISCOVERY",
-                        methodology="automated_stage2_pivot",
-                        sources=pvt.get("sources", ["Pivot Engine"]),
-                        metadata={"pivot_id": pvt.get("pivot_id"), "why_it_matters": pvt.get("why_it_matters")}
-                    )
-                    corr_relationships.append(pivot_rel)
+                mod_results = await asyncio.gather(*[_query_pivot_module(m) for m in valid_mods], return_exceptions=True)
+                for child_res in mod_results:
+                    if isinstance(child_res, Exception) or not child_res:
+                        continue
+                    if child_res.entities:
+                        for ce in child_res.entities:
+                            if not any(existing.value.lower() == ce.value.lower() for existing in corr_entities):
+                                corr_entities.append(ce)
+                                child_entities_found.append(ce)
+                    if child_res.relationships:
+                        corr_relationships.extend(child_res.relationships)
+                    if child_res.evidence:
+                        all_evidence.extend(child_res.evidence)
+
+                rel_type_str = str(pvt.get("relationship", "RELATED_TO")).upper()
+                try:
+                    r_type = RelationshipType(rel_type_str)
+                except ValueError:
+                    r_type = RelationshipType.RELATED_TO
+
+                pivot_rel = RelationshipPayload(
+                    id=f"rel_pvt_{uuid.uuid4().hex[:8]}",
+                    source_entity_value=parent_val,
+                    target_entity_value=p_query,
+                    relationship_type=r_type,
+                    confidence=float(pvt.get("confidence", 0.85)),
+                    basis="MULTI_HOP_PIVOT_DISCOVERY",
+                    methodology=f"automated_hop_{hop}_pivot",
+                    sources=pvt.get("sources", ["Pivot Engine"]),
+                    metadata={"pivot_id": pvt.get("pivot_id"), "why_it_matters": pvt.get("why_it_matters"), "hop_depth": hop}
+                )
+                corr_relationships.append(pivot_rel)
 
                 executed_pivots.append({
                     "pivot_id": pvt.get("pivot_id"),
                     "pivot_query": p_query,
                     "target_modules": valid_mods,
                     "relationship": pvt.get("relationship"),
-                    "parent_entity": pvt.get("parent_entity_value"),
-                    "status": "COMPLETED" if child_entities else "SUCCESS_EMPTY",
-                    "entities_discovered": child_entities
+                    "parent_entity": parent_val,
+                    "hop": hop,
+                    "status": "COMPLETED" if child_entities_found else "SUCCESS_EMPTY",
+                    "entities_discovered": [e.value for e in child_entities_found]
                 })
+
+                # Bounded recursion: queue next hops if allowed
+                if hop < max_depth and child_entities_found and len(executed_pivots) < max_total_pivots:
+                    next_pivots = pivot_engine.generate_pivots(
+                        original_query=p_query,
+                        target_type=pvt.get("pivot_target_type", "entity"),
+                        entities=child_entities_found,
+                        max_pivots=3
+                    )
+                    for np in next_pivots:
+                        if np.get("pivot_query", "").strip().lower() not in visited_queries:
+                            pivot_queue.append((hop + 1, np))
 
             if executed_pivots:
                 pipeline_trace.append({
                     "stage": "Automated Multi-Stage Pivot Execution",
                     "status": "completed",
                     "duration_ms": round((time.time() - pvt_start) * 1000, 2),
-                    "details": f"Executed {len(executed_pivots)} secondary investigative hops; discovered {sum(len(ep['entities_discovered']) for ep in executed_pivots)} additional entities"
+                    "details": f"Executed {len(executed_pivots)} investigative hops across {max_depth} depth levels; discovered {sum(len(ep['entities_discovered']) for ep in executed_pivots)} additional entities"
                 })
 
         if is_identifier and len(corr_entities) == 0:
@@ -805,7 +835,7 @@ class SearchOrchestrator:
             executed_pivots=executed_pivots,
             multi_stage_metadata={
                 "auto_pivot_enabled": request.options.get("auto_pivot", True),
-                "hops_executed": 2 if executed_pivots else 1,
+                "hops_executed": (max([p.get("hop", 1) for p in executed_pivots], default=1) + 1) if executed_pivots else 1,
                 "executed_pivots_count": len(executed_pivots)
             },
             search_mode=search_mode,
@@ -840,10 +870,11 @@ class SearchOrchestrator:
             
         search_repo._sync_write({"id": search_id, "tenant_id": tenant_id}, search_record)
 
-        # Persist correlated entities & evidence to MongoDB
+        # Persist correlated entities & evidence to MongoDB and Neo4j
         for ent in corr_entities:
-            entity_repo._sync_write({"type": ent.type, "value": ent.value, "tenant_id": tenant_id}, {
-                "id": getattr(ent, "id", None) or f"ent_{hash(f'{ent.type}_{ent.value}')}",
+            ent_id = getattr(ent, "id", None) or f"ent_{hashlib.md5(f'{ent.type}_{ent.value}'.encode()).hexdigest()[:10]}"
+            ent_dict = {
+                "id": ent_id,
                 "tenant_id": tenant_id,
                 "type": ent.type,
                 "value": ent.value,
@@ -851,7 +882,31 @@ class SearchOrchestrator:
                 "sources": ent.sources,
                 "metadata": ent.metadata or {},
                 "last_seen": datetime.utcnow().isoformat()
-            })
+            }
+            entity_repo._sync_write({"type": ent.type, "value": ent.value, "tenant_id": tenant_id}, ent_dict)
+            try:
+                await neo4j_service.upsert_entity(tenant_id, ent_dict)
+            except Exception as n_err:
+                app_logger.debug(f"Neo4j entity upsert non-critical failure: {n_err}")
+
+        # Persist correlated relationships to MongoDB and Neo4j
+        for rel in corr_relationships:
+            rel_dict = rel.dict() if hasattr(rel, "dict") else dict(rel)
+            s_val = rel_dict.get("source_entity_value", "")
+            t_val = rel_dict.get("target_entity_value", "")
+            r_type = rel_dict.get("relationship_type", "")
+            rel_hash = hashlib.md5(f"{s_val}_{t_val}_{r_type}".encode()).hexdigest()[:12]
+            rel_id = rel_dict.get("id") or f"rel_{rel_hash}"
+            rel_dict["id"] = rel_id
+            rel_dict["tenant_id"] = tenant_id
+            relationship_repo._sync_write({"id": rel_id, "tenant_id": tenant_id}, rel_dict)
+            with memory_cache._lock:
+                memory_cache.relationships[rel_id] = rel_dict
+            try:
+                await neo4j_service.upsert_relationship(tenant_id, rel_dict)
+            except Exception as n_err:
+                app_logger.debug(f"Neo4j relationship upsert non-critical failure: {n_err}")
+
         for ev in all_evidence:
             ev_hash = getattr(ev, "hash", "") or getattr(ev, "id", "")
             if ev_hash:

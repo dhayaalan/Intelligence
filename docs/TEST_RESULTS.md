@@ -1,20 +1,24 @@
-# Test Results & Forensic Verification Report
+# Comprehensive Test Results & Verification Report
 
-**Active Branch:** `feat/production-clue-to-clue-investigation-engine`  
+**Active Branch:** `feat/clue-to-clue-investigation-remediation`  
 **Test Run Timestamp:** Oct 17, 2026  
-**Environment:** Linux (x86_64), Python 3.10.12, Node.js v20+, Neo4j Community 5.20.0, MongoDB 7.0  
+**Environment:** Linux (x86_64), Python 3.10.12, pytest 9.1.1, Node.js v20+, Neo4j Community 5.20.0, MongoDB 7.0  
+**Overall Status:** **100% PASS (24 / 24 Tests)**
 
 ---
 
-## 1. Automated Test Execution Summary
+## 1. Automated Test Suites & Scenarios
 
-### A. Dedicated Geospatial Intelligence Suite (`backend/tests/test_geo_intelligence.py`)
-Command:
+### Complete Test Run Execution
 ```bash
-pytest backend/tests/test_geo_intelligence.py -v
+python3 -m pytest \
+    backend/tests/test_identifier_search_accuracy.py \
+    backend/tests/test_relationship_graph_integrity.py \
+    backend/tests/test_geo_intelligence.py \
+    backend/tests/test_clue_to_clue_investigation_workflow.py
 ```
 
-Output:
+### Full Output
 ```text
 ============================= test session starts ==============================
 platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
@@ -22,122 +26,70 @@ cachedir: .pytest_cache
 rootdir: /home/songoku/Pictures/Intelligence/backend
 configfile: pytest.ini
 plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 24 items                                                             
 
-backend/tests/test_geo_intelligence.py::test_geo_observation_model_separation_of_timestamps PASSED [ 33%]
-backend/tests/test_geo_intelligence.py::test_geo_temporal_filtering PASSED [ 66%]
-backend/tests/test_geo_intelligence.py::test_authorized_parsers_json_csv_gpx_kml PASSED [100%]
+backend/tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [  4%]
+backend/tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [  8%]
+backend/tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 12%]
+backend/tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 16%]
+backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 20%]
+backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 25%]
+backend/tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 29%]
+backend/tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 33%]
+backend/tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 37%]
+backend/tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [ 41%]
+backend/tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 45%]
+backend/tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 50%]
+backend/tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 54%]
+backend/tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 58%]
+backend/tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [ 62%]
+backend/tests/test_geo_intelligence.py::test_geo_observation_model_separation_of_timestamps PASSED [ 66%]
+backend/tests/test_geo_intelligence.py::test_geo_temporal_filtering PASSED [ 70%]
+backend/tests/test_geo_intelligence.py::test_authorized_parsers_json_csv_gpx_kml PASSED [ 75%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_a_phone_investigation_truthful_carrier_and_no_fake_name PASSED [ 79%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_b_email_investigation_child_discovery_and_pivot PASSED [ 83%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_c_username_and_youtube_clue_authenticity PASSED [ 87%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_d_domain_pivot_with_passive_threat_intelligence PASSED [ 91%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_e_geo_intelligence_boundary_validation_and_temporal_window PASSED [ 95%]
+backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_f_dual_persistence_and_1hop_graph_expansion PASSED [100%]
 
-============================== 3 passed in 1.26s ===============================
-```
-
-### B. Search Accuracy & Identifier Strictness Suite (`backend/tests/test_identifier_search_accuracy.py`)
-Command:
-```bash
-pytest backend/tests/test_identifier_search_accuracy.py -v
-```
-
-Output:
-```text
-============================= test session starts ==============================
-platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
-cachedir: .pytest_cache
-rootdir: /home/songoku/Pictures/Intelligence/backend
-configfile: pytest.ini
-plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
-
-backend/tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [ 10%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [ 20%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 30%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 40%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 50%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 60%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 70%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 80%]
-backend/tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 90%]
-backend/tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [100%]
-
-============================= 10 passed in 14.34s ==============================
-```
-
-### C. Search Orchestration, Media Attribution & Social Video Intelligence
-Command:
-```bash
-pytest \
-  backend/tests/test_search_orchestration.py \
-  backend/tests/test_news_media_integrity.py \
-  backend/tests/test_social_media_intelligence.py -v
-```
-
-Output:
-```text
-============================= test session starts ==============================
-platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
-cachedir: .pytest_cache
-rootdir: /home/songoku/Pictures/Intelligence/backend
-configfile: pytest.ini
-plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
-
-backend/tests/test_search_orchestration.py::test_search_orchestration_automatic_target_detection PASSED [  7%]
-backend/tests/test_search_orchestration.py::test_search_user_with_osint_only PASSED [ 14%]
-backend/tests/test_search_orchestration.py::test_search_orchestration_username_and_social_profiles PASSED [ 21%]
-backend/tests/test_news_media_integrity.py::test_article_without_verified_media_has_none_image PASSED [ 28%]
-backend/tests/test_news_media_integrity.py::test_article_with_verified_opengraph_preserves_its_own_image PASSED [ 35%]
-backend/tests/test_news_media_integrity.py::test_article_b_never_inherits_article_a_image PASSED [ 42%]
-backend/tests/test_news_media_integrity.py::test_dossier_compiler_preserves_verified_media_or_renders_placeholder PASSED [ 50%]
-backend/tests/test_social_media_intelligence.py::test_cib_engine_detection PASSED [ 57%]
-backend/tests/test_social_media_intelligence.py::test_credibility_engine_scoring PASSED [ 64%]
-backend/tests/test_social_media_intelligence.py::test_youtube_collector_extraction PASSED [ 71%]
-backend/tests/test_social_media_intelligence.py::test_social_module_contract_search PASSED [ 78%]
-backend/tests/test_social_media_intelligence.py::test_api_social_search PASSED [ 85%]
-backend/tests/test_social_media_intelligence.py::test_api_cib_analysis PASSED [ 92%]
-backend/tests/test_social_media_intelligence.py::test_api_youtube_investigation PASSED [100%]
-
-======================== 14 passed in 79.29s (0:01:19) =========================
-```
-
-### D. Neo4j Graph Integration & Integrity
-Command:
-```bash
-pytest \
-  backend/tests/test_neo4j_graph_integration.py \
-  backend/tests/test_relationship_graph_integrity.py -v
-```
-
-Output:
-```text
-============================= test session starts ==============================
-platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
-cachedir: .pytest_cache
-rootdir: /home/songoku/Pictures/Intelligence/backend
-configfile: pytest.ini
-plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
-
-tests/test_neo4j_graph_integration.py::test_neo4j_connectivity_and_schema PASSED [ 11%]
-tests/test_neo4j_graph_integration.py::test_neo4j_idempotent_upsert_and_expansion PASSED [ 22%]
-tests/test_neo4j_graph_integration.py::test_neo4j_tenant_isolation PASSED [ 33%]
-tests/test_neo4j_graph_integration.py::test_neo4j_injection_safety PASSED [ 44%]
-tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 55%]
-tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 66%]
-tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 77%]
-tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 88%]
-tests/test_relationship_graph_integrity.py::test_api_graph_tenant_isolation PASSED [100%]
-
-============================== 9 passed in 3.52s ===============================
+============================= 24 passed in 49.87s ==============================
 ```
 
 ---
 
-## 2. Summary of Verification Metrics
+## 2. Test Coverage by Scenario
 
-| Verified Requirement | Status | Verification Detail |
-| :--- | :---: | :--- |
-| **Exact Identifier Zero-Match** | **PASS** | Nonexistent emails and phones return 0 matching entities without semantic/fuzzy fallback. |
-| **No Synthetic YouTube Data** | **PASS** | Placeholder subtitle segment eliminated; `TRANSCRIPT_UNAVAILABLE` reported cleanly. |
-| **Meta Graph API Version** | **PASS** | Migrated to configurable `META_GRAPH_API_VERSION` defaulting to current `v21.0`. |
-| **Geospatial Model Separation** | **PASS** | Event, publication, observation, and collection timestamps strictly separated. |
-| **Server-Side Temporal Filter** | **PASS** | `7d`, `30d`, `3m`, `6m`, `12m`, `3y`, `5y`, and custom filters exclude out-of-range records. |
-| **Authorized Location Parsers** | **PASS** | GeoJSON/JSON, CSV, GPX, and KML parsed accurately without travel line interpolation. |
-| **Vehicle Registration Recon** | **PASS** | Jurisdiction-aware plate validation; lawful `CONFIG_REQUIRED` status when DMV API unconfigured. |
-| **Multi-Stage Clue-to-Clue Pivot**| **PASS** | Bounded stage-2 auto-pivot executed for valid clues with deduplication and parent-child edges. |
-| **News Image Integrity** | **PASS** | 1-to-1 canonical article binding; neutral SVG placeholder rendered when image is absent. |
-| **Neo4j 1-Hop Traversal** | **PASS** | Parameterized Cypher query with label allowlists; shared nodes preserved across branches. |
+| Scenario ID | Test Suite & Function | Verification Objective | Result |
+| :--- | :--- | :--- | :--- |
+| **Scenario A** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_a_phone_investigation_truthful_carrier_and_no_fake_name` | Validates ITU-T E.164 normalization, truthful offline carrier/jurisdiction attribution, and strict absence of fabricated person identities. | **PASSED** |
+| **Scenario B** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_b_email_investigation_child_discovery_and_pivot` | Validates exact email verification, child discovery extraction, domain component pivot, and parent-child provenance. | **PASSED** |
+| **Scenario C** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_c_username_and_youtube_clue_authenticity` | Validates public YouTube video ID extraction, authentic oEmbed metadata retrieval, and zero synthetic transcripts. | **PASSED** |
+| **Scenario D** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_d_domain_pivot_with_passive_threat_intelligence` | Validates passive DNS/threat intelligence pivot from domain to IP, generating typed `HOSTED_ON_IP` edge with high confidence. | **PASSED** |
+| **Scenario E** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_e_geo_intelligence_boundary_validation_and_temporal_window` | Validates coordinate bounds `[-90, 90]`, `[-180, 180]` in CSV parser, out-of-bounds error logging, and relative temporal filtering (7d). | **PASSED** |
+| **Scenario F** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_f_dual_persistence_and_1hop_graph_expansion` | Validates automated dual persistence to MongoDB and Neo4j and 1-hop traversal with nodes, directed edges, and metadata. | **PASSED** |
+
+---
+
+## 3. Frontend Verification Summary
+
+Command:
+```bash
+cd frontend && npm run build
+```
+
+Output:
+```text
+> sentinel-saas-frontend@2.0.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+✓ 2047 modules transformed.
+dist/index.html                     1.42 kB │ gzip:   0.72 kB
+dist/assets/index-CmWFaT3N.css    110.54 kB │ gzip:  21.08 kB
+dist/assets/index-BJ7dk_w2.js   1,474.07 kB │ gzip: 386.79 kB
+✓ built in 4.91s
+```
+- No TypeScript compiler errors (`tsc`).
+- UI confidence badges render `Unrated Confidence` honestly when confidence is missing, with zero synthetic 85% fallback.

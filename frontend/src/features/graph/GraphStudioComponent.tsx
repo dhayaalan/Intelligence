@@ -1475,8 +1475,8 @@ export const GraphStudioComponent: React.FC<Props> = ({
                       <Badge variant="outline" className="font-mono text-[10px] uppercase">
                         {category}
                       </Badge>
-                      <Badge variant={(selectedEntity.confidence || 0) >= 0.85 ? 'success' : 'mono'} className="font-mono text-[10px]">
-                        {Math.round((selectedEntity.confidence || 0.85) * 100)}% verified
+                      <Badge variant={(selectedEntity.confidence != null && selectedEntity.confidence >= 0.85) ? 'success' : 'mono'} className="font-mono text-[10px]">
+                        {selectedEntity.confidence != null ? `${Math.round(selectedEntity.confidence * 100)}% confidence` : 'Unrated Confidence'}
                       </Badge>
                     </div>
                   </div>

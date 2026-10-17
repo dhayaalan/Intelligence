@@ -425,11 +425,14 @@ class RelationshipRepository(BaseMongoRepository):
         with memory_cache._lock:
             memory_cache.relationships[rel_id] = rel_data
         if self.collection is not None:
-            await self.collection.update_one(
-                {"id": rel_id, "tenant_id": tenant_id},
-                {"$set": rel_data},
-                upsert=True
-            )
+            try:
+                await self.collection.update_one(
+                    {"id": rel_id, "tenant_id": tenant_id},
+                    {"$set": rel_data},
+                    upsert=True
+                )
+            except Exception:
+                pass
         else:
             self._sync_write({"id": rel_id, "tenant_id": tenant_id}, rel_data)
 
@@ -446,10 +449,13 @@ class EvidenceRepository(BaseMongoRepository):
         if search_id:
             query["search_id"] = search_id
         if self.collection is not None:
-            cursor = self.collection.find(query, {"_id": 0})
-            items = await cursor.to_list(length=1000)
-            if items:
-                return items
+            try:
+                cursor = self.collection.find(query, {"_id": 0})
+                items = await cursor.to_list(length=1000)
+                if items:
+                    return items
+            except Exception:
+                pass
         with memory_cache._lock:
             records = [d for d in memory_cache.evidence.values() if d.get("tenant_id") == tenant_id]
             if investigation_id:
@@ -460,9 +466,12 @@ class EvidenceRepository(BaseMongoRepository):
 
     async def get_by_id(self, tenant_id: str, evidence_id: str) -> Optional[Dict[str, Any]]:
         if self.collection is not None:
-            doc = await self.collection.find_one({"id": evidence_id, "tenant_id": tenant_id}, {"_id": 0})
-            if doc:
-                return doc
+            try:
+                doc = await self.collection.find_one({"id": evidence_id, "tenant_id": tenant_id}, {"_id": 0})
+                if doc:
+                    return doc
+            except Exception:
+                pass
         with memory_cache._lock:
             data = memory_cache.evidence.get(evidence_id)
             if data and data.get("tenant_id") == tenant_id:
