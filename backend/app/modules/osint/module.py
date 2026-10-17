@@ -264,12 +264,16 @@ class OsintModule(IntelligenceModule):
             entities.extend(provider_entities)
 
             # Connect discovered entities back to the root query entity if not already related
+            # Guardrail: For phone queries, never attach uncorroborated person or username candidates directly to the phone
             existing_pairs = {(r.source_entity_value.lower(), r.target_entity_value.lower()) for r in relationships}
             for pe in provider_entities:
                 if pe.value.lower() != context.query.lower():
                     pair = (context.query.lower(), pe.value.lower())
                     reverse_pair = (pe.value.lower(), context.query.lower())
                     if pair not in existing_pairs and reverse_pair not in existing_pairs:
+                        if t_type == "phone" and pe.type in [EntityType.PERSON, EntityType.USERNAME]:
+                            # Never connect personal names or usernames to a phone number without explicit subscriber verification
+                            continue
                         rel_type = RelationshipType.HAS_IDENTIFIER if pe.type in [EntityType.USERNAME, EntityType.EMAIL, EntityType.PHONE] else RelationshipType.ASSOCIATED_WITH
                         relationships.append(RelationshipPayload(
                             id=f"rel_{uuid.uuid4().hex[:8]}",
@@ -302,9 +306,9 @@ class OsintModule(IntelligenceModule):
             entities.insert(0, EntityPayload(
                 type=root_type,
                 value=context.query,
-                confidence=1.0,
+                confidence=None,
                 sources=["search_query"],
-                metadata={"is_search_target": True}
+                metadata={"is_search_target": True, "is_seed_input": True, "verification_status": "UNASSESSED"}
             ))
 
         duration = round((time.time() - start_time) * 1000, 2)

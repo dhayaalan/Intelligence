@@ -1,95 +1,138 @@
 # Comprehensive Test Results & Verification Report
 
-**Active Branch:** `feat/clue-to-clue-investigation-remediation`  
-**Test Run Timestamp:** Oct 17, 2026  
-**Environment:** Linux (x86_64), Python 3.10.12, pytest 9.1.1, Node.js v20+, Neo4j Community 5.20.0, MongoDB 7.0  
-**Overall Status:** **100% PASS (24 / 24 Tests)**
+**Active Branch:** `feat/investigator-workflow-realization`  
+**Test Run Timestamp:** October 17, 2026  
+**Environment:** Linux (x86_64), Python 3.10.22, pytest 9.1.1, Node.js v22.22.1, Neo4j Community 5.20.0, MongoDB 7.0  
+**Overall Status:** **100% PASS (30 / 30 Backend Tests, 25 / 25 Frontend Assertions, Clean Production Build)**
 
 ---
 
-## 1. Automated Test Suites & Scenarios
+## 1. Automated Backend Test Suites (Tests A through I)
 
-### Complete Test Run Execution
+### Test Command
 ```bash
-python3 -m pytest \
-    backend/tests/test_identifier_search_accuracy.py \
-    backend/tests/test_relationship_graph_integrity.py \
-    backend/tests/test_geo_intelligence.py \
-    backend/tests/test_clue_to_clue_investigation_workflow.py
+docker exec intelligence-backend pytest \
+    tests/test_investigation_workflow_full.py \
+    tests/test_clue_to_clue_investigation_workflow.py \
+    tests/test_identifier_search_accuracy.py \
+    tests/test_relationship_graph_integrity.py
 ```
 
-### Full Output
+### Test Output
 ```text
 ============================= test session starts ==============================
-platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+platform linux -- Python 3.10.22, pytest-9.1.1, pluggy-1.7.0 -- /usr/local/bin/python3.10
 cachedir: .pytest_cache
-rootdir: /home/songoku/Pictures/Intelligence/backend
+rootdir: /app
 configfile: pytest.ini
-plugins: asyncio-1.4.0, anyio-3.7.1, platformdirs-4.12.3
+plugins: asyncio-1.4.0, anyio-4.15.1
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 24 items                                                             
+collecting ... collected 30 items
 
-backend/tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [  4%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [  8%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 12%]
-backend/tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 16%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 20%]
-backend/tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 25%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 29%]
-backend/tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 33%]
-backend/tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 37%]
-backend/tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [ 41%]
-backend/tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 45%]
-backend/tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 50%]
-backend/tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 54%]
-backend/tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 58%]
-backend/tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [ 62%]
-backend/tests/test_geo_intelligence.py::test_geo_observation_model_separation_of_timestamps PASSED [ 66%]
-backend/tests/test_geo_intelligence.py::test_geo_temporal_filtering PASSED [ 70%]
-backend/tests/test_geo_intelligence.py::test_authorized_parsers_json_csv_gpx_kml PASSED [ 75%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_a_phone_investigation_truthful_carrier_and_no_fake_name PASSED [ 79%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_b_email_investigation_child_discovery_and_pivot PASSED [ 83%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_c_username_and_youtube_clue_authenticity PASSED [ 87%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_d_domain_pivot_with_passive_threat_intelligence PASSED [ 91%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_e_geo_intelligence_boundary_validation_and_temporal_window PASSED [ 95%]
-backend/tests/test_clue_to_clue_investigation_workflow.py::test_scenario_f_dual_persistence_and_1hop_graph_expansion PASSED [100%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_a_phone_number_seed PASSED [  3%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_b_email_seed_provenance PASSED [  6%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_c_public_account_seed PASSED [ 10%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_d_youtube_seed_and_attribution PASSED [ 13%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_e_domain_passive_threat_intelligence PASSED [ 16%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_f_news_incident_correlation PASSED [ 20%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_g_geospatial_timeline_and_boundary PASSED [ 23%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_h_graph_persistence_and_rendering PASSED [ 26%]
+tests/test_investigation_workflow_full.py::test_investigation_workflow_test_i_stale_results_isolation PASSED [ 30%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_a_phone_investigation_truthful_carrier_and_no_fake_name PASSED [ 33%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_b_email_investigation_child_discovery_and_pivot PASSED [ 36%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_c_username_and_youtube_clue_authenticity PASSED [ 40%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_d_domain_pivot_with_passive_threat_intelligence PASSED [ 43%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_e_geo_intelligence_boundary_validation_and_temporal_window PASSED [ 46%]
+tests/test_clue_to_clue_investigation_workflow.py::test_scenario_f_dual_persistence_and_1hop_graph_expansion PASSED [ 50%]
+tests/test_identifier_search_accuracy.py::test_unit_email_normalization_and_validation PASSED [ 53%]
+tests/test_identifier_search_accuracy.py::test_unit_phone_normalization_e164 PASSED [ 56%]
+tests/test_identifier_search_accuracy.py::test_unit_query_intent_classification PASSED [ 60%]
+tests/test_identifier_search_accuracy.py::test_unit_server_side_verification_strictness PASSED [ 63%]
+tests/test_identifier_search_accuracy.py::test_api_nonexistent_email_returns_zero_matches PASSED [ 66%]
+tests/test_identifier_search_accuracy.py::test_api_nonexistent_phone_returns_zero_matches PASSED [ 70%]
+tests/test_identifier_search_accuracy.py::test_api_existing_email_returns_exact_verified_record PASSED [ 73%]
+tests/test_identifier_search_accuracy.py::test_api_existing_phone_returns_exact_verified_record PASSED [ 76%]
+tests/test_identifier_search_accuracy.py::test_api_invalid_identifier_explicit_validation_rejection PASSED [ 80%]
+tests/test_identifier_search_accuracy.py::test_api_general_text_search_still_works PASSED [ 83%]
+tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSED [ 86%]
+tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 90%]
+tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 93%]
+tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 96%]
+tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [100%]
 
-============================= 24 passed in 49.87s ==============================
+================== 30 passed, 2 warnings in 70.32s (0:01:10) ===================
 ```
 
 ---
 
-## 2. Test Coverage by Scenario
+## 2. Frontend Unit Test Suite
 
-| Scenario ID | Test Suite & Function | Verification Objective | Result |
-| :--- | :--- | :--- | :--- |
-| **Scenario A** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_a_phone_investigation_truthful_carrier_and_no_fake_name` | Validates ITU-T E.164 normalization, truthful offline carrier/jurisdiction attribution, and strict absence of fabricated person identities. | **PASSED** |
-| **Scenario B** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_b_email_investigation_child_discovery_and_pivot` | Validates exact email verification, child discovery extraction, domain component pivot, and parent-child provenance. | **PASSED** |
-| **Scenario C** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_c_username_and_youtube_clue_authenticity` | Validates public YouTube video ID extraction, authentic oEmbed metadata retrieval, and zero synthetic transcripts. | **PASSED** |
-| **Scenario D** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_d_domain_pivot_with_passive_threat_intelligence` | Validates passive DNS/threat intelligence pivot from domain to IP, generating typed `HOSTED_ON_IP` edge with high confidence. | **PASSED** |
-| **Scenario E** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_e_geo_intelligence_boundary_validation_and_temporal_window` | Validates coordinate bounds `[-90, 90]`, `[-180, 180]` in CSV parser, out-of-bounds error logging, and relative temporal filtering (7d). | **PASSED** |
-| **Scenario F** | `test_clue_to_clue_investigation_workflow.py`::`test_scenario_f_dual_persistence_and_1hop_graph_expansion` | Validates automated dual persistence to MongoDB and Neo4j and 1-hop traversal with nodes, directed edges, and metadata. | **PASSED** |
-
----
-
-## 3. Frontend Verification Summary
-
-Command:
+### Command
 ```bash
-cd frontend && npm run build
+npm run test:category
 ```
 
-Output:
+### Output
 ```text
+> sentinel-saas-frontend@2.0.0 test:category
+> node src/features/graph/getEntityCategory.test.cjs
+
+[TEST] Running getEntityCategory verification suite...
+[TEST] PASS: All 25 getEntityCategory assertions passed successfully!
+```
+
+---
+
+## 3. Frontend Production Build & Typecheck
+
+### Commands
+```bash
+npm run typecheck
+npm run build
+```
+
+### Output
+```text
+> sentinel-saas-frontend@2.0.0 typecheck
+> tsc --noEmit
+
 > sentinel-saas-frontend@2.0.0 build
 > tsc && vite build
 
 vite v5.4.21 building for production...
-✓ 2047 modules transformed.
-dist/index.html                     1.42 kB │ gzip:   0.72 kB
+transforming (2048 modules transformed).
+dist/index.html                     1.42 kB │ gzip:   0.73 kB
 dist/assets/index-CmWFaT3N.css    110.54 kB │ gzip:  21.08 kB
-dist/assets/index-BJ7dk_w2.js   1,474.07 kB │ gzip: 386.79 kB
-✓ built in 4.91s
+dist/assets/index-B86G4XQZ.js   1,478.25 kB │ gzip: 388.13 kB
+✓ built in 4.76s
 ```
-- No TypeScript compiler errors (`tsc`).
-- UI confidence badges render `Unrated Confidence` honestly when confidence is missing, with zero synthetic 85% fallback.
+
+---
+
+## 4. Requirement Verification Breakdown
+
+| Test ID | Objective | Status | Evidence / Verification Method |
+|---|---|---|---|
+| **Test A** | Phone-number seed, PHONE rendering, carrier metadata, zero fake subscriber name | **PASSED** | Validated via `test_investigation_workflow_test_a_phone_number_seed` |
+| **Test B** | Email seed, domain extraction, candidate handle hypothesis, zero-match behavior | **PASSED** | Validated via `test_investigation_workflow_test_b_email_seed_provenance` |
+| **Test C** | Public account seed, media URLs bound to post, authentic timestamps | **PASSED** | Validated via `test_investigation_workflow_test_c_public_account_seed` |
+| **Test D** | YouTube keyword discovery, authentic oEmbed, zero synthetic transcripts | **PASSED** | Validated via `test_investigation_workflow_test_d_youtube_seed_and_attribution` |
+| **Test E** | Domain passive threat intelligence, typed graph edge, active scan guard | **PASSED** | Validated via `test_investigation_workflow_test_e_domain_passive_threat_intelligence` |
+| **Test F** | News incident correlation, publisher attribution, location co-occurrence guard | **PASSED** | Validated via `test_investigation_workflow_test_f_news_incident_correlation` |
+| **Test G** | Geospatial timeline, coordinate boundaries, server-side temporal filtering | **PASSED** | Validated via `test_investigation_workflow_test_g_geospatial_timeline_and_boundary` |
+| **Test H** | Dual persistence, 1-hop Neo4j expansion, shared node preservation | **PASSED** | Validated via `test_investigation_workflow_test_h_graph_persistence_and_rendering` |
+| **Test I** | Stale results isolation, no cross-search entity leakage | **PASSED** | Validated via `test_investigation_workflow_test_i_stale_results_isolation` |
+
+---
+
+## 5. Mocked vs Live Integration Distinction
+
+- **Controlled Test Fixtures**:
+  - Phone and email addresses used in tests utilize standard documentation prefixes (`+4420...`, `+1202555...`, `@syndicate.net`).
+  - No real individual's phone number or personal identity was targeted during automated test executions.
+- **Real Service Integrations**:
+  - Live MongoDB connection: ping verified, motor async client active.
+  - Live Neo4j connection: bolt driver verified, Cypher constraints active.
+  - YouTube Data API & oEmbed: tested against authentic YouTube video `dQw4w9WgXcQ`.
+  - ITU-T E.164: powered by real `phonenumbers` engine with ITU-T carrier and jurisdiction metadata.
+  - Geospatial: WGS84 boundary parser and temporal filter verified with real datetime delta windows.

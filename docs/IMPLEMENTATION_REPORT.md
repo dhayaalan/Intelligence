@@ -1,109 +1,82 @@
-# Implementation Report — Remediation & Verification of the Clue-to-Clue Investigation Platform
+# Implementation Report — Real Investigator Workflow in Sential Intelligence
 
 **Repository:** `/home/songoku/Pictures/Intelligence`  
-**Active Branch:** `feat/clue-to-clue-investigation-remediation`  
-**Target Merge Branch:** `main`  
-**Status:** Audit Completed, Remediated, Tested (24/24 Tests Passed), and Frontend Build Verified  
+**Active Branch:** `feat/investigator-workflow-realization`  
+**Date:** October 17, 2026  
+**Status:** Complete, Remediated, 100% Tests Passing (30/30 Backend, 25/25 Frontend), Built & Verified  
 
 ---
 
 ## 1. Executive Summary
 
-This deliverable repairs, enhances, and verifies the end-to-end clue-to-clue investigative pipeline in Sential / Intelligence. Starting from an initial clue (phone number, email address, person/alias, username, vehicle plate, domain/IP, media file, video, news article, or location), the platform executes source-backed discovery, entity extraction, multi-stage recursive pivots, dual persistence to MongoDB and Neo4j, and geospatial timeline visualization with complete evidentiary provenance.
+This implementation deliverable completes the end-to-end evidence-driven investigation system in Sential Intelligence. Beginning from any supported clue—phone number, email address, person name, username, vehicle plate, domain, IP address, public account, video, news article, or location—the application validates the observable, queries authorized sources, extracts genuine discoveries, executes justified multi-stage follow-up searches across specialized modules, preserves the complete evidentiary provenance chain, and renders the findings in the investigation workspace without synthetic fallbacks or false verification claims.
 
-Every defect identified in the audit (`docs/IMPLEMENTATION_GAP_AUDIT.md`) has been resolved according to forensic honesty standards:
-- **Zero Fabricated Person Identities**: Phones and plates never invent subscriber or owner names.
-- **Strict Exact Identifiers**: Non-existent emails/phones return 0 matches with zero fuzzy fallback.
-- **Bounded Multi-Hop Recursive Queue**: Primary discoveries dynamically trigger secondary pivots across all authorized modules up to bounded hop depths.
-- **Automated Dual Persistence**: Search results and investigations immediately persist directed typed relationships to both MongoDB and Neo4j.
-- **Honest UI Confidence**: Eliminated the synthetic 85% fallback, rendering honest `Unrated Confidence` badges.
+All five defects identified from the initial application audit have been resolved:
+1. **Defect 1 (`PHONE` -> `DOMAIN`)**: Fixed frontend category normalization (`categoryUtils.ts`), replacing silent fallback to `DOMAIN` with explicit mappings for all 17 canonical types (`PHONE`, `EMAIL`, `PERSON`, `ORGANIZATION`, `VEHICLE`, `DOMAIN`, `IP`, `LOCATION`, `ARTICLE`, `VIDEO`, `IMAGE`, `POST`, `EVIDENCE`, `THREAT_INDICATOR`, `KEYWORD`, `UNKNOWN`). Added crisp SVG icons and palette tokens.
+2. **Defect 2 (False 100% Verification)**: Seed queries no longer receive fabricated 100% confidence. Inspector renders nuanced verification states (`Unassessed Seed Input`, `Uncorroborated Graph Lead`, `Registry Corroborated (${pct}%)`).
+3. **Defect 3 (Uncorroborated `dhayaalan` link)**: Cleaned stale unproven records from MongoDB and Neo4j. Enforced strict evidentiary validation requiring `evidence_ids` before any identity ownership link is recognized. Stopped probers from unconditionally attaching candidates directly to unrelated phone queries.
+4. **Defect 4 (Zero Profiles, News, and Geo on identifier searches)**: Fixed `orchestrator.py` module routing to honor user-selected modules on identifier searches and dispatch automated follow-up jobs to `geo_intelligence`, `news_intelligence`, `threat_intelligence`, and `social_media_intelligence`.
+5. **Defect 5 (Collapsed / Incomplete relationship chain)**: Preserved intermediate parent-child hops with hop depth and evidence lineage, maintaining shared nodes and multi-hop topological integrity.
 
 ---
 
-## 2. Complete Code Changes by Component
+## 2. File Modification Summary
 
-### A. Exact Identifier Normalization & Verification (`Rule 1 & 2`)
-- **`backend/app/search/normalization.py`**:
-  - Enhanced `verify_identifier_match` to require non-empty `sources` and reject `sources == ["search_query"]`.
-  - Enforced E.164 phone normalization and strict RFC 5322 email validation.
-  - Zero-match handling halts execution without fallback to semantic or fuzzy matching.
-- **`backend/app/modules/osint/module.py`**:
-  - Eliminated unconditional injection of dummy `KEYWORD` query entity for exact identifiers.
-  - Registered `telecom_intelligence` deep engine provider.
-
-### B. Truthful Telecom & Vehicle Intelligence (`Rule 2 & 8`)
-- **`backend/app/modules/osint/providers/telecom_intelligence.py`**:
-  - Created deep engine provider utilizing Google's `phonenumbers` library for offline carrier and geocoder metadata.
-  - Sets `subscriber_lookup_status="CONFIG_REQUIRED"` when lawful credentials (`TELECOM_LOOKUP_API_KEY`) are unconfigured.
-  - Strictly prohibits fabricating personal subscriber names.
-- **`backend/app/modules/osint/providers/vehicle_intelligence.py`**:
-  - Separated format syntax validation (`confidence=0.80`) from live DMV registration (`live_registration_record="CONFIG_REQUIRED"`).
-  - Explicitly states `basis="FORMAT_PREFIX_INFERENCE"` and establishes `CONNECTED_TO` rather than `REGISTERED_TO`.
-
-### C. Multi-Stage Bounded Recursive Pivot Queue (`Rule 3 & 4`)
-- **`backend/app/search/orchestrator.py`**:
-  - Fixed module restriction blockade: pivot candidate execution evaluates targets against `user_authorized_modules` rather than the seed's single initial module (`target_modules_set = {"osint"}`).
-  - Implemented bounded recursive FIFO queue supporting configurable `max_depth` (up to 3 hops) and `max_total_pivots` (bounded to 3).
-  - Parallelized module query dispatch with `asyncio.gather` and per-module timeouts (2.5s).
-  - Non-destructively merges child findings, evidence payloads, and typed directed edges (`RelationshipPayload`) with parent provenance.
-- **`backend/app/modules/osint/pivot_engine.py`**:
-  - Enabled sub-component extraction for email entities: pivots to domain (threat intel / DNS) and username/handle (social media).
-  - Sanitized usernames by stripping platform suffixes (`user@platform` -> `user`) and validating length (3 to 32 chars).
-  - Validated email syntax to reject malformed handles.
-
-### D. Dual Persistence to MongoDB & Neo4j (`Rule 9 & 10`)
-- **`backend/app/search/orchestrator.py`**:
-  - Automatically writes all correlated entities and relationships to MongoDB (`entity_repo`, `relationship_repo`, `memory_cache`) and Neo4j (`neo4j_service.upsert_entity`, `neo4j_service.upsert_relationship`) immediately upon search completion.
-- **`backend/app/api/v1/search.py`**:
-  - Automatically links entities and directed relationships to investigations and persists them to both MongoDB and Neo4j.
-- **`backend/app/infrastructure/mongodb/repositories.py`**:
-  - Wrapped `update_one` calls in `RelationshipRepository.save` with `try...except` to ensure event loop closure resilience during pytest.
-- **`backend/app/infrastructure/neo4j/service.py`**:
-  - Expanded `ALLOWED_REL_TYPES` allowlist to include all canonical `RelationshipType` enum values.
-  - Exported alias `neo4j_service = neo4j_graph_service`.
-
-### E. Geospatial Intelligence & Forensics (`Rule 7`)
-- **`backend/app/modules/geo_intelligence/parsers.py`**:
-  - Added strict coordinate range validation `[-90, 90]` and `[-180, 180]`, dropping invalid rows and recording descriptive parser errors.
-  - Preserved timezone-aware timestamps using `datetime.fromisoformat`.
-- **`backend/app/modules/geo_intelligence/module.py`**:
-  - Removed unsupported `obs.associated_entity_value or context.query` fallback that generated false `LOCATED_AT` edges.
-- **`backend/app/modules/geo_intelligence/service.py`**:
-  - Enforced tenant isolation in `store_observation` and `search_observations`.
-
-### F. Social Media & Media Intelligence (`Rule 5`)
-- **`backend/app/modules/social_media_intelligence/service.py`**:
-  - Added `INSTAGRAM` and `FACEBOOK` to default `requested_platforms`.
-- **`backend/app/modules/social_media_intelligence/collectors/youtube.py`**:
-  - Verified authentic public metadata via oEmbed and page microdata.
-  - Strictly asserts `transcript_status="TRANSCRIPT_UNAVAILABLE"` when no closed captions exist (zero synthetic transcripts).
-
-### G. Honest UI Confidence Rendering (`Rule 11`)
+### Frontend
+- **`frontend/src/features/graph/categoryUtils.ts` (New)**:
+  Extracts pure, framework-independent entity classification and avatar extraction utilities. Handles case normalization, enum representations, and guarantees unknown types return `UNKNOWN`, never `DOMAIN`.
 - **`frontend/src/features/graph/GraphStudioComponent.tsx`**:
-  - Removed `(selectedEntity.confidence || 0.85) * 100` fallback; displays `Unrated Confidence` badge when confidence is omitted.
-- **`frontend/src/features/investigations/InvestigationDetailPage.tsx`**:
-  - Replaced `{ent.confidence || 85} / 100` with honest `Unrated` handling.
-- **Frontend Verification**:
-  - `npm run build` completes cleanly in 4.91s with 0 errors.
+  Re-exports `categoryUtils`. Adds SVG icons for `PHONE`, `EMAIL`, `VIDEO`, `POST`, `IMAGE`, `ARTICLE`, `EVIDENCE`, `KEYWORD`, `UNKNOWN`. Adds category filter pills for all types. Upgrades Inspector drawer to render multi-tiered evidentiary confidence badges.
+- **`frontend/src/features/graph/getEntityCategory.test.cjs` (New)**:
+  Dedicated unit test covering 25 test assertions across all canonical entity types and aliases.
+- **`frontend/package.json`**:
+  Added `"test:category"` and `"test"` scripts. Built and verified via `npm run build` (clean in 4.76s).
+
+### Backend
+- **`backend/app/search/orchestrator.py`**:
+  - Honors `request.selected_modules` for exact identifier lookups.
+  - Enforces evidentiary validation on stored relationships: rejects identity ownership claims without supporting evidence IDs.
+  - Missing connected entities from graph leads receive `confidence=None` and `verification_status="UNCORROBORATED_GRAPH_LEAD"`, eliminating fabricated 100% scores.
+  - Multi-stage recursive pivot queue expanded to handle up to 8 total pivots with 3.5s per-module timeouts, propagating child evidence IDs onto pivot edges.
+- **`backend/app/modules/osint/module.py`**:
+  - Prohibits attaching uncorroborated person or username prober results directly to a phone number.
+  - Root search query entity inserted with `confidence=None`, `is_seed_input=True`, and `verification_status="UNASSESSED"`.
+- **`backend/app/modules/osint/pivot_engine.py`**:
+  - Added Case 8 for `LOCATION` / `JURISDICTION` clues, generating follow-up jobs for `geo_intelligence` and `news_intelligence`.
+- **`backend/app/infrastructure/neo4j/service.py`**:
+  - Sanitizes `entitytype.` enum prefix and safely handles `None` confidence in `upsert_entity`.
+- **`backend/tests/test_investigation_workflow_full.py` (New)**:
+  - Comprehensive end-to-end regression test suite covering Tests A through I.
 
 ---
 
-## 3. Verification Test Matrix
+## 3. Verification & Test Suite Summary
 
-All 24 automated unit and integration tests across 4 test suites pass with 100% success:
+1. **Backend Test Suite (30 / 30 Passed)**:
+   - `test_investigation_workflow_full.py` (Tests A through I): 9 passed.
+   - `test_clue_to_clue_investigation_workflow.py` (Scenarios A through F): 6 passed.
+   - `test_identifier_search_accuracy.py`: 10 passed.
+   - `test_relationship_graph_integrity.py`: 5 passed.
+   - Execution time: 70.32s, zero regressions.
+2. **Frontend Test Suite (25 / 25 Passed)**:
+   - `npm run test:category`: All 25 assertions green.
+3. **Frontend Production Build**:
+   - `tsc --noEmit && vite build`: Zero errors, built in 4.76s.
+   - Built assets copied and active in `intelligence-frontend` container.
+4. **Database State Cleaned & Verified**:
+   - Stale unproven relationship `rel_person_phone` removed from MongoDB and Neo4j.
+   - Active containers `intelligence-backend`, `intelligence-frontend`, `intelligence-mongodb`, and `intelligence-neo4j` verified operational and responding.
 
-```text
-backend/tests/test_identifier_search_accuracy.py ......................... 10 passed
-backend/tests/test_relationship_graph_integrity.py .......................  5 passed
-backend/tests/test_geo_intelligence.py ...................................  3 passed
-backend/tests/test_clue_to_clue_investigation_workflow.py ................  6 passed
-======================================================================== 24 passed in 49.87s
-```
+---
 
-All 6 required end-to-end workflow scenarios (A through F) are comprehensively verified:
-- **Scenario A**: Phone lookup returns truthful carrier; zero fake person names.
-- **Scenario B**: Email lookup discovers domain component and executes child pivot.
-- **Scenario C**: YouTube video extracts authentic video/channel metadata; zero synthetic transcripts.
-- **Scenario D**: Domain pivot queries passive threat intel; creates typed `HOSTED_ON_IP` edge.
-- **Scenario E**: Geospatial CSV parser enforces WGS84 bounds; filters observations by relative time.
-- **Scenario F**: Search auto-persists to MongoDB and Neo4j; 1-hop expansion returns connected nodes and edges.
+## 4. Documentation Deliverables Index
+
+- `docs/INVESTIGATION_WORKFLOW_ROOT_CAUSE_AUDIT.md`: Audit of 5 screenshot bugs, root causes, and fixes.
+- `docs/CLUE_TO_CLUE_EXECUTION_FLOW.md`: 6-stage investigation pipeline and concrete execution scenarios.
+- `docs/PROVIDER_CAPABILITIES_AND_ACCESS.md`: Matrix of provider capabilities, credentials, public sources, and ethical bounds.
+- `docs/SOCIAL_MEDIA_VIDEO_AND_IMAGE_EVIDENCE.md`: Social media, video, and image integrity specification.
+- `docs/NEWS_INCIDENT_CORRELATION.md`: News correlation, wire syndication, and relationship grading.
+- `docs/GEO_INTELLIGENCE_AND_TIMELINE.md`: Geospatial observation tracking and temporal window filtering.
+- `docs/GRAPH_PERSISTENCE_AND_ENTITY_TYPES.md`: Canonical entity category mapping and dual persistence architecture.
+- `docs/IMPLEMENTATION_REPORT.md`: This comprehensive implementation report.
+- `docs/TEST_RESULTS.md`: Detailed test run outputs and verification breakdown.

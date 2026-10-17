@@ -95,7 +95,10 @@ class SearchOrchestrator:
             intent_explanation = f"Deterministic exact {target_type} identifier lookup: canonical value '{normalized_identifier}'"
             is_technical = False
             effective_query = normalized_identifier
-            target_modules_set = {"osint"}
+            if request.selected_modules:
+                target_modules_set = set(request.selected_modules)
+            else:
+                target_modules_set = {"osint"}
         else:
             intent_info = target_classifier.classify_intent(query)
             intent = intent_info.get("intent", "GENERAL_RESEARCH")
@@ -347,8 +350,17 @@ class SearchOrchestrator:
                     t_val = str(sr.get("target_val") or sr.get("target_entity_value", ""))
                     if s_val.lower() in verified_vals or t_val.lower() in verified_vals:
                         raw_rtype = sr.get("type") or sr.get("relationship_type") or "RELATED_TO"
+                        r_type_str = str(raw_rtype).upper()
+
+                        # STRICT EVIDENTIARY VALIDATION:
+                        # Reject uncorroborated identity ownership claims without supporting evidence IDs or verified registry
+                        r_sources = sr.get("sources", [])
+                        r_ev_ids = sr.get("evidence_ids", [])
+                        if r_type_str in ["OWNS", "SUBSCRIBER_OF", "HAS_IDENTIFIER"] and not r_ev_ids and not any("registry" in str(s).lower() or "itu" in str(s).lower() for s in r_sources):
+                            continue
+
                         try:
-                            rel_type = RelationshipType(str(raw_rtype).upper())
+                            rel_type = RelationshipType(r_type_str)
                         except Exception:
                             rel_type = RelationshipType.RELATED_TO
                         corr_relationships.append(RelationshipPayload(
@@ -356,9 +368,10 @@ class SearchOrchestrator:
                             source_entity_value=s_val,
                             target_entity_value=t_val,
                             relationship_type=rel_type,
-                            confidence=float(sr.get("confidence", 1.0)),
-                            sources=sr.get("sources", ["telecom_registry"]),
-                            metadata=sr.get("metadata", {})
+                            confidence=float(sr.get("confidence", 0.8)),
+                            sources=sr.get("sources", ["stored_database_record"]),
+                            metadata=sr.get("metadata", {}),
+                            evidence_ids=r_ev_ids
                         ))
 
                 corr_relationships = [
@@ -386,19 +399,19 @@ class SearchOrchestrator:
                             id=doc.get("id"),
                             type=d_type,
                             value=doc.get("value", mv),
-                            confidence=float(doc.get("confidence", 1.0)),
+                            confidence=float(doc.get("confidence", 0.8)),
                             sources=doc.get("sources", ["stored_database_record"]),
                             metadata=doc.get("metadata", {})
                         ))
                     else:
-                        d_type = EntityType.ORGANIZATION if "jio" in mv.lower() else (EntityType.LOCATION if mv.lower() == "india" else EntityType.PERSON)
+                        d_type = EntityType.ORGANIZATION if "jio" in mv.lower() else (EntityType.LOCATION if mv.lower() == "india" else EntityType.KEYWORD)
                         corr_entities.append(EntityPayload(
                             id=f"ent_{uuid.uuid4().hex[:8]}",
                             type=d_type,
                             value=mv,
-                            confidence=1.0,
+                            confidence=None,
                             sources=["relationship_graph"],
-                            metadata={}
+                            metadata={"is_graph_lead": True, "verification_status": "UNCORROBORATED_GRAPH_LEAD"}
                         ))
 
                 # Deduplicate entities by value
@@ -693,7 +706,7 @@ class SearchOrchestrator:
         if (not is_identifier or len(corr_entities) > 0) and request.options.get("auto_pivot", True) and suggested_pivots:
             pvt_start = time.time()
             max_depth = int(request.options.get("max_depth") or request.options.get("max_hop_depth") or 2)
-            max_total_pivots = min(int(request.options.get("max_pivots", 2)), 3)
+            max_total_pivots = min(int(request.options.get("max_pivots", 5)), 8)
             visited_queries = {effective_query.strip().lower()}
             
             # Queue item: (hop_depth, pivot_dict)
@@ -713,6 +726,7 @@ class SearchOrchestrator:
                     continue
 
                 child_entities_found: List[EntityPayload] = []
+                child_res_evidence: List[EvidencePayload] = []
                 parent_val = pvt.get("parent_entity_value", effective_query)
 
                 async def _query_pivot_module(m_id: str):
@@ -728,7 +742,7 @@ class SearchOrchestrator:
                             target_type=pvt.get("pivot_target_type", "entity"),
                             options={"hop_depth": hop + 1, "parent_entity": parent_val}
                         )
-                        return await asyncio.wait_for(m.search(child_ctx), timeout=2.5)
+                        return await asyncio.wait_for(m.search(child_ctx), timeout=3.5)
                     except Exception as p_ex:
                         app_logger.debug(f"Pivot execution non-critical failure for module {m_id}: {p_ex}")
                         return None
@@ -746,6 +760,7 @@ class SearchOrchestrator:
                         corr_relationships.extend(child_res.relationships)
                     if child_res.evidence:
                         all_evidence.extend(child_res.evidence)
+                        child_res_evidence.extend(child_res.evidence)
 
                 rel_type_str = str(pvt.get("relationship", "RELATED_TO")).upper()
                 try:
@@ -753,6 +768,7 @@ class SearchOrchestrator:
                 except ValueError:
                     r_type = RelationshipType.RELATED_TO
 
+                pivot_ev_ids = [getattr(ev, 'id', '') for ev in child_res_evidence if getattr(ev, 'id', '')]
                 pivot_rel = RelationshipPayload(
                     id=f"rel_pvt_{uuid.uuid4().hex[:8]}",
                     source_entity_value=parent_val,
@@ -762,7 +778,8 @@ class SearchOrchestrator:
                     basis="MULTI_HOP_PIVOT_DISCOVERY",
                     methodology=f"automated_hop_{hop}_pivot",
                     sources=pvt.get("sources", ["Pivot Engine"]),
-                    metadata={"pivot_id": pvt.get("pivot_id"), "why_it_matters": pvt.get("why_it_matters"), "hop_depth": hop}
+                    metadata={"pivot_id": pvt.get("pivot_id"), "why_it_matters": pvt.get("why_it_matters"), "hop_depth": hop},
+                    evidence_ids=pivot_ev_ids
                 )
                 corr_relationships.append(pivot_rel)
 
