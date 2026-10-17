@@ -1063,7 +1063,41 @@ class ToolExecutor:
                     relationships=[{"source": username, "relationship": "HAS_CHANNEL", "target": "YouTube"}]
                 )
             )
-            summary = f"Resolved YouTube creator channel footprint for @{username}"
+
+            # Discover authentic channel posts, shorts, and image attachments
+            try:
+                from app.modules.social_media_intelligence.collectors.youtube import youtube_collector
+                channel_posts = await youtube_collector.get_channel_posts(username)
+                for p in channel_posts:
+                    lead_img = p.media_urls[0] if p.media_urls else ""
+                    results.append(
+                        NormalizedResult(
+                            id=p.id,
+                            tool_id=tool_id,
+                            type="POST" if "post" in p.id else "VIDEO",
+                            target=username,
+                            value=f"YouTube Item: {p.text[:60]} ({p.url})",
+                            source="YouTube Channel Intelligence",
+                            confidence=0.95,
+                            severity="INFO",
+                            metadata={
+                                "platform": "YouTube",
+                                "author": p.author,
+                                "post_url": p.url,
+                                "url": p.url,
+                                "text": p.text,
+                                "media_type": "image" if lead_img else "text",
+                                "image_url": lead_img,
+                                "hero_image": lead_img,
+                                "thumbnail_url": lead_img,
+                            },
+                            relationships=[{"source": p.id, "relationship": "POSTED_BY", "target": username}]
+                        )
+                    )
+            except Exception as e:
+                app_logger.debug(f"Error expanding YouTube channel posts for @{username}: {e}")
+
+            summary = f"Resolved YouTube creator channel footprint and {len(results) - 1} posts/assets for @{username}"
 
         return ToolExecutionResponse(
             execution_id=exec_id,
