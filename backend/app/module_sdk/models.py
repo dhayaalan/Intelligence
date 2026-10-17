@@ -45,6 +45,8 @@ class EntityType(str, Enum):
     MEDIA = "media"
     POST = "post"
     VIDEO = "video"
+    IMAGE = "image"
+    UNKNOWN = "unknown"
 
 class RelationshipType(str, Enum):
     OWNS = "OWNS"

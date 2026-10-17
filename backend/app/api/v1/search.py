@@ -29,6 +29,8 @@ async def execute_search(
         from app.infrastructure.mongodb.repositories import investigation_repo, case_repo
         import hashlib
         query_val = req.query.strip()
+        if response.target_type == "unknown" or response.validation_error:
+            return response
         
         executed_mods = [j.module for j in response.module_jobs if j.status in ["completed", "partial"]]
         selected_modules = list(set(["osint", "threat_intelligence", "news_intelligence"] + executed_mods))

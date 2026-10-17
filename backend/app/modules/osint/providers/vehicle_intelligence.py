@@ -205,6 +205,7 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "plate_number": canonical,
                 "country": country,
                 "state": state_name,
+                "jurisdiction": f"{state_name}, {country}" if state_name else country,
                 "rto_office": rto_office,
                 "standard": standard,
                 "syntax_valid": True,

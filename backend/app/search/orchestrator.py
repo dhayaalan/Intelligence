@@ -19,11 +19,12 @@ from app.infrastructure.mongodb.repositories import entity_repo, relationship_re
 from app.infrastructure.neo4j.service import neo4j_service
 from app.correlation.engine import correlation_engine
 from app.search.classifier import target_classifier
-from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord
+from app.search.schemas import SearchRequest, SearchResponse, ModuleJobStatusRecord, ProviderExecutionStatus, ProviderExecutionRecord
 from app.search.normalization import (
     classify_query_intent_and_mode, verify_identifier_match, SearchMode, IdentifierType
 )
 from app.modules.osint.pivot_engine import pivot_engine
+from app.core.provider_registry.registry import provider_registry
 
 class SearchOrchestrator:
     """Module-agnostic search orchestration engine executing independent intelligence jobs."""
@@ -35,7 +36,58 @@ class SearchOrchestrator:
     ) -> SearchResponse:
         search_id = f"srch_{uuid.uuid4().hex[:10]}"
         query = request.query.strip()
-        
+        tenant_id = user.tenant_id
+        start_time = time.time()
+
+        # 0. Deterministic intent classification and ambiguity guard
+        intent_info = target_classifier.classify_intent(query)
+        if intent_info.get("is_unknown_or_ambiguous") or intent_info.get("intent") in ["UNKNOWN", "AMBIGUOUS"]:
+            clarification = intent_info.get("clarification_guidance") or f"Input '{query}' is unclassified or ambiguous. Please provide a supported target identifier."
+            app_logger.info(
+                f"Search unclassified/ambiguous input '{query}': {clarification}",
+                extra={"search_id": search_id, "tenant_id": tenant_id, "user_id": user.id}
+            )
+            return SearchResponse(
+                search_id=search_id,
+                query=query,
+                target_type="unknown",
+                intent=intent_info.get("intent", "UNKNOWN"),
+                intent_explanation=intent_info.get("explanation"),
+                clarification_guidance=clarification,
+                input_classification=intent_info,
+                selected_scopes=request.selected_scopes or ["ALL INTELLIGENCE"],
+                status="completed",
+                search_mode=request.search_mode or SearchMode.TEXT_SEARCH.value,
+                active_search_mode_label="Unclassified / Ambiguous input",
+                is_exact_identifier=False,
+                normalized_identifier=None,
+                validation_error=clarification,
+                entities=[],
+                relationships=[],
+                evidence=[],
+                module_jobs=[],
+                provider_executions=[],
+                investigation_snapshot={
+                    "target": query,
+                    "target_type": "unknown",
+                    "entities_count": 0,
+                    "relationships_count": 0,
+                    "evidence_count": 0,
+                    "status": "UNCLASSIFIED",
+                    "reason": clarification,
+                    "message": clarification
+                },
+                pipeline_trace=[
+                    {
+                        "stage": "Universal Input Classification",
+                        "status": "unclassified",
+                        "duration_ms": 1.5,
+                        "details": clarification
+                    }
+                ],
+                stats={"total_duration_ms": round((time.time() - start_time) * 1000, 2), "entities_count": 0, "relationships_count": 0, "evidence_count": 0}
+            )
+
         # 1. Deterministic query intent classification and search mode enforcement
         mode_info = classify_query_intent_and_mode(
             query=query,
@@ -48,9 +100,6 @@ class SearchOrchestrator:
         normalized_identifier = mode_info["normalized_value"]
         validation_error = mode_info["validation_error"]
         identifier_type = mode_info["identifier_type"]
-
-        tenant_id = user.tenant_id
-        start_time = time.time()
 
         if is_identifier and validation_error:
             # Immediate rejection of invalid/malformed identifier with zero matches
@@ -95,27 +144,76 @@ class SearchOrchestrator:
             intent_explanation = f"Deterministic exact {target_type} identifier lookup: canonical value '{normalized_identifier}'"
             is_technical = False
             effective_query = normalized_identifier
+            intent_info = {"intent": intent, "target_type": target_type, "is_unknown_or_ambiguous": False}
             if request.selected_modules:
                 target_modules_set = set(request.selected_modules)
             else:
                 target_modules_set = {"osint"}
         else:
             intent_info = target_classifier.classify_intent(query)
+            
+            # Explicit classification / clarification state for unknown or ambiguous input
+            if intent_info.get("is_unknown_or_ambiguous") or intent_info.get("intent") in ["UNKNOWN", "AMBIGUOUS"]:
+                clarification = intent_info.get("clarification_guidance") or f"Input '{query}' is unclassified or ambiguous. Please provide a supported target identifier."
+                app_logger.info(
+                    f"Search unclassified/ambiguous input '{query}': {clarification}",
+                    extra={"search_id": search_id, "tenant_id": tenant_id, "user_id": user.id}
+                )
+                return SearchResponse(
+                    search_id=search_id,
+                    query=query,
+                    target_type="unknown",
+                    intent=intent_info.get("intent", "UNKNOWN"),
+                    intent_explanation=intent_info.get("explanation"),
+                    clarification_guidance=clarification,
+                    input_classification=intent_info,
+                    selected_scopes=request.selected_scopes or ["ALL INTELLIGENCE"],
+                    status="completed",
+                    search_mode=search_mode,
+                    active_search_mode_label="Unclassified / Ambiguous input",
+                    is_exact_identifier=False,
+                    normalized_identifier=None,
+                    validation_error=clarification,
+                    entities=[],
+                    relationships=[],
+                    evidence=[],
+                    module_jobs=[],
+                    provider_executions=[],
+                    investigation_snapshot={
+                        "target": query,
+                        "target_type": "unknown",
+                        "entities_count": 0,
+                        "relationships_count": 0,
+                        "evidence_count": 0,
+                        "status": "UNCLASSIFIED",
+                        "message": clarification
+                    },
+                    pipeline_trace=[
+                        {
+                            "stage": "Universal Input Classification",
+                            "status": "unclassified",
+                            "duration_ms": 1.5,
+                            "details": clarification
+                        }
+                    ],
+                    stats={"total_duration_ms": round((time.time() - start_time) * 1000, 2), "entities_count": 0, "relationships_count": 0, "evidence_count": 0}
+                )
+
             intent = intent_info.get("intent", "GENERAL_RESEARCH")
             intent_explanation = intent_info.get("explanation", "")
             is_technical = intent_info.get("is_technical_target", False)
-            target_type = request.target_type or target_classifier.classify(query)
+            target_type = request.target_type or intent_info.get("target_type") or target_classifier.classify(query)
             effective_query = query
             selected_scopes = request.selected_scopes or ["ALL INTELLIGENCE"]
 
             all_registered_module_ids = module_registry.list_modules()
             extra_pluggable_modules = [
                 m for m in all_registered_module_ids
-                if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence"]
+                if m not in ["osint", "threat_intelligence", "news_intelligence", "social_media_intelligence", "geo_intelligence"]
                 and module_registry.is_module_enabled(m)
             ]
 
-            all_core_mods = ["osint", "news_intelligence", "social_media_intelligence"]
+            all_core_mods = ["osint", "news_intelligence", "social_media_intelligence", "geo_intelligence"]
             if is_technical:
                 all_core_mods.append("threat_intelligence")
 
@@ -143,6 +241,20 @@ class SearchOrchestrator:
                 if not target_modules_set:
                     target_modules_set = set(intent_info.get("applicable_modules", ["news_intelligence", "osint"]) + extra_pluggable_modules)
 
+                # Ensure target-specific relevant modules are actively included
+                if intent == "LOCATION" or target_type == "location":
+                    target_modules_set.add("geo_intelligence")
+                elif intent in ["SOCIAL_MEDIA_URL", "VIDEO", "USERNAME"] or target_type in ["social_url", "video", "username"]:
+                    target_modules_set.add("social_media_intelligence")
+                elif intent == "IMAGE" or target_type == "image":
+                    target_modules_set.add("osint")
+                    target_modules_set.add("social_media_intelligence")
+                elif intent in ["ORGANIZATION", "PERSON"] or target_type in ["organization", "person"]:
+                    target_modules_set.add("osint")
+                    target_modules_set.add("news_intelligence")
+                elif intent in ["NEWS_ARTICLE", "NEWS_TOPIC", "EVENT"] or target_type == "article":
+                    target_modules_set.add("news_intelligence")
+
             # SAFETY GOVERNOR: Guard against port scanning non-technical queries like "India vs China"
             has_explicit_threat = (request.selected_modules and "threat_intelligence" in request.selected_modules) or any(s.upper() in ["THREAT INTELLIGENCE", "DIGITAL INFRASTRUCTURE"] for s in selected_scopes)
             if not is_technical and not has_explicit_threat and "threat_intelligence" in target_modules_set:
@@ -169,6 +281,142 @@ class SearchOrchestrator:
             if m in target_modules_set and module_registry.is_module_enabled(m)
         ]
         
+        # Complete Relevant-Source Discovery & Capability Matching
+        provider_declarations = [
+            ("osint", "telecom_intelligence", "National Telecom & Carrier Registry", ["phone"]),
+            ("osint", "vehicle_registration_recon", "Vehicle Registration & RTO Registry", ["vehicle", "vehicle_plate"]),
+            ("osint", "image_osint", "Visual Intelligence & EXIF Engine", ["image", "url"]),
+            ("osint", "username_recon", "Social Username Profiler", ["username", "person"]),
+            ("osint", "financial_intel", "Corporate & Financial Intelligence", ["organization", "company", "domain"]),
+            ("osint", "wayback_cdx", "Wayback Historical Archive", ["domain", "url", "hostname"]),
+            ("osint", "urlscan", "URLScan Web Telemetry", ["domain", "url", "ip"]),
+            ("osint", "opensanctions", "OpenSanctions Global Watchlists", ["person", "organization", "keyword"]),
+            ("osint", "gleif_lei", "GLEIF Corporate Registry", ["organization", "company", "domain"]),
+            ("osint", "sec_edgar", "SEC EDGAR Corporate Filings", ["organization", "company", "domain"]),
+            ("osint", "shodan", "Shodan Host & Banner Telemetry", ["ip", "domain"]),
+            ("osint", "censys", "Censys Host & Certificate Search", ["ip", "domain"]),
+            ("threat_intelligence", "threatfox", "ThreatFox Abuse.ch Indicators", ["ip", "domain", "hash"]),
+            ("threat_intelligence", "nvd_cve", "National Vulnerability Database", ["hash", "cve", "vulnerability"]),
+            ("threat_intelligence", "greynoise", "GreyNoise Internet Noise Telemetry", ["ip"]),
+            ("threat_intelligence", "dns_engine", "DNS & Active Resolution", ["domain", "subdomain"]),
+            ("threat_intelligence", "whois_engine", "WHOIS & RDAP Domain Registry", ["domain"]),
+            ("threat_intelligence", "tls_engine", "TLS & Certificate Transparency", ["domain"]),
+            ("threat_intelligence", "alienvault_otx", "AlienVault Open Threat Exchange", ["ip", "domain", "hash"]),
+            ("news_intelligence", "news_collector", "Global Wire & RSS Aggregator", ["keyword", "person", "organization", "article", "location", "news_topic", "event"]),
+            ("news_intelligence", "event_registry", "Event & Incident Correlator", ["keyword", "news_topic", "event", "location"]),
+            ("social_media_intelligence", "bluesky", "Bluesky Social Dispatch", ["username", "keyword", "social_url", "post"]),
+            ("social_media_intelligence", "telegram", "Telegram Channel Reconnaissance", ["username", "keyword", "social_url", "post"]),
+            ("social_media_intelligence", "reddit", "Reddit Discourse Analyzer", ["username", "keyword", "social_url", "post"]),
+            ("social_media_intelligence", "youtube", "YouTube Video Forensics", ["username", "video", "social_url", "keyword"]),
+            ("social_media_intelligence", "mastodon", "Mastodon Federated Feed", ["username", "keyword", "social_url", "post"]),
+            ("social_media_intelligence", "instagram", "Instagram Account Collector", ["username", "social_url", "image"]),
+            ("social_media_intelligence", "facebook", "Facebook Public Dispatches", ["username", "social_url"]),
+            ("geo_intelligence", "geographic_timeline", "Geospatial Timeline & Observation Engine", ["location", "coordinates", "geo"]),
+            ("geo_intelligence", "osm_nominatim", "OpenStreetMap Spatial Resolver", ["location", "coordinates", "geo"])
+        ]
+
+        provider_executions: List[ProviderExecutionRecord] = []
+        import os
+
+        for mod_id, prov_id, prov_name, supported_targets in provider_declarations:
+            target_matches = any(
+                st == target_type.lower() or 
+                st == intent.lower() or 
+                (st == "keyword" and target_type.lower() in ["keyword", "general_research", "entity"]) or
+                (st in ["url", "domain"] and target_type.lower() in ["url", "domain", "subdomain"])
+                for st in supported_targets
+            )
+
+            if not target_matches:
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.SKIPPED_WITH_REASON.value,
+                    reason=f"Target type '{target_type}' not supported by provider",
+                    target_type_matched=None,
+                    items_count=0
+                ))
+                continue
+
+            if mod_id not in user_authorized_modules:
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.RESTRICTED.value,
+                    reason=f"User role lacks permission for module '{mod_id}'",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+                continue
+
+            if not module_registry.is_module_enabled(mod_id):
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.SKIPPED_WITH_REASON.value,
+                    reason=f"Module '{mod_id}' is disabled in registry",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+                continue
+
+            if mod_id not in effective_module_ids:
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.NOT_ATTEMPTED.value,
+                    reason=f"Module '{mod_id}' not included in target execution scope",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+                continue
+
+            # Check configuration requirements
+            if prov_id == "shodan" and not os.getenv("SHODAN_API_KEY"):
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.CONFIGURATION_REQUIRED.value,
+                    reason="SHODAN_API_KEY required in environment",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+            elif prov_id == "censys" and (not os.getenv("CENSYS_API_ID") or not os.getenv("CENSYS_API_SECRET")):
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.CONFIGURATION_REQUIRED.value,
+                    reason="CENSYS_API_ID and CENSYS_API_SECRET required in environment",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+            elif prov_id in ["instagram", "facebook"] and (not os.getenv("INSTAGRAM_ACCESS_TOKEN") and not os.getenv("FACEBOOK_ACCESS_TOKEN") and not os.getenv("META_GRAPH_API_TOKEN")):
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.CONFIGURATION_REQUIRED.value,
+                    reason="Meta Graph API access token required",
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+            else:
+                provider_executions.append(ProviderExecutionRecord(
+                    provider_id=prov_id,
+                    provider_name=prov_name,
+                    module_id=mod_id,
+                    status=ProviderExecutionStatus.RUNNING.value,
+                    reason=None,
+                    target_type_matched=target_type,
+                    items_count=0
+                ))
+
         # 2. Prepare independent jobs for each authorized and available module
         context = SearchContext(
             search_id=search_id,
@@ -447,6 +695,30 @@ class SearchOrchestrator:
                         }
                     ))
 
+        # Update running provider execution statuses with authentic results count
+        for pe in provider_executions:
+            if pe.status == ProviderExecutionStatus.RUNNING.value:
+                matching_evidence = [
+                    ev for ev in all_evidence 
+                    if getattr(ev, 'provider', '').lower() == pe.provider_id.lower() or pe.provider_id.lower() in getattr(ev, 'source', '').lower()
+                ]
+                matching_entities = [
+                    ent for ent in corr_entities
+                    if any(pe.provider_id.lower() in str(s).lower() or pe.module_id.lower() in str(s).lower() for s in ent.sources)
+                ]
+                items_cnt = len(matching_evidence) + len(matching_entities)
+                
+                m_job = next((j for j in module_jobs if j.module == pe.module_id), None)
+                if m_job and m_job.status == "failed":
+                    pe.status = ProviderExecutionStatus.FAILED.value
+                    pe.error = m_job.error
+                elif items_cnt > 0:
+                    pe.status = ProviderExecutionStatus.SUCCESSFUL_WITH_RESULTS.value
+                    pe.items_count = items_cnt
+                else:
+                    pe.status = ProviderExecutionStatus.SUCCESSFUL_WITH_NO_RESULTS.value
+                    pe.items_count = 0
+
         # 4. Assess overall search status and partial intelligence
         failed_jobs = [j for j in module_jobs if j.status == "failed"]
         completed_jobs = [j for j in module_jobs if j.status in ["completed", "partial"]]
@@ -685,11 +957,17 @@ class SearchOrchestrator:
             "PARTIAL_COVERAGE"
         )
 
+        prov_summary = {}
+        for pe in provider_executions:
+            prov_summary[pe.status] = prov_summary.get(pe.status, 0) + 1
+
         coverage_telemetry = {
             "collection_completeness_index": cci_score,
             "modules_attempted": total_modules_attempted,
             "modules_successful": successful_modules,
             "coverage_breakdown": coverage_breakdown,
+            "provider_statuses": prov_summary,
+            "providers_evaluated": len(provider_executions),
             "coverage_assessment": coverage_assessment,
             "provenance_traceable": True,
         }
@@ -817,7 +1095,8 @@ class SearchOrchestrator:
         if is_identifier and len(corr_entities) == 0:
             key_findings = []
             investigative_leads = []
-            suggested_pivots = []
+            # Preserve suggested component pivots (e.g. domain and username pivots from email)
+            # suggested_pivots retained
             investigation_snapshot = {
                 "target": query,
                 "target_type": target_type,
@@ -839,6 +1118,9 @@ class SearchOrchestrator:
             status=overall_status,
             partial_warning=partial_warning,
             module_jobs=module_jobs,
+            provider_executions=provider_executions,
+            clarification_guidance=None,
+            input_classification=intent_info,
             entities=corr_entities,
             relationships=corr_relationships,
             evidence=all_evidence,

@@ -1,7 +1,31 @@
+from enum import Enum
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from app.module_sdk.models import EntityPayload, RelationshipPayload, EvidencePayload
+
+class ProviderExecutionStatus(str, Enum):
+    NOT_ATTEMPTED = "not_attempted"
+    RUNNING = "running"
+    SUCCESSFUL_WITH_RESULTS = "successful_with_results"
+    SUCCESSFUL_WITH_NO_RESULTS = "successful_with_no_results"
+    PARTIAL = "partial"
+    CONFIGURATION_REQUIRED = "configuration_required"
+    AUTHENTICATION_REQUIRED = "authentication_required"
+    RESTRICTED = "restricted"
+    FAILED = "failed"
+    SKIPPED_WITH_REASON = "skipped_with_reason"
+
+class ProviderExecutionRecord(BaseModel):
+    provider_id: str
+    provider_name: str
+    module_id: str
+    status: str  # from ProviderExecutionStatus
+    reason: Optional[str] = None
+    target_type_matched: Optional[str] = None
+    items_count: int = 0
+    duration_ms: float = 0.0
+    error: Optional[str] = None
 
 class SearchRequest(BaseModel):
     query: str
@@ -43,6 +67,9 @@ class SearchResponse(BaseModel):
     suggested_pivots: List[Dict[str, Any]] = Field(default_factory=list)
     executed_pivots: List[Dict[str, Any]] = Field(default_factory=list)
     multi_stage_metadata: Optional[Dict[str, Any]] = None
+    provider_executions: List[ProviderExecutionRecord] = Field(default_factory=list)
+    clarification_guidance: Optional[str] = None
+    input_classification: Optional[Dict[str, Any]] = None
     search_mode: str = "TEXT_SEARCH"
     active_search_mode_label: str = "Text search"
     is_exact_identifier: bool = False

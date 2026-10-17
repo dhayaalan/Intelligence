@@ -132,6 +132,46 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
                 confidence=0.85
             ))
 
+        # Extract structured entities directly from social URL inputs
+        from urllib.parse import urlparse
+        if context.query.startswith(("http://", "https://")):
+            parsed_u = urlparse(context.query)
+            clean_host = parsed_u.netloc.lower().replace("www.", "")
+            path_segs = [s for s in parsed_u.path.split("/") if s]
+            
+            # YouTube video extraction
+            if "youtube.com" in clean_host or "youtu.be" in clean_host or context.target_type == "video":
+                if not any(e.type == EntityType.VIDEO and e.value == context.query for e in entities):
+                    entities.append(EntityPayload(
+                        type=EntityType.VIDEO,
+                        value=context.query,
+                        confidence=1.0,
+                        sources=[self.manifest.id, "youtube"],
+                        metadata={"url": context.query, "platform": "youtube", "media_type": "video"}
+                    ))
+            
+            # Social handle extraction from URL
+            if path_segs and clean_host in ["twitter.com", "x.com", "instagram.com", "reddit.com", "t.me", "tiktok.com", "threads.net"]:
+                extracted_handle = path_segs[0].lstrip("@")
+                if extracted_handle and extracted_handle not in ["p", "watch", "status", "channel", "c", "explore"]:
+                    if not any(e.value.lower() == extracted_handle.lower() for e in entities):
+                        u_ent = EntityPayload(
+                            type=EntityType.USERNAME,
+                            value=extracted_handle,
+                            confidence=0.95,
+                            sources=[self.manifest.id, clean_host],
+                            metadata={"source_url": context.query, "platform": clean_host}
+                        )
+                        entities.append(u_ent)
+                        relationships.append(RelationshipPayload(
+                            source_entity_value=u_ent.value,
+                            target_entity_value=context.query,
+                            relationship_type=RelationshipType.ACCOUNT_REFERENCES_ENTITY if hasattr(RelationshipType, "ACCOUNT_REFERENCES_ENTITY") else RelationshipType.ASSOCIATED_WITH,
+                            confidence=0.95,
+                            sources=[self.manifest.id],
+                            metadata={"url": context.query}
+                        ))
+
         return NormalizedModuleResult(
             module=self.manifest.id,
             execution_id=context.search_id or f"exec_soc_{uuid.uuid4().hex[:8]}",
