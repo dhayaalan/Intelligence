@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 import phonenumbers
 from phonenumbers import NumberParseException
@@ -291,7 +291,8 @@ def verify_identifier_match(
     identifier_type: str,
     record_type: str,
     record_value: str,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    sources: Optional[List[str]] = None
 ) -> bool:
     """
     Server-side verification confirming that a candidate record actually equals
@@ -302,12 +303,16 @@ def verify_identifier_match(
       email must strictly equal queried_canonical. A mere occurrence in body text is REJECTED.
     - For PHONE: record_type must be 'phone' and its canonical E.164 must strictly equal
       queried_canonical. Digit-overlap, substring match, or body mention is REJECTED.
+    - Sources consisting only of 'search_query' are rejected as unverified user input.
     """
     # Auto-detect if caller passed identifier_type first
     if str(queried_canonical).upper() in ["EMAIL", "PHONE", "EXACT_EMAIL", "EXACT_PHONE"]:
         queried_canonical, identifier_type = identifier_type, queried_canonical
 
     if not queried_canonical or not record_value:
+        return False
+
+    if sources and set(sources) == {"search_query"}:
         return False
         
     meta = metadata or {}

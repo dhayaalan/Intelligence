@@ -132,8 +132,8 @@ class GeoIntelligenceModule(IntelligenceModule):
             )
             evidence_list.append(ev)
 
-            # 3. Relationship if associated with target or query entity
-            target_val = obs.associated_entity_value or context.query
+            # 3. Relationship: Only create LOCATED_AT when observation has an explicit verified association
+            target_val = obs.associated_entity_value
             if target_val:
                 rel = RelationshipPayload(
                     id=f"rel_{obs.id}",
@@ -144,6 +144,21 @@ class GeoIntelligenceModule(IntelligenceModule):
                     basis=obs.observation_type.value,
                     methodology=obs.extraction_method,
                     uncertainty_notes=f"Temporal uncertainty: {obs.temporal_uncertainty_seconds}s; Radius: {obs.accuracy_radius_meters}m" if obs.accuracy_radius_meters else "Standard accuracy",
+                    sources=[src],
+                    metadata={"evidence_id": ev_id, "observation_id": obs.id}
+                )
+                relationships.append(rel)
+            elif context.query and context.query.lower() not in obs.place_name.lower():
+                # General intelligence mention of a location during search
+                rel = RelationshipPayload(
+                    id=f"rel_{obs.id}",
+                    source_entity_value=context.query,
+                    target_entity_value=loc_entity.value,
+                    relationship_type=RelationshipType.POSSIBLE_ASSOCIATION,
+                    confidence=min(0.60, obs.identity_resolution_confidence),
+                    basis="DOCUMENTARY_LOCATION_MENTION",
+                    methodology=obs.extraction_method,
+                    uncertainty_notes="Location mentioned in collected intelligence source; does not confirm physical presence or personal travel.",
                     sources=[src],
                     metadata={"evidence_id": ev_id, "observation_id": obs.id}
                 )

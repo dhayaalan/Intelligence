@@ -1382,7 +1382,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
                             </Badge>
                           </td>
                           <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
-                            {ent.confidence || 85} / 100
+                            {ent.confidence != null ? `${Math.round(ent.confidence > 1 ? ent.confidence : ent.confidence * 100)} / 100` : 'Unrated'}
                           </td>
                           <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-sans truncate max-w-xs">
                             {(ent.sources || []).join(', ') || 'Sential Intel Pipeline'}

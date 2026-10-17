@@ -32,6 +32,7 @@ from app.modules.osint.providers.gleif import GLEIFProvider
 from app.modules.osint.providers.sec_edgar import SECEDGARProvider
 from app.modules.osint.providers.censys import CensysSearchProvider
 from app.modules.osint.providers.vehicle_intelligence import vehicle_registration_provider
+from app.modules.osint.providers.telecom_intelligence import telecom_intelligence_provider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -54,6 +55,7 @@ class OsintModule(IntelligenceModule):
         """Loads and registers primary OSINT engines and 329 platform probers."""
         # 1. Primary Deep OSINT Providers
         primary_providers = [
+            ("telecom_intelligence", telecom_intelligence_provider, "TELECOM_INTEL", ["carrier_lookup", "telecom_allocation", "jurisdiction_attribution"], ["phone"]),
             ("vehicle_registration_recon", vehicle_registration_provider, "VEHICLE_INTEL", ["plate_lookup", "jurisdiction_validation"], ["vehicle", "vehicle_plate"]),
             ("spiderfoot", SpiderFootProvider(), "AUTOMATION", ["domain", "ip", "subdomain"], ["domain", "ip"]),
             ("shodan", ShodanProvider(), "NETWORK_INTEL", ["ip", "domain", "ports", "cve"], ["ip", "domain"]),
@@ -293,9 +295,9 @@ class OsintModule(IntelligenceModule):
                 )
                 evidence.append(ev)
 
-        # Ensure root query entity is present in entities
+        # Ensure root query entity is present in entities for non-identifier or discovered targets
         root_exists = any(e.value.lower() == context.query.lower() for e in entities)
-        if not root_exists:
+        if not root_exists and t_type not in ["email", "phone"]:
             root_type = EntityType.VEHICLE if t_type in ["vehicle", "vehicle_plate"] else (EntityType.USERNAME if t_type == "username" else EntityType.KEYWORD)
             entities.insert(0, EntityPayload(
                 type=root_type,

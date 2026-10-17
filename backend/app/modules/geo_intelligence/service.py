@@ -53,7 +53,7 @@ class GeoIntelligenceService:
             sync_db = get_sync_database()
             if sync_db is not None:
                 sync_db.geo_observations.update_one(
-                    {"id": obs.id},
+                    {"id": obs.id, "tenant_id": obs.tenant_id},
                     {"$set": obs.dict()},
                     upsert=True
                 )
@@ -138,8 +138,8 @@ class GeoIntelligenceService:
             if obs.tenant_id != tenant_id and obs.tenant_id != "platform_admin":
                 continue
 
-            # Case isolation if specified
-            if case_id and obs.case_id and obs.case_id != case_id:
+            # Strict case isolation if case_id specified
+            if case_id and obs.case_id != case_id:
                 continue
 
             # Query match on place_name or metadata

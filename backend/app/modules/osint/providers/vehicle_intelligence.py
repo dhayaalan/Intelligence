@@ -195,11 +195,11 @@ class VehicleRegistrationProvider(ProviderAdapter):
         relationships: List[RelationshipPayload] = []
         evidence: List[EvidencePayload] = []
 
-        # 1. Primary Vehicle Entity
+        # 1. Primary Vehicle Entity (Validated format syntax)
         vehicle_entity = EntityPayload(
             type=EntityType.VEHICLE,
             value=canonical,
-            confidence=0.99,
+            confidence=0.80,
             sources=[self.name],
             metadata={
                 "plate_number": canonical,
@@ -207,23 +207,28 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "state": state_name,
                 "rto_office": rto_office,
                 "standard": standard,
+                "syntax_valid": True,
+                "jurisdiction_attribution_mode": "FORMAT_PREFIX_INFERENCE",
+                "live_registration_record": "CONFIG_REQUIRED",
+                "registered_ownership": "NOT_AVAILABLE_WITHOUT_AUTHORIZED_CREDENTIAL",
                 "is_search_target": True,
                 "lookup_timestamp": datetime.utcnow().isoformat(),
             }
         )
         entities.append(vehicle_entity)
 
-        # 2. Regional Transport Office (Organization)
+        # 2. Regional Transport Office (Organization - Jurisdictional Attribution)
         if rto_office:
             rto_entity = EntityPayload(
                 type=EntityType.ORGANIZATION,
                 value=rto_office,
-                confidence=0.95,
+                confidence=0.85,
                 sources=[self.name],
                 metadata={
                     "organization_type": "Lawful Vehicle Licensing & Registration Authority",
                     "jurisdiction": f"{state_name}, {country}",
                     "rto_code": parsed.get("rto_code"),
+                    "attribution_basis": "PREFIX_SYNTAX_MAPPING"
                 }
             )
             entities.append(rto_entity)
@@ -232,10 +237,11 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 id=f"rel_{uuid.uuid4().hex[:8]}",
                 source_entity_value=canonical,
                 target_entity_value=rto_office,
-                relationship_type=RelationshipType.REGISTERED_TO,
-                confidence=0.95,
-                basis="OFFICIAL_FORMAT_VALIDATION",
+                relationship_type=RelationshipType.CONNECTED_TO,
+                confidence=0.85,
+                basis="FORMAT_PREFIX_INFERENCE",
                 methodology="hsrp_rto_attribution",
+                uncertainty_notes="Attributed to RTO licensing authority from plate prefix formatting; live vehicle registration database record not queried.",
                 sources=[self.name]
             ))
 
@@ -245,12 +251,13 @@ class VehicleRegistrationProvider(ProviderAdapter):
             loc_entity = EntityPayload(
                 type=EntityType.LOCATION,
                 value=location_val,
-                confidence=0.98,
+                confidence=0.85,
                 sources=[self.name],
                 metadata={
                     "country": country,
                     "state": state_name,
-                    "location_type": "State / Administrative Region"
+                    "location_type": "State / Administrative Region",
+                    "attribution_basis": "JURISDICTION_PREFIX"
                 }
             )
             entities.append(loc_entity)
@@ -260,9 +267,10 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 source_entity_value=canonical,
                 target_entity_value=location_val,
                 relationship_type=RelationshipType.LOCATED_AT,
-                confidence=0.95,
+                confidence=0.85,
                 basis="REGISTRATION_JURISDICTION",
                 methodology="regional_jurisdiction_mapping",
+                uncertainty_notes="Jurisdiction inferred from registration prefix, not physical vehicle GPS telemetry.",
                 sources=[self.name]
             ))
 
@@ -272,7 +280,7 @@ class VehicleRegistrationProvider(ProviderAdapter):
                     source_entity_value=rto_office,
                     target_entity_value=location_val,
                     relationship_type=RelationshipType.LOCATED_AT,
-                    confidence=0.98,
+                    confidence=0.90,
                     basis="INSTITUTIONAL_JURISDICTION",
                     methodology="rto_location_link",
                     sources=[self.name]

@@ -9,16 +9,24 @@ from app.modules.geo_intelligence.models import (
     GeographicObservation, LocationObservationType
 )
 
+from datetime import datetime, timezone
+
 def _parse_iso_or_epoch(val: Any) -> Optional[datetime]:
     if not val:
         return None
+    if isinstance(val, datetime):
+        return val
     if isinstance(val, (int, float)):
         # Support milliseconds or seconds epoch
         if val > 1e11:
-            return datetime.utcfromtimestamp(val / 1000.0)
-        return datetime.utcfromtimestamp(val)
+            return datetime.fromtimestamp(val / 1000.0, timezone.utc)
+        return datetime.fromtimestamp(val, timezone.utc)
     if isinstance(val, str):
         val = val.strip()
+        try:
+            return datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except Exception:
+            pass
         for fmt in (
             "%Y-%m-%dT%H:%M:%S.%fZ",
             "%Y-%m-%dT%H:%M:%SZ",
@@ -49,6 +57,9 @@ def parse_geo_json(content: str, tenant_id: str, case_id: Optional[str] = None, 
             coords = geom.get("coordinates")
             if geom.get("type") == "Point" and coords and len(coords) >= 2:
                 lon, lat = float(coords[0]), float(coords[1])
+                if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                    errors.append(f"Feature {idx}: Coordinates out of range ({lat}, {lon})")
+                    continue
                 t_str = props.get("time") or props.get("timestamp") or props.get("observation_time")
                 obs_t = _parse_iso_or_epoch(t_str)
                 obs = GeographicObservation(
@@ -128,6 +139,9 @@ def parse_geo_csv(content: str, tenant_id: str, case_id: Optional[str] = None, s
                 
             lat = float(row[lat_key])
             lon = float(row[lon_key])
+            if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                errors.append(f"CSV Row {idx+1}: Coordinates out of range ({lat}, {lon})")
+                continue
             obs_time = _parse_iso_or_epoch(row[time_key]) if time_key else None
             accuracy = float(row[acc_key]) if acc_key and row[acc_key] else None
             place_name = row[name_key] if name_key and row[name_key] else f"Coordinate ({lat:.4f}, {lon:.4f})"
@@ -172,8 +186,14 @@ def parse_geo_gpx(content: str, tenant_id: str, case_id: Optional[str] = None, s
     points = root.findall(f".//{ns}wpt") + root.findall(f".//{ns}trkpt")
     for idx, pt in enumerate(points):
         try:
-            lat = float(pt.attrib.get("lat", 0.0))
-            lon = float(pt.attrib.get("lon", 0.0))
+            if "lat" not in pt.attrib or "lon" not in pt.attrib:
+                errors.append(f"GPX point {idx}: Missing required lat/lon coordinate attribute")
+                continue
+            lat = float(pt.attrib["lat"])
+            lon = float(pt.attrib["lon"])
+            if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                errors.append(f"GPX point {idx}: Coordinates out of range ({lat}, {lon})")
+                continue
             
             time_el = pt.find(f"{ns}time")
             name_el = pt.find(f"{ns}name")
@@ -228,6 +248,9 @@ def parse_geo_kml(content: str, tenant_id: str, case_id: Optional[str] = None, s
                 continue
             lon = float(parts[0])
             lat = float(parts[1])
+            if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                errors.append(f"KML Placemark {idx}: Coordinates out of range ({lat}, {lon})")
+                continue
             
             name_el = pm.find(f"{ns}name")
             time_el = pm.find(f".//{ns}when") or pm.find(f".//{ns}TimeStamp/{ns}when")

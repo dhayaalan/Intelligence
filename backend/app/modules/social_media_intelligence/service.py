@@ -41,7 +41,9 @@ class SocialMediaIntelligenceService:
             SocialPlatformType.TELEGRAM,
             SocialPlatformType.REDDIT,
             SocialPlatformType.MASTODON,
-            SocialPlatformType.YOUTUBE
+            SocialPlatformType.YOUTUBE,
+            SocialPlatformType.INSTAGRAM,
+            SocialPlatformType.FACEBOOK
         ]
 
         tasks = []

@@ -102,12 +102,23 @@ async def execute_search(
             from app.evidence.service import evidence_service
             import uuid
 
+            from app.infrastructure.mongodb.repositories import relationship_repo, memory_cache
+            from app.infrastructure.neo4j.service import neo4j_service
+
             # 1. Upsert and persist every entity to DB linked to target_inv.id
             for ent in response.entities:
                 try:
                     saved_ent = entity_service.upsert_entity(current_user.tenant_id, ent, investigation_id=target_inv.id)
                     ent_id = getattr(saved_ent, "id", None) or getattr(ent, "id", None) or f"ent_{hashlib.md5(f'{ent.type}_{ent.value}'.encode()).hexdigest()[:10]}"
                     investigation_service.link_entity(current_user.tenant_id, target_inv.id, ent_id)
+                    await neo4j_service.upsert_entity(current_user.tenant_id, {
+                        "id": ent_id,
+                        "value": ent.value,
+                        "type": ent.type,
+                        "confidence": ent.confidence,
+                        "sources": ent.sources,
+                        "metadata": ent.metadata or {}
+                    })
                 except Exception as ent_err:
                     app_logger.warning(f"Error persisting entity {ent}: {ent_err}")
 
@@ -126,7 +137,7 @@ async def execute_search(
                 except Exception as ev_err:
                     app_logger.warning(f"Error persisting evidence {ev}: {ev_err}")
 
-            # 3. Store relationships and summary on target_inv
+            # 3. Store relationships and summary on target_inv and persist to MongoDB & Neo4j
             with db._lock:
                 inv_data = db.investigations.get(target_inv.id)
                 if inv_data:
@@ -135,6 +146,15 @@ async def execute_search(
                     inv_data["investigation_health"] = inv_health
                     investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
                     case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
+
+            for rel_d in rel_dicts:
+                try:
+                    rel_d["investigation_id"] = target_inv.id
+                    rel_d["tenant_id"] = current_user.tenant_id
+                    await relationship_repo.save(current_user.tenant_id, rel_d)
+                    await neo4j_service.upsert_relationship(current_user.tenant_id, rel_d)
+                except Exception as r_err:
+                    app_logger.warning(f"Error persisting relationship {rel_d}: {r_err}")
 
             # 4. Bridge News Intelligence into the investigation
             try:
