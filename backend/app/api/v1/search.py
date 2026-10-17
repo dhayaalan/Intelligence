@@ -41,6 +41,7 @@ async def execute_search(
         ]
         target_inv = None
         rel_dicts = [rel.dict() if hasattr(rel, "dict") else dict(rel) for rel in response.relationships]
+        media_dicts = [m.model_dump() if hasattr(m, "model_dump") else (m.dict() if hasattr(m, "dict") else dict(m)) for m in (response.media or [])]
         findings_data = [f if isinstance(f, dict) else f.dict() for f in (response.key_findings or [])]
         leads_data = [l if isinstance(l, dict) else l.dict() for l in (response.investigative_leads or [])]
         pivots_data = [p if isinstance(p, dict) else p.dict() for p in (response.suggested_pivots or [])]
@@ -77,6 +78,14 @@ async def execute_search(
                         inv_data["relationships"] = rel_dicts
                     inv_data["investigative_summary"] = inv_summary
                     inv_data["investigation_health"] = inv_health
+                    if media_dicts:
+                        curr_m = inv_data.get("media", [])
+                        seen_u = {m.get("url") for m in curr_m if isinstance(m, dict) and m.get("url")}
+                        for md in media_dicts:
+                            if md.get("url") and md.get("url") not in seen_u:
+                                curr_m.append(md)
+                                seen_u.add(md.get("url"))
+                        inv_data["media"] = curr_m
                     investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
                     case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
         else:
@@ -90,7 +99,8 @@ async def execute_search(
                 search_id=response.search_id,
                 relationships=rel_dicts,
                 investigative_summary=inv_summary,
-                investigation_health=inv_health
+                investigation_health=inv_health,
+                media=media_dicts
             )
             target_inv = investigation_service.create_investigation(
                 tenant_id=current_user.tenant_id,
@@ -140,13 +150,28 @@ async def execute_search(
                 except Exception as ev_err:
                     app_logger.warning(f"Error persisting evidence {ev}: {ev_err}")
 
-            # 3. Store relationships and summary on target_inv and persist to MongoDB & Neo4j
+            # 2.5 Store and link media records to DB linked to target_inv.id
+            for md in media_dicts:
+                try:
+                    investigation_service.link_media(current_user.tenant_id, target_inv.id, md)
+                except Exception as m_err:
+                    app_logger.warning(f"Error persisting media {md}: {m_err}")
+
+            # 3. Store relationships, media, and summary on target_inv and persist to MongoDB & Neo4j
             with db._lock:
                 inv_data = db.investigations.get(target_inv.id)
                 if inv_data:
                     inv_data["relationships"] = rel_dicts
                     inv_data["investigative_summary"] = inv_summary
                     inv_data["investigation_health"] = inv_health
+                    if media_dicts:
+                        curr_m = inv_data.get("media", [])
+                        seen_u = {m.get("url") for m in curr_m if isinstance(m, dict) and m.get("url")}
+                        for md in media_dicts:
+                            if md.get("url") and md.get("url") not in seen_u:
+                                curr_m.append(md)
+                                seen_u.add(md.get("url"))
+                        inv_data["media"] = curr_m
                     investigation_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
                     case_repo._sync_write({"id": target_inv.id, "tenant_id": current_user.tenant_id}, inv_data)
 

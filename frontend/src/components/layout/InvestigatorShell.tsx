@@ -48,17 +48,7 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
 
   const navItems: NavItem[] = [
     { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
-    { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" />, dividerBefore: true },
-    // { id: 'social', label: 'Social Intelligence', icon: <MessageSquare className="w-4 h-4" /> },
-    // { id: 'agents', label: 'ML Services', icon: <Bot className="w-4 h-4" /> },
-    // { id: 'news', label: 'News Intelligence', icon: <Newspaper className="w-4 h-4" /> },
-    // { id: 'tools', label: 'Tool Workbench', icon: <Wrench className="w-4 h-4" /> },
-    { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" /> },
-    { id: 'graph', label: 'Relationships', icon: <Share2 className="w-4 h-4" /> },
-    { id: 'map', label: 'Geospatial Map', icon: <Globe className="w-4 h-4" /> },
-    { id: 'findings', label: 'Findings', icon: <ShieldAlert className="w-4 h-4" />, dividerBefore: true },
-    { id: 'evidence', label: 'Evidence Vault', icon: <Lock className="w-4 h-4" /> },
-    { id: 'reports', label: 'Reports', icon: <FileText className="w-4 h-4" /> },
+    { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
   ];
 
   const handleOpenInvestigationFromSearch = async (target: string, targetType: string, searchId?: string) => {

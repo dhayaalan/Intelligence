@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from app.identity.models import UserRecord
 from app.tenancy.context import get_current_user
@@ -138,3 +138,71 @@ async def link_evidence_to_investigation(
     if not success:
         raise HTTPException(status_code=404, detail="Investigation not found in this tenant")
     return {"status": "linked", "evidence_id": req.resource_id}
+
+@router.get("/{investigation_id}/media")
+async def get_investigation_media(
+    investigation_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Retrieves all source-backed media records directly attached to this investigation."""
+    inv = investigation_service.get_investigation(current_user.tenant_id, investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found in this tenant")
+    return inv.media or []
+
+@router.post("/{investigation_id}/link-media")
+async def link_media_to_investigation(
+    investigation_id: str,
+    media_item: Dict[str, Any],
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Links and deduplicates a media item on this investigation."""
+    success = investigation_service.link_media(current_user.tenant_id, investigation_id, media_item)
+    if not success:
+        raise HTTPException(status_code=404, detail="Investigation not found in this tenant")
+    inv = investigation_service.get_investigation(current_user.tenant_id, investigation_id)
+    return {
+        "status": "linked",
+        "media": media_item,
+        "investigation_id": investigation_id,
+        "total_media": len(inv.media) if inv and inv.media else 0,
+        "all_media": inv.media if inv else []
+    }
+
+@router.get("/{investigation_id}/graph")
+async def get_investigation_graph(
+    investigation_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Returns an investigation-scoped graph containing ONLY entities and verified relationships
+    belonging to this specific investigation.
+    """
+    tenant_id = current_user.tenant_id
+    inv = investigation_service.get_investigation(tenant_id, investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found in this tenant")
+
+    from app.entities.service import entity_service
+    from app.infrastructure.mongodb.repositories import relationship_repo
+
+    linked_entity_ids = set(inv.entity_ids or [])
+    all_tenant_entities = entity_service.list_entities(tenant_id)
+    entities = [
+        ent for ent in all_tenant_entities
+        if ent.id in linked_entity_ids or getattr(ent, "investigation_id", None) == investigation_id
+    ]
+
+    relationships = await relationship_repo.list_by_investigation(tenant_id, investigation_id)
+    if not relationships and inv.relationships:
+        relationships = inv.relationships
+
+    serialized_entities = [e.dict() if hasattr(e, "dict") else dict(e) for e in entities]
+    return {
+        "investigation_id": investigation_id,
+        "target": inv.target,
+        "target_type": inv.target_type,
+        "entities": serialized_entities,
+        "nodes": serialized_entities,
+        "relationships": relationships or []
+    }

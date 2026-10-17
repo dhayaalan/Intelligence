@@ -40,8 +40,12 @@ import {
   Database,
   Users,
   MapPin,
+  Camera,
+  Video,
+  Film,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { Investigation, Entity, Evidence } from '../../types';
+import { Investigation, Entity, Evidence, MediaRecord } from '../../types';
 import { apiRequest } from '../../core/api/client';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -51,6 +55,9 @@ import { Pagination } from '../../components/ui/Pagination';
 import { formatDate, truncateHash, cn } from '../../lib/utils';
 import { GraphStudioComponent, extractEntityAvatar } from '../graph/GraphStudioComponent';
 import { NewsArticleReaderView } from '../news_intelligence/NewsArticleReaderView';
+import { ImagesTab } from '../search/components/ImagesTab';
+import { VideosTab } from '../search/components/VideosTab';
+import { MediaViewerModal } from '../search/components/MediaViewerModal';
 
 export type TargetType = 'DOMAIN' | 'IP' | 'EMAIL' | 'USERNAME' | 'PHONE' | 'HASH' | 'CRYPTO' | 'URL' | 'PERSON' | 'ORGANIZATION';
 
@@ -91,10 +98,34 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
   const [isAnalyzingNews, setIsAnalyzingNews] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Tabs (Section 13)
+  // Tabs (7 Preferred Sections + legacy aliases)
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'findings' | 'leads' | 'entities' | 'profiles' | 'relationships' | 'map' | 'evidence' | 'sources' | 'timeline' | 'news' | 'tools' | 'reports'
+    | 'overview'
+    | 'all'
+    | 'profiles'
+    | 'media'
+    | 'news_intel'
+    | 'relationships'
+    | 'timeline_evidence'
+    | 'findings'
+    | 'leads'
+    | 'entities'
+    | 'map'
+    | 'evidence'
+    | 'sources'
+    | 'timeline'
+    | 'news'
+    | 'tools'
+    | 'reports'
   >('overview');
+
+  // Media state
+  const [selectedMedia, setSelectedMedia] = useState<MediaRecord | null>(null);
+  const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
+  const [mediaList, setMediaList] = useState<MediaRecord[]>([]);
+
+  const imageRecords = useMemo(() => mediaList.filter((m) => m.media_type === 'image'), [mediaList]);
+  const videoRecords = useMemo(() => mediaList.filter((m) => m.media_type === 'video'), [mediaList]);
 
   const [entityDisplayMode, setEntityDisplayMode] = useState<'cards' | 'table'>('table');
   const [selectedFact, setSelectedFact] = useState<string | null>(null);
@@ -499,46 +530,17 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
       );
       setNewsRecord(matchingNews || null);
 
-      setToolRuns([
-        {
-          id: 'tr-01',
-          tool_name: 'Amass DNS & Subdomain Enumerator',
-          status: 'SUCCESS',
-          duration_ms: 382,
-          output_summary: `Discovered canonical infrastructure hosts and nameservers associated with ${inv.target}`,
-        },
-        {
-          id: 'tr-02',
-          tool_name: 'Shodan IP & Port Scanner',
-          status: 'SUCCESS',
-          duration_ms: 541,
-          output_summary: `Identified open ingress ports and verified TLS certificates`,
-        },
-        {
-          id: 'tr-03',
-          tool_name: 'VirusTotal Threat Intelligence Feed',
-          status: 'SUCCESS',
-          duration_ms: 619,
-          output_summary: `Correlated threat intelligence feeds across global malware telemetry databases`,
-        },
-        {
-          id: 'tr-04',
-          tool_name: 'AlienVault OTX Correlation',
-          status: 'SUCCESS',
-          duration_ms: 275,
-          output_summary: `Correlated adversary indicators matching known threat group infrastructure patterns`,
-        },
-      ]);
+      // Load source-backed media
+      const fetchedMedia = (inv.media && inv.media.length > 0)
+        ? inv.media
+        : await apiRequest<MediaRecord[]>(`/investigations/${investigationId}/media`).catch(() => []);
+      setMediaList(fetchedMedia || []);
+      if (fetchedMedia && fetchedMedia.some((m: MediaRecord) => m.media_type === 'video') && !fetchedMedia.some((m: MediaRecord) => m.media_type === 'image')) {
+        setMediaSubTab('videos');
+      }
 
-      setReports([
-        {
-          id: `rep-${investigationId.slice(0, 8)}`,
-          title: `Executive Intelligence Dossier: ${inv.title}`,
-          created_at: inv.created_at || new Date().toISOString(),
-          format: 'PDF / JSON',
-          classification: 'TLP:AMBER+STRICT',
-        },
-      ]);
+      setToolRuns([]);
+      setReports([]);
     } catch (err) {
       console.error('Failed to load investigation details', err);
     } finally {
@@ -827,22 +829,16 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </div>
       </div>
 
-      {/* Navigation Tabs (Section 13) */}
+      {/* Navigation Tabs (7 Preferred Unified Sections) */}
       <div className="flex border-b border-slate-200/90 dark:border-slate-800 text-xs gap-1 overflow-x-auto pb-0.5">
         {[
           { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
-          { id: 'findings', label: 'Findings', count: keyFindingsList.length, icon: ShieldAlert },
-          { id: 'leads', label: 'Leads', count: investigativeLeadsList.length, icon: Compass },
-          { id: 'entities', label: 'Entities', count: entities.length, icon: Database },
+          { id: 'all', label: 'All Results', count: entities.length, icon: Database },
           { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
+          { id: 'media', label: 'Media', count: imageRecords.length + videoRecords.length, icon: Camera },
+          { id: 'news_intel', label: 'News & Intelligence', count: (newsRecord ? 1 : 0) + keyFindingsList.length, icon: Newspaper },
           { id: 'relationships', label: 'Relationships', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
-          { id: 'map', label: 'Geospatial Radar', count: geoLocations.length, icon: Globe },
-          { id: 'evidence', label: 'Evidence Vault', count: evidenceList.length, icon: Lock },
-          { id: 'sources', label: 'Sources', count: sourceStats.length, icon: BookOpen },
-          { id: 'timeline', label: 'Timeline', count: timelineEvents.length, icon: Clock },
-          { id: 'news', label: 'News Intel', count: newsRecord ? 1 : 0, icon: Newspaper },
-          { id: 'tools', label: 'Tool Activity', count: toolRuns.length, icon: Cpu },
-          { id: 'reports', label: 'Dossiers', count: reports.length, icon: FileText },
+          { id: 'timeline_evidence', label: 'Timeline & Evidence', count: evidenceList.length, icon: Lock },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -1296,8 +1292,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
-      {/* TAB 4: ENTITIES */}
-      {activeTab === 'entities' && (
+      {/* TAB 2: ALL RESULTS / CANONICAL ENTITIES */}
+      {(activeTab === 'all' || activeTab === 'entities') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -1538,6 +1534,68 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
+      {/* TAB 4: MEDIA (Source-Backed Images & Videos with Toggle) */}
+      {activeTab === 'media' && (
+        <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <Camera className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Media & Visual Intelligence</span>
+              </CardTitle>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Source-backed visual media records, avatars, EXIF forensics, and video broadcasts linked to this investigation.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMediaSubTab('images')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                  mediaSubTab === 'images'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                )}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Images ({imageRecords.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaSubTab('videos')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                  mediaSubTab === 'videos'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                )}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Videos ({videoRecords.length})</span>
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            {mediaSubTab === 'images' ? (
+              <ImagesTab
+                images={imageRecords}
+                query={investigation?.target || ''}
+                onSelectImage={(m) => setSelectedMedia(m)}
+                sourcesEvaluated={sourceStats.length}
+              />
+            ) : (
+              <VideosTab
+                videos={videoRecords}
+                query={investigation?.target || ''}
+                onSelectVideo={(m) => setSelectedMedia(m)}
+                sourcesEvaluated={sourceStats.length}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* TAB 5: RELATIONSHIP GRAPH */}
       {activeTab === 'relationships' && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
@@ -1626,8 +1684,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
-      {/* TAB 6: EVIDENCE VAULT */}
-      {activeTab === 'evidence' && (
+      {/* TAB 7: TIMELINE & EVIDENCE */}
+      {(activeTab === 'timeline_evidence' || activeTab === 'evidence') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -1774,8 +1832,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
-      {/* TAB 9: NEWS INTELLIGENCE */}
-      {activeTab === 'news' && (
+      {/* TAB 5: NEWS INTELLIGENCE */}
+      {(activeTab === 'news_intel' || activeTab === 'news') && (
         <div className="space-y-6">
           {!newsRecord ? (
             <Card className="border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
@@ -2027,6 +2085,10 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           </div>
         )}
       </Dialog>
+      <MediaViewerModal
+        media={selectedMedia}
+        onClose={() => setSelectedMedia(null)}
+      />
     </div>
   );
 };
