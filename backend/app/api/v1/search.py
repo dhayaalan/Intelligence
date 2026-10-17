@@ -52,6 +52,7 @@ async def execute_search(
             "search_mode": response.search_mode,
             "intent": response.intent,
             "target_type": response.target_type,
+            "media_count": len(response.media),
         }
         inv_health = {
             "evidence_coverage": "HIGH" if len(response.evidence) > 10 else "MEDIUM",

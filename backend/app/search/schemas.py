@@ -35,6 +35,25 @@ class SearchRequest(BaseModel):
     selected_scopes: Optional[List[str]] = None
     options: Dict[str, Any] = Field(default_factory=dict)
 
+class MediaRecord(BaseModel):
+    id: str
+    media_type: str  # "image" or "video"
+    url: str
+    thumbnail_url: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    source_provider: str
+    source_platform: Optional[str] = None
+    parent_id: Optional[str] = None
+    parent_type: Optional[str] = None  # "post", "article", "video", "entity", "profile"
+    parent_title: Optional[str] = None
+    publication_date: Optional[str] = None
+    collection_date: Optional[str] = None
+    verification_status: str = "VERIFIED"  # "VERIFIED", "UNVERIFIED", "RESTRICTED", "DEGRADED"
+    canonical_source_url: Optional[str] = None
+    evidence_ids: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
 class ModuleJobStatusRecord(BaseModel):
     module: str
     module_name: str
@@ -58,6 +77,7 @@ class SearchResponse(BaseModel):
     entities: List[EntityPayload] = Field(default_factory=list)
     relationships: List[RelationshipPayload] = Field(default_factory=list)
     evidence: List[EvidencePayload] = Field(default_factory=list)
+    media: List[MediaRecord] = Field(default_factory=list)
     investigation_snapshot: Optional[Dict[str, Any]] = None
     key_findings: List[Dict[str, Any]] = Field(default_factory=list)
     investigative_leads: List[Dict[str, Any]] = Field(default_factory=list)
