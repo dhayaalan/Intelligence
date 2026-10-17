@@ -164,6 +164,46 @@ class GeoIntelligenceModule(IntelligenceModule):
                 )
                 relationships.append(rel)
 
+        if not entities and context.query:
+            clean_q = context.query.split(":", 1)[1].strip() if context.query.lower().startswith(("geo:", "location:", "coords:")) else context.query.strip()
+            from app.search.classifier import TargetClassifier
+            if TargetClassifier.COORDINATES_REGEX.match(clean_q):
+                parts = [p.strip() for p in clean_q.split(",")]
+                if len(parts) == 2:
+                    try:
+                        lat, lon = float(parts[0]), float(parts[1])
+                        coord_val = f"Coordinates ({lat:.5f}, {lon:.5f})"
+                        loc_ent = EntityPayload(
+                            id=f"ent_geo_{uuid.uuid4().hex[:8]}",
+                            type=EntityType.LOCATION,
+                            value=coord_val,
+                            confidence=1.0,
+                            sources=["Geographic Coordinates Parser"],
+                            metadata={
+                                "place_name": coord_val,
+                                "latitude": lat,
+                                "longitude": lon,
+                                "coordinate_source": "DIRECT_OBSERVATION",
+                                "observation_type": "KNOWN_FIX"
+                            }
+                        )
+                        entities.append(loc_ent)
+                        if "Geographic Coordinates Parser" not in sources:
+                            sources.append("Geographic Coordinates Parser")
+                        evidence_list.append(EvidencePayload(
+                            id=f"ev_coord_{uuid.uuid4().hex[:8]}",
+                            source="Geographic Coordinates Parser",
+                            timestamp=datetime.utcnow(),
+                            provider="geo_intelligence",
+                            module="geo_intelligence",
+                            collection_method="deterministic_coordinate_parse",
+                            reference=clean_q,
+                            confidence=1.0,
+                            raw_data={"latitude": lat, "longitude": lon, "query": clean_q}
+                        ))
+                    except ValueError:
+                        pass
+
         return NormalizedModuleResult(
             module="geo_intelligence",
             execution_id=f"exec_geo_{uuid.uuid4().hex[:8]}",

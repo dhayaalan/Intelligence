@@ -51,6 +51,49 @@ class PivotDiscoveryEngine:
         pivots: List[PivotCandidate] = []
         seen_queries = {original_query.strip().lower()}
 
+        # 0. Direct Identifier Component Pivots (e.g. Email -> Domain, Email -> Username handle)
+        clean_orig = original_query.split(":", 1)[-1].strip()
+        if ("@" in clean_orig and not clean_orig.startswith("@")) or actual_target_type == "email":
+            if "@" in clean_orig:
+                parts = clean_orig.split("@", 1)
+                u_part, d_part = parts[0].strip(), parts[1].strip()
+                if d_part and d_part.lower() not in seen_queries and "." in d_part:
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_emldom_{hashlib.md5(d_part.encode()).hexdigest()[:8]}",
+                            pivot_query=d_part,
+                            pivot_target_type="DOMAIN",
+                            pivot_type="infrastructure_osint",
+                            target_modules=["threat_intelligence", "osint"],
+                            relationship="USES_DOMAIN",
+                            parent_entity_value=clean_orig,
+                            parent_entity_type="EMAIL",
+                            confidence=0.95,
+                            recommended_action=f"Perform DNS, WHOIS, and infrastructure reconnaissance on email domain '{d_part}'.",
+                            why_it_matters=f"Email identifier '{clean_orig}' is hosted on domain infrastructure '{d_part}'.",
+                            sources=["Email Normalization"]
+                        )
+                    )
+                    seen_queries.add(d_part.lower())
+                if u_part and u_part.lower() not in seen_queries and len(u_part) >= 3:
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_emlusr_{hashlib.md5(u_part.encode()).hexdigest()[:8]}",
+                            pivot_query=u_part,
+                            pivot_target_type="USERNAME",
+                            pivot_type="social_recon",
+                            target_modules=["social_media_intelligence", "osint"],
+                            relationship="USES_HANDLE",
+                            parent_entity_value=clean_orig,
+                            parent_entity_type="EMAIL",
+                            confidence=0.8,
+                            recommended_action=f"Check username alias '{u_part}' across social networks and public repositories.",
+                            why_it_matters=f"Username '{u_part}' extracted from local part of email '{clean_orig}'.",
+                            sources=["Email Normalization"]
+                        )
+                    )
+                    seen_queries.add(u_part.lower())
+
         for ent in actual_entities:
             # Handle both EntityPayload/object and dict
             if isinstance(ent, dict):
@@ -292,6 +335,97 @@ class PivotDiscoveryEngine:
                     )
                 )
                 seen_queries.add(val_lower)
+
+            # 9. Vehicle Registration Plate Pivot -> RTO Jurisdiction & Location
+            elif e_type in ["vehicle", "vehicle_plate"]:
+                jurisdiction = meta.get("jurisdiction") or meta.get("region")
+                if jurisdiction and jurisdiction.lower() not in seen_queries and len(jurisdiction) >= 3:
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_vjur_{hashlib.md5(jurisdiction.encode()).hexdigest()[:8]}",
+                            pivot_query=jurisdiction,
+                            pivot_target_type="LOCATION",
+                            pivot_type="geospatial_intelligence",
+                            target_modules=["geo_intelligence", "news_intelligence"],
+                            relationship="REGISTERED_IN_JURISDICTION",
+                            parent_entity_value=val,
+                            parent_entity_type="VEHICLE",
+                            confidence=0.9,
+                            recommended_action=f"Inspect regional transport authority records and local news in jurisdiction '{jurisdiction}'.",
+                            why_it_matters=f"Vehicle '{val}' is attributed to regional transport authority jurisdiction '{jurisdiction}'.",
+                            sources=sources or ["Vehicle Registration Recon"]
+                        )
+                    )
+                    seen_queries.add(jurisdiction.lower())
+
+            # 10. Social Media URL / Post Pivot -> Author Handle & Content Forensics
+            elif e_type in ["social_url", "post", "social_post"]:
+                author = meta.get("author") or meta.get("author_id")
+                if author and str(author).strip().lower() not in seen_queries and len(str(author).strip()) >= 3:
+                    clean_author = str(author).strip().lstrip("@")
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_auth_{hashlib.md5(clean_author.encode()).hexdigest()[:8]}",
+                            pivot_query=clean_author,
+                            pivot_target_type="USERNAME",
+                            pivot_type="handle_reconnaissance",
+                            target_modules=["social_media_intelligence", "osint"],
+                            relationship="AUTHORED",
+                            parent_entity_value=val,
+                            parent_entity_type="POST",
+                            confidence=0.9,
+                            recommended_action=f"Investigate author profile and account footprint for handle '@{clean_author}'.",
+                            why_it_matters=f"Discovered author handle of social media dispatch '{val}'.",
+                            sources=sources or ["Social Media Intelligence"]
+                        )
+                    )
+                    seen_queries.add(clean_author.lower())
+
+            # 11. Image / Video / Media Pivot -> Channel / Author or Cryptographic Hash
+            elif e_type in ["image", "video", "media"]:
+                channel = meta.get("channel") or meta.get("author")
+                if channel and str(channel).strip().lower() not in seen_queries and len(str(channel).strip()) >= 3:
+                    clean_chan = str(channel).strip()
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_chan_{hashlib.md5(clean_chan.encode()).hexdigest()[:8]}",
+                            pivot_query=clean_chan,
+                            pivot_target_type="PERSON",
+                            pivot_type="person_reconnaissance",
+                            target_modules=["social_media_intelligence", "news_intelligence", "osint"],
+                            relationship="VIDEO_PUBLISHED_BY_CHANNEL" if e_type == "video" else "AUTHORED",
+                            parent_entity_value=val,
+                            parent_entity_type="MEDIA",
+                            confidence=0.85,
+                            recommended_action=f"Correlate creator / channel intelligence for '{clean_chan}'.",
+                            why_it_matters=f"Media asset '{val}' is published or authored by '{clean_chan}'.",
+                            sources=sources or ["Media Extraction"]
+                        )
+                    )
+                    seen_queries.add(clean_chan.lower())
+
+            # 12. News Article Pivot -> Publisher / Outlet Intelligence
+            elif e_type in ["article", "news"]:
+                publisher = meta.get("publisher")
+                if publisher and str(publisher).strip().lower() not in seen_queries and len(str(publisher).strip()) >= 3:
+                    clean_pub = str(publisher).strip()
+                    pivots.append(
+                        PivotCandidate(
+                            pivot_id=f"pvt_pub_{hashlib.md5(clean_pub.encode()).hexdigest()[:8]}",
+                            pivot_query=clean_pub,
+                            pivot_target_type="ORGANIZATION",
+                            pivot_type="corporate_intelligence",
+                            target_modules=["news_intelligence", "osint"],
+                            relationship="PUBLISHED",
+                            parent_entity_value=val,
+                            parent_entity_type="ARTICLE",
+                            confidence=0.85,
+                            recommended_action=f"Examine editorial coverage and source independence for publisher '{clean_pub}'.",
+                            why_it_matters=f"Article reporting '{val}' originates from publisher outlet '{clean_pub}'.",
+                            sources=sources or ["News Intelligence"]
+                        )
+                    )
+                    seen_queries.add(clean_pub.lower())
 
         # Sort by confidence descending and limit
         pivots.sort(key=lambda p: p.confidence, reverse=True)

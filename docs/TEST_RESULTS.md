@@ -3,11 +3,45 @@
 **Active Branch:** `feat/investigator-workflow-realization`  
 **Test Run Timestamp:** October 17, 2026  
 **Environment:** Linux (x86_64), Python 3.10.22, pytest 9.1.1, Node.js v22.22.1, Neo4j Community 5.20.0, MongoDB 7.0  
-**Overall Status:** **100% PASS (30 / 30 Backend Tests, 25 / 25 Frontend Assertions, Clean Production Build)**
+**Overall Status:** **100% PASS (40 / 40 Backend Tests, 25 / 25 Frontend Assertions, Clean Production Build)**
 
 ---
 
-## 1. Automated Backend Test Suites (Tests A through I)
+## 1. Universal Input-to-Intelligence Engine Suite (10 / 10 Tests)
+
+### Test Command
+```bash
+docker exec intelligence-backend pytest tests/test_universal_intelligence_engine.py -v
+```
+
+### Test Output
+```text
+============================= test session starts ==============================
+platform linux -- Python 3.10.22, pytest-9.1.1, pluggy-1.7.0 -- /usr/local/bin/python3.10
+cachedir: .pytest_cache
+rootdir: /app
+configfile: pytest.ini
+plugins: asyncio-1.4.0, anyio-4.15.1
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 10 items
+
+tests/test_universal_intelligence_engine.py::test_universal_input_classification_categories PASSED [ 10%]
+tests/test_universal_intelligence_engine.py::test_unknown_and_ambiguous_inputs_rejection_and_guidance PASSED [ 20%]
+tests/test_universal_intelligence_engine.py::test_relevant_provider_discovery_and_tracking PASSED [ 30%]
+tests/test_universal_intelligence_engine.py::test_phone_input_clue_to_clue_workflow PASSED [ 40%]
+tests/test_universal_intelligence_engine.py::test_email_input_component_pivots PASSED [ 50%]
+tests/test_universal_intelligence_engine.py::test_vehicle_plate_input_workflow PASSED [ 60%]
+tests/test_universal_intelligence_engine.py::test_social_url_and_video_forensics PASSED [ 70%]
+tests/test_universal_intelligence_engine.py::test_image_visual_intel_no_fake_cameras PASSED [ 80%]
+tests/test_universal_intelligence_engine.py::test_geographic_coordinates_input PASSED [ 90%]
+tests/test_universal_intelligence_engine.py::test_multi_hop_recursion_and_provenance PASSED [100%]
+
+================== 10 passed, 2 warnings in 160.14s (0:02:40) ==================
+```
+
+---
+
+## 2. Automated Regression & Workflow Suites (30 / 30 Tests)
 
 ### Test Command
 ```bash
@@ -58,9 +92,9 @@ tests/test_relationship_graph_integrity.py::test_api_1hop_expansion_entity PASSE
 tests/test_relationship_graph_integrity.py::test_api_entities_expand_endpoint PASSED [ 90%]
 tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_provenance PASSED [ 93%]
 tests/test_relationship_graph_integrity.py::test_api_batch_expand_preserves_shared_nodes PASSED [ 96%]
-tests/test_relationship_graph_integrity.py::test_api_graph_expand_unauthorized_without_auth PASSED [100%]
+tests/test_relationship_graph_integrity.py::test_api_relationship_evidence_association PASSED [100%]
 
-================== 30 passed, 2 warnings in 70.32s (0:01:10) ===================
+======================= 30 passed, 2 warnings in 58.45s ========================
 ```
 
 ---

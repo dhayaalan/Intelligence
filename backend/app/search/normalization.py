@@ -187,10 +187,13 @@ def classify_query_intent_and_mode(
       but for identifiers, EXACT_IDENTIFIER is strictly maintained.
     """
     q = (query or "").strip()
-    
-    # Check if query is an email (must not start with @, as leading @ denotes a username handle)
-    if not q.startswith("@") and "@" in q and not any(c in q for c in [" ", "\t", "\n"]):
-        norm_email, err = normalize_email(q)
+    q_lower = q.lower()
+
+    # Check explicit email prefix or direct email syntax
+    is_explicit_email = q_lower.startswith("email:") or q_lower.startswith("mailto:")
+    clean_email = q.split(":", 1)[1].strip() if is_explicit_email else q
+    if (is_explicit_email or ("@" in clean_email and not clean_email.startswith("@"))) and not any(c in clean_email for c in [" ", "\t", "\n"]):
+        norm_email, err = normalize_email(clean_email)
         if norm_email:
             return {
                 "search_mode": SearchMode.EXACT_IDENTIFIER.value,
@@ -214,9 +217,11 @@ def classify_query_intent_and_mode(
                 "validation_error": err
             }
     
-    # Check if query looks like a phone number
-    if PHONE_CANDIDATE_REGEX.match(q) and any(c.isdigit() for c in q) and not any(c.isalpha() for c in q):
-        norm_phone, err = normalize_phone(q, default_region=default_phone_region)
+    # Check explicit phone prefix or direct phone syntax
+    is_explicit_phone = q_lower.startswith("phone:") or q_lower.startswith("tel:")
+    clean_phone = q.split(":", 1)[1].strip() if is_explicit_phone else q
+    if is_explicit_phone or (PHONE_CANDIDATE_REGEX.match(clean_phone) and any(c.isdigit() for c in clean_phone) and not any(c.isalpha() for c in clean_phone)):
+        norm_phone, err = normalize_phone(clean_phone, default_region=default_phone_region)
         if norm_phone:
             return {
                 "search_mode": SearchMode.EXACT_IDENTIFIER.value,
