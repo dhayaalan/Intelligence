@@ -526,7 +526,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           n.associated_case_id === investigationId ||
           n.id === investigationId ||
           n.original_query?.toLowerCase() === inv.target?.toLowerCase() ||
-          n.title?.toLowerCase().includes(inv.target?.toLowerCase())
+          n.title?.toLowerCase() === `investigation: news dossier: ${inv.target?.toLowerCase()}`
       );
       setNewsRecord(matchingNews || null);
 

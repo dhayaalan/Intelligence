@@ -2257,44 +2257,67 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                           ) : (
                             /* Card Layout with Image / Video Preview */
                             <div className="flex flex-col sm:flex-row gap-4 items-start">
-                              {heroImage && (
-                                <div
-                                  className="w-full sm:w-48 h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-800 relative group cursor-pointer"
-                                  onClick={() => {
-                                    if (isVideo && embedUrl) {
-                                      setPlayingVideoId(articleId);
-                                    } else {
-                                      setSelectedArticleId(articleId);
-                                    }
-                                  }}
-                                >
-                                  <img
-                                    src={heroImage}
-                                    alt={title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      (e.target as any).style.display = 'none';
-                                    }}
-                                  />
-                                  {isVideo ? (
-                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                      <div className="w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                        <Play className="w-5 h-5 fill-white ml-0.5" />
+                              {/* Card Thumbnail: Authentic Hero Image OR Verified Publisher Brand Preview */}
+                              <div
+                                className="w-full sm:w-48 h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-800 relative group cursor-pointer flex flex-col items-center justify-center"
+                                onClick={() => {
+                                  if (isVideo && embedUrl) {
+                                    setPlayingVideoId(articleId);
+                                  } else {
+                                    setSelectedArticleId(articleId);
+                                  }
+                                }}
+                              >
+                                {heroImage ? (
+                                  <>
+                                    <img
+                                      src={heroImage}
+                                      alt={title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        (e.target as any).style.display = 'none';
+                                      }}
+                                    />
+                                    {isVideo ? (
+                                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                          <Play className="w-5 h-5 fill-white ml-0.5" />
+                                        </div>
+                                        <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-[10px] rounded font-mono font-bold">
+                                          PLAY
+                                        </span>
                                       </div>
-                                      <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-[10px] rounded font-mono font-bold">
-                                        PLAY
-                                      </span>
+                                    ) : (
+                                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <span className="text-[10px] bg-slate-900/90 text-white px-2 py-0.5 rounded font-medium">
+                                          Inspect
+                                        </span>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800/80 dark:to-slate-900 flex flex-col items-center justify-center p-3 text-center">
+                                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-2xs mb-1.5 overflow-hidden">
+                                      <img
+                                        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(publisher.replace(/^https?:\/\//, '').split('/')[0])}&sz=128`}
+                                        alt={publisher}
+                                        className="w-6 h-6 object-contain"
+                                        onError={(e) => {
+                                          (e.target as any).style.display = 'none';
+                                        }}
+                                      />
+                                      <Newspaper className="w-5 h-5 text-slate-400 -ml-6 peer-only" />
                                     </div>
-                                  ) : (
-                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                      <span className="text-[10px] bg-slate-900/90 text-white px-2 py-0.5 rounded font-medium">
-                                        Inspect
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                    <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 truncate max-w-full">
+                                      {publisher}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider mt-0.5">
+                                      Verified Wire
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
                               <div className="flex-1 space-y-1">
                                 <h3
