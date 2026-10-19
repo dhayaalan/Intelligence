@@ -20,7 +20,7 @@ ENV VITE_API_URL=/api/v1
 RUN npm run build
 
 # Stage 2: Production Nginx web server
-FROM nginx:1.25-alpine
+FROM nginx:1.31-alpine
 
 # Install curl for container health check
 RUN apk add --no-cache curl
