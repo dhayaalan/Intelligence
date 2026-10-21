@@ -116,11 +116,7 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
       });
 
       if (res && res.length > 0) {
-        setDetections((prev) => {
-          const ids = new Set(prev.map((d) => d.detection_id));
-          const newItems = res.filter((d) => !ids.has(d.detection_id));
-          return [...newItems, ...prev];
-        });
+        setDetections(res);
       }
     } catch (err) {
       console.error('ANPR processing error', err);
@@ -247,6 +243,16 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                 {candidateCount} Candidates
               </span>
             </div>
+            {detections.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDetections([])}
+                className="px-2.5 py-1 text-[11px] font-mono rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                title="Clear current sightings to run a fresh ANPR scan"
+              >
+                Clear Sightings
+              </button>
+            )}
           </div>
         </div>
 
@@ -394,9 +400,14 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                     {/* Metadata details */}
                     <div className="space-y-1.5 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                          {det.raw_ocr_text}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                            {det.raw_ocr_text}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800">
+                            SEDAN / CAR
+                          </span>
+                        </div>
                         <span className="text-slate-400 text-[11px]">
                           Confidence: {Math.round(det.confidence * 100)}%
                         </span>

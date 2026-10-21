@@ -409,10 +409,10 @@ class ANPRService:
     def create_synthetic_authorized_test_clip(self, output_path: str, plate_text: str = "TN34MA8562") -> str:
         """
         Generates a 3-second synthetic authorized test MP4 video containing:
-        - 1 second of street scene without vehicle
-        - 1 second of vehicle entering with clearly visible license plate
+        - 1 second of highway roadway scene without vehicle
+        - 1 second of realistic vehicle (chassis, tires, windshield, LED tail lights, bumper, and HSRP plate)
         - 1 second of vehicle exiting
-        Ensures 100% reproducible test verification without external network dependency.
+        Ensures 100% reproducible test verification with high-fidelity vehicle visuals.
         """
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         w, h = 640, 480
@@ -423,35 +423,135 @@ class ANPRService:
         total_frames = int(fps * 3.0)  # 75 frames
 
         for i in range(total_frames):
-            # Draw background asphalt and road markings
-            frame = np.full((h, w, 3), (70, 70, 70), dtype=np.uint8)
-            # Road dashed lane divider
-            cv2.line(frame, (w // 2, 0), (w // 2, h), (255, 255, 255), 3)
+            # 1. Environment / Highway roadway background
+            frame = np.full((h, w, 3), (48, 48, 52), dtype=np.uint8)
+            # Sky & Horizon
+            cv2.rectangle(frame, (0, 0), (w, 130), (195, 175, 155), -1)
+            cv2.rectangle(frame, (0, 120), (w, 138), (75, 110, 70), -1)  # Distant landscape
+            cv2.rectangle(frame, (0, 138), (w, 145), (140, 140, 140), -1)  # Roadside guard rail
 
-            # Frame 25..55: Vehicle present in frame
+            # Road perspective boundaries
+            cv2.line(frame, (50, h), (260, 145), (230, 230, 230), 4)
+            cv2.line(frame, (w - 50, h), (380, 145), (230, 230, 230), 4)
+            # Center dashed lane divider
+            for dash_y in range(160, h, 40):
+                cv2.line(frame, (320, dash_y), (320, min(h, dash_y + 22)), (240, 240, 240), 3)
+
+            # CCTV Camera HUD
+            cv2.putText(frame, "● LIVE CCTV / ANPR SURVEILLANCE", (16, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 230), 1, cv2.LINE_AA)
+            cv2.putText(frame, "CAM-04 NHAI HIGHWAY SIGHTING [KM 14.2] 25FPS", (16, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (200, 200, 200), 1, cv2.LINE_AA)
+
+            # Frame 25..55: Realistic Vehicle present in frame
             if 25 <= i <= 55:
-                # Vehicle body (dark blue rectangle)
-                car_x, car_y = 180, 160
-                car_w, car_h = 280, 180
-                cv2.rectangle(frame, (car_x, car_y), (car_x + car_w, car_y + car_h), (120, 50, 20), -1)
-                # Windshield
-                cv2.rectangle(frame, (car_x + 30, car_y + 20), (car_x + car_w - 30, car_y + 80), (190, 190, 190), -1)
+                car_center_x, car_center_y = 320, 275
 
-                # License plate (white background with black text)
-                plate_x = car_x + 60
-                plate_y = car_y + 110
-                plate_w = 160
-                plate_h = 42
-                cv2.rectangle(frame, (plate_x, plate_y), (plate_x + plate_w, plate_y + plate_h), (255, 255, 255), -1)
-                cv2.rectangle(frame, (plate_x, plate_y), (plate_x + plate_w, plate_y + plate_h), (0, 0, 0), 2)
+                # 2. Ground Contact Shadow
+                cv2.ellipse(frame, (car_center_x, car_center_y + 115), (160, 22), 0, 0, 360, (20, 20, 22), -1)
+
+                # 3. Wheels / Tires with Alloy Rims
+                cv2.ellipse(frame, (car_center_x - 145, car_center_y + 75), (26, 36), 0, 0, 360, (25, 25, 28), -1)
+                cv2.ellipse(frame, (car_center_x - 145, car_center_y + 75), (13, 18), 0, 0, 360, (120, 120, 125), -1)
+                cv2.ellipse(frame, (car_center_x + 145, car_center_y + 75), (26, 36), 0, 0, 360, (25, 25, 28), -1)
+                cv2.ellipse(frame, (car_center_x + 145, car_center_y + 75), (13, 18), 0, 0, 360, (120, 120, 125), -1)
+
+                # 4. Lower Bumper & Diffuser
+                body_left, body_w = car_center_x - 150, 300
+                body_bottom = car_center_y + 105
+                cv2.rectangle(frame, (body_left + 15, body_bottom - 36), (body_left + body_w - 15, body_bottom), (35, 36, 40), -1)
+                # Dual chrome exhaust tips
+                cv2.ellipse(frame, (body_left + 45, body_bottom - 12), (10, 6), 0, 0, 360, (180, 180, 185), 2)
+                cv2.ellipse(frame, (body_left + body_w - 45, body_bottom - 12), (10, 6), 0, 0, 360, (180, 180, 185), 2)
+                # Red bumper reflectors
+                cv2.rectangle(frame, (body_left + 25, body_bottom - 30), (body_left + 75, body_bottom - 22), (30, 30, 210), -1)
+                cv2.rectangle(frame, (body_left + body_w - 75, body_bottom - 30), (body_left + body_w - 25, body_bottom - 22), (30, 30, 210), -1)
+
+                # 5. Main Car Body (Metallic Deep Sapphire Blue-Grey)
+                body_pts = np.array([
+                    [body_left + 20, body_bottom - 36],
+                    [body_left, car_center_y + 30],
+                    [body_left + 12, car_center_y - 15],
+                    [body_left + 45, car_center_y - 20],
+                    [body_left + body_w - 45, car_center_y - 20],
+                    [body_left + body_w - 12, car_center_y - 15],
+                    [body_left + body_w, car_center_y + 30],
+                    [body_left + body_w - 20, body_bottom - 36],
+                ], dtype=np.int32)
+                cv2.fillPoly(frame, [body_pts], (85, 45, 28))
+                cv2.polylines(frame, [body_pts], True, (50, 28, 15), 2)
+
+                # 6. Upper Cabin & Tinted Rear Window
+                cabin_w_top = 185
+                cabin_top = car_center_y - 95
+                cabin_bottom = car_center_y - 20
+                roof_left = car_center_x - cabin_w_top // 2
+                cv2.rectangle(frame, (roof_left, cabin_top - 8), (roof_left + cabin_w_top, cabin_top), (85, 45, 28), -1)
+                # Shark-fin roof antenna
+                cv2.ellipse(frame, (car_center_x, cabin_top - 10), (6, 12), 0, 0, 360, (85, 45, 28), -1)
+
+                window_pts = np.array([
+                    [car_center_x - cabin_w_top // 2 + 8, cabin_top],
+                    [car_center_x + cabin_w_top // 2 - 8, cabin_top],
+                    [car_center_x + 110, cabin_bottom],
+                    [car_center_x - 110, cabin_bottom],
+                ], dtype=np.int32)
+                cv2.fillPoly(frame, [window_pts], (30, 28, 25))
+                cv2.polylines(frame, [window_pts], True, (60, 58, 55), 2)
+                # Headrests inside
+                cv2.ellipse(frame, (car_center_x - 55, cabin_bottom - 32), (18, 14), 0, 0, 360, (45, 45, 45), -1)
+                cv2.ellipse(frame, (car_center_x + 55, cabin_bottom - 32), (18, 14), 0, 0, 360, (45, 45, 45), -1)
+                # Third high-mount brake lamp
+                cv2.rectangle(frame, (car_center_x - 30, cabin_top + 4), (car_center_x + 30, cabin_top + 10), (35, 35, 230), -1)
+
+                # 7. Tail Lights (Vivid modern LED clusters)
+                tail_w, tail_h = 68, 32
+                left_tail_pts = np.array([
+                    [body_left + 15, car_center_y - 5],
+                    [body_left + 15 + tail_w, car_center_y + 2],
+                    [body_left + 15 + tail_w - 12, car_center_y + tail_h],
+                    [body_left + 10, car_center_y + tail_h - 4],
+                ], dtype=np.int32)
+                cv2.fillPoly(frame, [left_tail_pts], (25, 25, 220))
+                cv2.rectangle(frame, (body_left + 35, car_center_y + 6), (body_left + 65, car_center_y + 18), (220, 220, 240), -1)
+
+                right_tail_pts = np.array([
+                    [body_left + body_w - 15, car_center_y - 5],
+                    [body_left + body_w - 15 - tail_w, car_center_y + 2],
+                    [body_left + body_w - 15 - tail_w + 12, car_center_y + tail_h],
+                    [body_left + body_w - 10, car_center_y + tail_h - 4],
+                ], dtype=np.int32)
+                cv2.fillPoly(frame, [right_tail_pts], (25, 25, 220))
+                cv2.rectangle(frame, (body_left + body_w - 65, car_center_y + 6), (body_left + body_w - 35, car_center_y + 18), (220, 220, 240), -1)
+
+                # 8. Chrome Brand Emblem & Trunk Release
+                cv2.ellipse(frame, (car_center_x, car_center_y + 14), (14, 9), 0, 0, 360, (210, 215, 220), 2)
+                cv2.circle(frame, (car_center_x, car_center_y + 14), 4, (210, 215, 220), 1)
+
+                # 9. License Plate Alcove & High Security Plate (HSRP)
+                plate_left, plate_top = car_center_x - 80, car_center_y + 36
+                plate_w, plate_h = 160, 42
+                # Alcove recess
+                cv2.rectangle(frame, (plate_left - 8, plate_top - 6), (plate_left + plate_w + 8, plate_top + plate_h + 6), (32, 33, 38), -1)
+                cv2.rectangle(frame, (plate_left - 8, plate_top - 6), (plate_left + plate_w + 8, plate_top + plate_h + 6), (20, 20, 24), 2)
+                # Plate lights
+                cv2.rectangle(frame, (car_center_x - 45, plate_top - 6), (car_center_x - 30, plate_top - 3), (250, 250, 230), -1)
+                cv2.rectangle(frame, (car_center_x + 30, plate_top - 6), (car_center_x + 45, plate_top - 3), (250, 250, 230), -1)
+
+                # White reflective plate
+                cv2.rectangle(frame, (plate_left, plate_top), (plate_left + plate_w, plate_top + plate_h), (255, 255, 255), -1)
+                cv2.rectangle(frame, (plate_left, plate_top), (plate_left + plate_w, plate_top + plate_h), (0, 0, 0), 2)
+
+                # Indian HSRP blue strip
+                cv2.rectangle(frame, (plate_left + 2, plate_top + 2), (plate_left + 20, plate_top + plate_h - 2), (180, 50, 0), -1)
+                cv2.circle(frame, (plate_left + 11, plate_top + 13), 4, (255, 255, 255), 1)
+                cv2.putText(frame, "IND", (plate_left + 3, plate_top + 33), cv2.FONT_HERSHEY_SIMPLEX, 0.28, (255, 255, 255), 1, cv2.LINE_AA)
 
                 # License plate characters
                 cv2.putText(
                     frame,
                     plate_text,
-                    (plate_x + 8, plate_y + 30),
+                    (plate_left + 26, plate_top + 30),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.82,
+                    0.78,
                     (0, 0, 0),
                     2,
                     cv2.LINE_AA
