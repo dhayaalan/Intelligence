@@ -209,7 +209,7 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 text-xs">
           <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
             <span className="text-slate-400 block mb-1">Administrative Jurisdiction</span>
             <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -233,6 +233,47 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
               {regOwnership}
             </span>
           </div>
+
+          {detections.length > 0 && detections[0].frame_preview_data ? (
+            <div
+              className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center gap-3 cursor-pointer hover:border-blue-500/50 transition-colors group"
+              onClick={() => {
+                setActivePreviewDetection(detections[0]);
+                setActiveModalTab('video');
+                setIsPlayingVideo(true);
+              }}
+              title="Click to watch CCTV surveillance video"
+            >
+              <div className="relative w-16 h-12 rounded overflow-hidden bg-black shrink-0">
+                <img
+                  src={detections[0].frame_preview_data}
+                  alt="Target Car Camera Evidence"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                />
+                <span className="absolute inset-0 bg-blue-600/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play className="w-3.5 h-3.5 text-white fill-current" />
+                </span>
+              </div>
+              <div className="overflow-hidden">
+                <span className="text-[10px] text-slate-400 block uppercase font-mono">Camera Sighting</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100 block text-xs truncate">
+                  Real CCTV Evidence
+                </span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1">
+                  <Play className="w-2.5 h-2.5 fill-current" />
+                  Watch Video
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+              <span className="text-slate-400 block mb-1">Vehicle Camera Evidence</span>
+              <span className="font-mono text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-slate-400" />
+                Available on Checkpoint Feeds
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded border border-slate-200 dark:border-slate-800">
@@ -584,28 +625,16 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
             <div className="relative bg-black flex flex-col items-center justify-center min-h-[380px] max-h-[58vh] overflow-hidden select-none">
               {activeModalTab === 'video' ? (
                 <div className="relative w-full h-full flex items-center justify-center">
-                  {/* HTML5 Video or Animated Frame Sequence */}
-                  {activePreviewDetection.video_url ? (
-                    <video
-                      src={activePreviewDetection.video_url}
-                      controls
-                      autoPlay
-                      loop
-                      className="max-h-[50vh] w-full object-contain"
-                    />
-                  ) : activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 0 ? (
-                    <img
-                      src={activePreviewDetection.video_frames_data[activeFrameStep] || activePreviewDetection.frame_preview_data}
-                      alt="CCTV Video Motion Frame"
-                      className="max-h-[50vh] w-full object-contain"
-                    />
-                  ) : (
-                    <img
-                      src={activePreviewDetection.frame_preview_data}
-                      alt="ANPR CCTV Frame"
-                      className="max-h-[50vh] w-full object-contain"
-                    />
-                  )}
+                  {/* Photorealistic Real Car CCTV Video Motion Player */}
+                  <img
+                    src={
+                      activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 0
+                        ? activePreviewDetection.video_frames_data[activeFrameStep] || activePreviewDetection.frame_preview_data
+                        : activePreviewDetection.frame_preview_data
+                    }
+                    alt="Real Vehicle CCTV Surveillance Footage"
+                    className="max-h-[50vh] w-full object-contain"
+                  />
 
                   {/* CCTV Telemetry HUD Overlay */}
                   <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1.5 rounded text-[11px] font-mono text-cyan-300 border border-cyan-800/40 pointer-events-none space-y-0.5">
