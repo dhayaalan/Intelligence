@@ -636,15 +636,46 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                     className="max-h-[50vh] w-full object-contain"
                   />
 
-                  {/* CCTV Telemetry HUD Overlay */}
-                  <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1.5 rounded text-[11px] font-mono text-cyan-300 border border-cyan-800/40 pointer-events-none space-y-0.5">
+                  {/* CCTV Telemetry HUD Overlay (Top-Left) */}
+                  <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg text-[11px] font-mono text-cyan-300 border border-cyan-800/50 pointer-events-none space-y-1 shadow-xl">
                     <div className="flex items-center gap-1.5 text-red-500 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      ● LIVE REC: NHAI HIGHWAY PATROL FEED [CAM-04]
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                      ● LIVE CCTV PATROL FEED [NHAI CAM-04]
                     </div>
-                    <div className="text-slate-300">
-                      TARGET: <strong className="text-white">{activePreviewDetection.target_plate}</strong> • CONFIDENCE: 92%
+                    <div className="text-slate-200">
+                      TARGET: <strong className="text-emerald-400 font-mono text-xs">{activePreviewDetection.target_plate}</strong>
                     </div>
+                    <div className="text-slate-400 text-[10px]">
+                      OCR: <strong className="text-white">{activePreviewDetection.raw_ocr_text}</strong> • CONFIDENCE: <strong className="text-cyan-400">{Math.round(activePreviewDetection.confidence * 100)}%</strong>
+                    </div>
+                  </div>
+
+                  {/* Optical License Plate Zoom Inset (Top-Right) */}
+                  {activePreviewDetection.plate_crop_data && (
+                    <div className="absolute top-3 right-3 bg-black/85 backdrop-blur-md p-2 rounded-lg border border-cyan-500/60 shadow-2xl pointer-events-none max-w-[200px]">
+                      <div className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span>OPTICAL PLATE ZOOM</span>
+                        <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          92% MATCH
+                        </span>
+                      </div>
+                      <div className="bg-white p-1 rounded border border-slate-600 shadow-inner">
+                        <img
+                          src={activePreviewDetection.plate_crop_data}
+                          alt="Zoomed Plate Crop"
+                          className="h-8 w-full object-contain"
+                        />
+                      </div>
+                      <div className="mt-1 text-[9px] font-mono text-slate-300 flex items-center justify-between">
+                        <span>PLATE: {activePreviewDetection.target_plate}</span>
+                        <span className="text-slate-400">HSRP / IND</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Highway Telemetry (Bottom-Left) */}
+                  <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1 rounded text-[10px] font-mono text-slate-300 border border-slate-800 pointer-events-none">
+                    NHAI HIGHWAY CORRIDOR [KM 14.2] • FRAME #{activePreviewDetection.frame_number} • TIMECODE {activePreviewDetection.timecode_seconds}s
                   </div>
                 </div>
               ) : (
