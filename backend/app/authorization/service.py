@@ -37,8 +37,13 @@ class AuthorizationService:
         if user.role == UserRole.TENANT_ADMIN:
             return True
 
-        # 4. User Module Assignment Check: Has this user been assigned this module?
-        return module_id in user.assigned_modules
+        # 4. User Module Assignment Check:
+        # If user explicitly has assigned_modules configured, enforce module membership.
+        # Otherwise, regular users have full access to all tenant-entitled modules.
+        if user.assigned_modules:
+            return module_id in user.assigned_modules
+
+        return True
 
     @staticmethod
     def get_effective_modules_for_user(user: UserRecord) -> List[str]:

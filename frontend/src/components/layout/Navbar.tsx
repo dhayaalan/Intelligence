@@ -78,21 +78,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenCommandPalette, onToggleSi
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
           {user && (
             <div className="hidden sm:flex items-center gap-1.5 font-mono text-[11px]">
-              {user.role === 'USER' ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await logout();
-                    window.location.href = '/login';
-                  }}
-                  title="Currently logged in as Investigator (OSINT only). Click to switch to Analyst for 368 engines."
-                  className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300 hover:border-amber-400 transition-colors"
-                >
-                  INVESTIGATOR (OSINT) • SWITCH TO ANALYST ↗
-                </button>
+              {user.role === 'USER' || user.role === 'INVESTIGATOR' ? (
+                <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 font-semibold">
+                  INVESTIGATOR (FULL ACCESS • 368 ENGINES)
+                </span>
               ) : user.role === 'ANALYST' ? (
                 <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 font-semibold">
-                  LEAD ANALYST (368 ENGINES)
+                  LEAD ANALYST (FULL ACCESS • 368 ENGINES)
                 </span>
               ) : user.role === 'TENANT_ADMIN' ? (
                 <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300 font-semibold">
