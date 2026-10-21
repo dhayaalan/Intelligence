@@ -368,6 +368,8 @@ export interface ANPRDetectionRecord {
   review_decision_notes?: string;
   frame_preview_data?: string;
   plate_crop_data?: string;
+  video_url?: string;
+  video_frames_data?: string[];
   evidence_id?: string;
   detector_version: string;
   processed_at: string;

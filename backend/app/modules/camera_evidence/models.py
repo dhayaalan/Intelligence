@@ -90,6 +90,8 @@ class ANPRDetectionRecord(BaseModel):
     # Media provenance
     frame_preview_data: Optional[str] = None  # Base64 data URL of frame thumbnail
     plate_crop_data: Optional[str] = None     # Base64 data URL of cropped license plate
+    video_url: Optional[str] = None           # API streaming URL for MP4 / WebM footage
+    video_frames_data: List[str] = Field(default_factory=list)  # Motion frame series for animated CCTV player
     evidence_id: Optional[str] = None
     
     detector_version: str = "OpenCV 5.0.0 Morphological Contour Filter + Tesseract 5.5.0"

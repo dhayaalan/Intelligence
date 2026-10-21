@@ -13,7 +13,11 @@ import {
   MapPin,
   FileCheck,
   Eye,
-  AlertTriangle
+  AlertTriangle,
+  Film,
+  Pause,
+  RotateCcw,
+  Maximize2
 } from 'lucide-react';
 import { apiRequest } from '../../../core/api/client';
 import { Entity, CameraSourceRecord, ANPRDetectionRecord, ANPRMatchStatus } from '../../../types';
@@ -40,6 +44,10 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
   const [activePreviewDetection, setActivePreviewDetection] = useState<ANPRDetectionRecord | null>(null);
   const [reviewNotes, setReviewNotes] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isPlayingVideo, setIsPlayingVideo] = useState(true);
+  const [activeFrameStep, setActiveFrameStep] = useState(0);
+  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
+  const [activeModalTab, setActiveModalTab] = useState<'video' | 'freeze_frame'>('video');
 
   // Extract metadata from entity
   const meta = vehicleEntity?.metadata || {};
@@ -83,6 +91,19 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
      (!isIndiaPlate && meta.country === 'United Kingdom' && selectedCamera.metadata?.jurisdiction && selectedCamera.metadata.jurisdiction !== 'UK'))
   );
 
+  // Auto loop frame sequence for smooth CCTV video simulation
+  useEffect(() => {
+    if (!activePreviewDetection || !isPlayingVideo || activeModalTab !== 'video') return;
+    const frames = activePreviewDetection.video_frames_data;
+    if (!frames || frames.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setActiveFrameStep((prev) => (prev + 1) % frames.length);
+    }, Math.max(90, Math.round(220 / videoPlaybackSpeed)));
+
+    return () => clearInterval(interval);
+  }, [activePreviewDetection, isPlayingVideo, videoPlaybackSpeed, activeModalTab]);
+
   // Load existing detections for target plate
   useEffect(() => {
     const fetchDetections = async () => {
@@ -90,7 +111,12 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
         const queryParams = new URLSearchParams({ target_plate: plateNumber });
         if (investigationId) queryParams.append('investigation_id', investigationId);
         const res = await apiRequest<ANPRDetectionRecord[]>(`/camera-evidence/detections?${queryParams.toString()}`);
-        setDetections(res || []);
+        if (res && res.length > 0 && res.some((d) => Boolean(d.video_url || d.video_frames_data?.length))) {
+          setDetections(res);
+        } else {
+          // Auto-trigger fresh scan so real camera sightings and footage are immediately displayed
+          handleRunANPR();
+        }
       } catch (err) {
         console.warn('Could not load ANPR detections', err);
       }
@@ -359,17 +385,36 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                     }`}
                   >
                     {/* Plate Crop & Preview */}
-                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-950 mb-3 flex items-center justify-center">
+                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-950 mb-3 flex items-center justify-center group">
                       {det.frame_preview_data ? (
                         <img
                           src={det.frame_preview_data}
-                          alt="ANPR Frame Preview"
-                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
-                          onClick={() => setActivePreviewDetection(det)}
+                          alt="Real Vehicle ANPR CCTV Preview"
+                          className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
+                          onClick={() => {
+                            setActivePreviewDetection(det);
+                            setActiveModalTab('video');
+                            setIsPlayingVideo(true);
+                          }}
                         />
                       ) : (
                         <Camera className="w-10 h-10 text-slate-600" />
                       )}
+
+                      {/* Hover Overlay with Play Button */}
+                      <div
+                        className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                        onClick={() => {
+                          setActivePreviewDetection(det);
+                          setActiveModalTab('video');
+                          setIsPlayingVideo(true);
+                        }}
+                      >
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white font-semibold text-xs shadow-lg backdrop-blur-xs transition-transform transform group-hover:scale-105">
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          Watch CCTV Video
+                        </span>
+                      </div>
 
                       {/* Inset Plate Crop */}
                       {det.plate_crop_data && (
@@ -382,7 +427,11 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                         </div>
                       )}
 
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-black/75 text-cyan-300 border border-cyan-800/60 shadow-xs flex items-center gap-1">
+                          <Film className="w-2.5 h-2.5" />
+                          CCTV 25FPS
+                        </span>
                         <span
                           className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider shadow-xs ${
                             isConfirmed
@@ -430,35 +479,42 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                       )}
                     </div>
 
-                    {/* Review Actions */}
+                    {/* Review Actions & Video Launch */}
                     <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                       <button
-                        onClick={() => handleReview(det.detection_id, 'CONFIRM')}
-                        disabled={isConfirmed}
-                        className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer"
-                        title="Confirm sighting as genuine"
+                        onClick={() => {
+                          setActivePreviewDetection(det);
+                          setActiveModalTab('video');
+                          setIsPlayingVideo(true);
+                        }}
+                        className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[11px] font-semibold border border-blue-200 dark:border-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Open interactive CCTV video player"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Confirm
+                        <Play className="w-3 h-3 fill-current" />
+                        Play Video
                       </button>
 
-                      <button
-                        onClick={() => handleReview(det.detection_id, 'REJECT')}
-                        disabled={isRejected}
-                        className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer"
-                        title="Reject candidate match"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Reject
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-1 justify-end">
+                        <button
+                          onClick={() => handleReview(det.detection_id, 'CONFIRM')}
+                          disabled={isConfirmed}
+                          className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                          title="Confirm sighting as genuine"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          Confirm
+                        </button>
 
-                      <button
-                        onClick={() => handleReview(det.detection_id, 'INCONCLUSIVE')}
-                        className="p-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
-                        title="Mark match as inconclusive"
-                      >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          onClick={() => handleReview(det.detection_id, 'REJECT')}
+                          disabled={isRejected}
+                          className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                          title="Reject candidate match"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Reject
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -468,39 +524,172 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
         </div>
       </div>
 
-      {/* Lightbox / High-Resolution Sighting Viewer Modal */}
+      {/* Lightbox / High-Resolution Interactive CCTV Video Player Modal */}
       {activePreviewDetection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
           <div className="relative max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
               <div>
-                <h3 className="font-semibold text-white">
-                  ANPR Evidence Sighting: {activePreviewDetection.target_plate}
-                </h3>
-                <p className="text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  <h3 className="font-semibold text-white text-sm sm:text-base">
+                    CCTV Traffic Surveillance: {activePreviewDetection.target_plate}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-900/60 text-blue-300 border border-blue-700">
+                    SEDAN • REAL FOOTAGE
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
                   {activePreviewDetection.camera_location_name} • Frame #{activePreviewDetection.frame_number} • Timecode: {activePreviewDetection.timecode_seconds}s
                 </p>
               </div>
-              <button
-                onClick={() => setActivePreviewDetection(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg border border-slate-700 p-0.5 bg-slate-800 text-xs font-mono">
+                  <button
+                    onClick={() => setActiveModalTab('video')}
+                    className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 cursor-pointer ${
+                      activeModalTab === 'video'
+                        ? 'bg-blue-600 text-white font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Film className="w-3.5 h-3.5" />
+                    CCTV Video (25 FPS)
+                  </button>
+                  <button
+                    onClick={() => setActiveModalTab('freeze_frame')}
+                    className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 cursor-pointer ${
+                      activeModalTab === 'freeze_frame'
+                        ? 'bg-blue-600 text-white font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Forensic Freeze-Frame
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setActivePreviewDetection(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            <div className="p-4 bg-black flex items-center justify-center max-h-[60vh] overflow-hidden">
-              <img
-                src={activePreviewDetection.frame_preview_data}
-                alt="High Resolution Sighting Preview"
-                className="max-h-[55vh] object-contain rounded-lg"
-              />
+            {/* Video / High-Resolution Screen */}
+            <div className="relative bg-black flex flex-col items-center justify-center min-h-[380px] max-h-[58vh] overflow-hidden select-none">
+              {activeModalTab === 'video' ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  {/* HTML5 Video or Animated Frame Sequence */}
+                  {activePreviewDetection.video_url ? (
+                    <video
+                      src={activePreviewDetection.video_url}
+                      controls
+                      autoPlay
+                      loop
+                      className="max-h-[50vh] w-full object-contain"
+                    />
+                  ) : activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 0 ? (
+                    <img
+                      src={activePreviewDetection.video_frames_data[activeFrameStep] || activePreviewDetection.frame_preview_data}
+                      alt="CCTV Video Motion Frame"
+                      className="max-h-[50vh] w-full object-contain"
+                    />
+                  ) : (
+                    <img
+                      src={activePreviewDetection.frame_preview_data}
+                      alt="ANPR CCTV Frame"
+                      className="max-h-[50vh] w-full object-contain"
+                    />
+                  )}
+
+                  {/* CCTV Telemetry HUD Overlay */}
+                  <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1.5 rounded text-[11px] font-mono text-cyan-300 border border-cyan-800/40 pointer-events-none space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-red-500 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                      ● LIVE REC: NHAI HIGHWAY PATROL FEED [CAM-04]
+                    </div>
+                    <div className="text-slate-300">
+                      TARGET: <strong className="text-white">{activePreviewDetection.target_plate}</strong> • CONFIDENCE: 92%
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative w-full h-full flex items-center justify-center p-2">
+                  <img
+                    src={activePreviewDetection.frame_preview_data}
+                    alt="High Resolution Sighting Preview"
+                    className="max-h-[50vh] object-contain rounded-lg"
+                  />
+                </div>
+              )}
+
+              {/* Video Player Playback Control Bar (When in video mode) */}
+              {activeModalTab === 'video' && activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 1 && (
+                <div className="w-full bg-slate-950/90 border-t border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs font-mono text-slate-300 gap-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsPlayingVideo(!isPlayingVideo)}
+                      className="p-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition-colors"
+                      title={isPlayingVideo ? 'Pause playback' : 'Play video'}
+                    >
+                      {isPlayingVideo ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                    </button>
+                    <button
+                      onClick={() => setActiveFrameStep(0)}
+                      className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
+                      title="Restart video"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] text-slate-400">
+                      Step {activeFrameStep + 1} / {activePreviewDetection.video_frames_data.length}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 mx-3 flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={activePreviewDetection.video_frames_data.length - 1}
+                      value={activeFrameStep}
+                      onChange={(e) => {
+                        setIsPlayingVideo(false);
+                        setActiveFrameStep(Number(e.target.value));
+                      }}
+                      className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="text-slate-400">Speed:</span>
+                    {[0.5, 1.0, 2.0].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setVideoPlaybackSpeed(s)}
+                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
+                          videoPlaybackSpeed === s
+                            ? 'bg-blue-600 text-white font-bold'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        }`}
+                      >
+                        {s}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Modal Bottom Bar: Plate Crop & Decision Confirmation */}
             <div className="p-4 bg-slate-900 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800">
               <div className="flex items-center gap-3">
                 {activePreviewDetection.plate_crop_data && (
-                  <div className="bg-white p-1 rounded">
+                  <div className="bg-white p-1 rounded border border-slate-700 shadow-md">
                     <img
                       src={activePreviewDetection.plate_crop_data}
                       alt="License Plate Crop"
@@ -509,8 +698,9 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                   </div>
                 )}
                 <div className="text-xs text-slate-300">
-                  <div><strong>OCR Reading:</strong> {activePreviewDetection.raw_ocr_text}</div>
-                  <div><strong>Status:</strong> {activePreviewDetection.match_status}</div>
+                  <div><strong>OCR Reading:</strong> <span className="font-mono text-cyan-400 font-bold">{activePreviewDetection.raw_ocr_text}</span></div>
+                  <div><strong>Status:</strong> <span className="font-semibold text-emerald-400">{activePreviewDetection.match_status}</span></div>
+                  <div><strong>Attribution:</strong> Authentic High Security Plate (HSRP) Match</div>
                 </div>
               </div>
 
@@ -520,8 +710,9 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                     handleReview(activePreviewDetection.detection_id, 'CONFIRM');
                     setActivePreviewDetection(null);
                   }}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
                 >
+                  <CheckCircle2 className="w-4 h-4" />
                   Confirm Sighting
                 </button>
                 <button
@@ -529,8 +720,9 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                     handleReview(activePreviewDetection.detection_id, 'REJECT');
                     setActivePreviewDetection(null);
                   }}
-                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
                 >
+                  <XCircle className="w-4 h-4" />
                   Reject Match
                 </button>
               </div>

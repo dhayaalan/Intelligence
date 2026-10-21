@@ -11,6 +11,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.identity.models import UserRecord
@@ -239,6 +240,22 @@ async def process_anpr_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error executing ANPR processing: {str(e)}"
         )
+
+
+@router.get("/footage/{filename}")
+async def stream_footage(filename: str):
+    """
+    Streams authorized case footage or synthetic CCTV video clips to browser video players.
+    """
+    safe_filename = os.path.basename(filename)
+    path = os.path.join(FOOTAGE_UPLOAD_DIR, safe_filename)
+    if not os.path.exists(path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Footage file '{safe_filename}' not found."
+        )
+    media_type = "video/webm" if path.endswith(".webm") else "video/mp4"
+    return FileResponse(path, media_type=media_type)
 
 
 @router.get("/detections", response_model=List[ANPRDetectionRecord])

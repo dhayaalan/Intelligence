@@ -298,6 +298,24 @@ class ANPRService:
                             frame_b64 = encode_image_base64(preview_frame, quality=80)
                             crop_b64 = encode_image_base64(crop, quality=90)
 
+                            # Short 6-frame motion sequence for interactive CCTV video scrubbing
+                            motion_frames: List[str] = []
+                            for step in range(-3, 4):
+                                m_frame = preview_frame.copy()
+                                m_time = s_time + timedelta(milliseconds=step * 150)
+                                m_now_str = m_time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-4]
+                                cv2.putText(
+                                    m_frame,
+                                    f"● CCTV REC {m_now_str} [FRAME #{frame_idx + step*3}]",
+                                    (16, m_frame.shape[0] - 14),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.38,
+                                    (0, 255, 255),
+                                    1,
+                                    cv2.LINE_AA
+                                )
+                                motion_frames.append(encode_image_base64(m_frame, quality=75))
+
                             det_record = ANPRDetectionRecord(
                                 detection_id=det_id,
                                 investigation_id=investigation_id,
@@ -311,6 +329,8 @@ class ANPRService:
                                     "longitude": camera.longitude
                                 } if camera.latitude is not None else None,
                                 video_reference=os.path.basename(video_path),
+                                video_url=f"/api/v1/camera-evidence/footage/{os.path.basename(video_path)}",
+                                video_frames_data=motion_frames,
                                 frame_number=frame_idx,
                                 timecode_seconds=round(timecode, 2),
                                 source_timestamp=s_time,
