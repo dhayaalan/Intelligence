@@ -199,10 +199,15 @@ class OsintModule(IntelligenceModule):
                     supported = [str(st).lower() for st in meta.supported_targets]
                 elif hasattr(p, "supported_targets"):
                     st_val = getattr(p, "supported_targets")
-                    supported = [str(x).lower() for x in (st_val() if callable(st_val) else st_val)]
                 if t_type not in supported and "all" not in supported:
                     continue
-            
+
+            # Skip vehicle registration recon unless searching a vehicle or query conforms to a vehicle plate
+            if pid == "vehicle_registration_recon" and t_type not in ["vehicle", "vehicle_plate"]:
+                from app.modules.osint.providers.vehicle_intelligence import vehicle_registration_provider
+                if not vehicle_registration_provider.match_plate_format(context.query):
+                    continue
+
             active_providers[pid] = p
 
         semaphore = asyncio.Semaphore(50)

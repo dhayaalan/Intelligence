@@ -257,6 +257,19 @@ class VehicleRegistrationProvider(ProviderAdapter):
         authorized_credential: Optional[str] = None
     ) -> Dict[str, Any]:
         parsed = self.parse_plate(plate_number)
+        if not parsed.get("matched"):
+            return {
+                "status": "NOT_FOUND",
+                "message": f"Query '{plate_number}' does not match recognized vehicle registration standards.",
+                "plate_number": plate_number,
+                "jurisdiction": "UNKNOWN",
+                "live_registry_status": "NOT_APPLICABLE",
+                "official_registry_executed": False,
+                "entities": [],
+                "relationships": [],
+                "evidence": []
+            }
+
         canonical = parsed.get("canonical_plate", plate_number.strip().upper())
         country = parsed.get("country", "Unknown")
         state_name = parsed.get("state_name")

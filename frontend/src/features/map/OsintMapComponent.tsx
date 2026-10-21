@@ -228,11 +228,24 @@ export const OsintMapComponent: React.FC<OsintMapProps> = ({
                     )}
                     <div className="text-[11px] text-zinc-600 space-y-0.5">
                       <p>Type: <strong className="text-zinc-900">{loc.type}</strong></p>
-                      {loc.ip && <p>IP: <strong className="text-zinc-900">{loc.ip}</strong></p>}
-                      <p>Location: <strong className="text-zinc-900">{loc.city}, {loc.country}</strong></p>
+                      {loc.ip && loc.ip !== loc.name && <p>IP: <strong className="text-zinc-900">{loc.ip}</strong></p>}
+                      <p>Location: <strong className="text-zinc-900">{[loc.city, loc.country].filter(Boolean).join(', ') || 'Global / Unspecified'}</strong></p>
                       {loc.timestamp && <p>Detected: <strong className="text-emerald-700">{loc.timestamp}</strong></p>}
-                      {loc.details && <p>Telemetry: <strong className="text-zinc-800">{loc.details}</strong></p>}
-                      <p className="text-zinc-500">GPS: {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</p>
+                      {loc.details && (
+                        <p className="line-clamp-2 text-zinc-800">
+                          {loc.details.startsWith('{') ? (() => {
+                            try {
+                              const p = JSON.parse(loc.details);
+                              return p.summary || p.description || p.publisher || 'Verified observation';
+                            } catch {
+                              return loc.details.substring(0, 80);
+                            }
+                          })() : loc.details}
+                        </p>
+                      )}
+                      <p className="text-zinc-500 font-bold">
+                        GPS: {Math.abs(loc.lat).toFixed(4)}° {loc.lat >= 0 ? 'N' : 'S'}, {Math.abs(loc.lng).toFixed(4)}° {loc.lng >= 0 ? 'E' : 'W'}
+                      </p>
                     </div>
                   </div>
                 </Popup>
@@ -245,9 +258,9 @@ export const OsintMapComponent: React.FC<OsintMapProps> = ({
         {selectedLoc && (
           <div className="absolute bottom-4 left-4 z-[1000] p-3.5 rounded-lg border border-zinc-200 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md shadow-xl text-xs space-y-2 font-mono max-w-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-bold text-zinc-950 dark:text-zinc-100 flex items-center gap-1.5">
-                <Crosshair className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-200" />
-                {selectedLoc.name}
+              <span className="font-bold text-zinc-950 dark:text-zinc-100 flex items-center gap-1.5 truncate max-w-[220px]">
+                <Crosshair className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-200 shrink-0" />
+                <span className="truncate">{selectedLoc.name}</span>
               </span>
               <Badge variant={selectedLoc.threatLevel === 'MALICIOUS' ? 'destructive' : 'warning'}>
                 {selectedLoc.threatLevel || 'RESOLVED'}
@@ -264,11 +277,27 @@ export const OsintMapComponent: React.FC<OsintMapProps> = ({
             )}
             <div className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1">
               <p>Type: <strong className="text-zinc-900 dark:text-zinc-100">{selectedLoc.type}</strong></p>
-              {selectedLoc.ip && <p>IP Host: <strong className="text-zinc-900 dark:text-zinc-100">{selectedLoc.ip}</strong></p>}
-              <p>Geographic Origin: <strong className="text-zinc-900 dark:text-zinc-100">{selectedLoc.city}, {selectedLoc.country}</strong></p>
+              {selectedLoc.ip && selectedLoc.ip !== selectedLoc.name && (
+                <p>IP Host: <strong className="text-zinc-900 dark:text-zinc-100">{selectedLoc.ip}</strong></p>
+              )}
+              <p>Geographic Origin: <strong className="text-zinc-900 dark:text-zinc-100">{[selectedLoc.city, selectedLoc.country].filter(Boolean).join(', ') || 'Global / Unspecified'}</strong></p>
               {selectedLoc.timestamp && <p>Sighting Time: <strong className="text-emerald-600 dark:text-emerald-400">{selectedLoc.timestamp}</strong></p>}
-              {selectedLoc.details && <p>Telemetry: <strong className="text-zinc-900 dark:text-zinc-100">{selectedLoc.details}</strong></p>}
-              <p>Coordinates: <span className="text-zinc-700 dark:text-zinc-300 font-bold">{selectedLoc.lat.toFixed(4)}° N, {selectedLoc.lng.toFixed(4)}° E</span></p>
+              {selectedLoc.details && (
+                <div className="pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                  <span className="text-zinc-500 block text-[10px] uppercase font-semibold">Summary / Telemetry:</span>
+                  <p className="text-zinc-800 dark:text-zinc-200 line-clamp-3 break-words text-[11px] mt-0.5">
+                    {selectedLoc.details.startsWith('{') ? (() => {
+                      try {
+                        const parsed = JSON.parse(selectedLoc.details);
+                        return parsed.summary || parsed.description || parsed.publisher || parsed.location || selectedLoc.details.substring(0, 100);
+                      } catch {
+                        return selectedLoc.details.substring(0, 100);
+                      }
+                    })() : selectedLoc.details}
+                  </p>
+                </div>
+              )}
+              <p className="pt-1">Coordinates: <span className="text-zinc-700 dark:text-zinc-300 font-bold">{Math.abs(selectedLoc.lat).toFixed(4)}° {selectedLoc.lat >= 0 ? 'N' : 'S'}, {Math.abs(selectedLoc.lng).toFixed(4)}° {selectedLoc.lng >= 0 ? 'E' : 'W'}</span></p>
             </div>
           </div>
         )}

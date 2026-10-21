@@ -210,6 +210,12 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
   // Geolocation entities
   const geoLocations: GeoLocationItem[] = useMemo(() => {
     const KNOWN_GEO: Record<string, [number, number]> = {
+      'australia': [-25.2744, 133.7751],
+      'sydney': [-33.8688, 151.2093],
+      'melbourne': [-37.8136, 144.9631],
+      'brisbane': [-27.4698, 153.0251],
+      'canberra': [-35.2809, 149.1300],
+      'perth': [-31.9505, 115.8605],
       'india': [20.5937, 78.9629],
       'tamil nadu': [11.1271, 78.6569],
       'chennai': [13.0827, 80.2707],
@@ -217,25 +223,74 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
       'bengaluru': [12.9716, 77.5946],
       'mumbai': [19.0760, 72.8777],
       'delhi': [28.6139, 77.2090],
+      'new delhi': [28.6139, 77.2090],
       'hyderabad': [17.3850, 78.4867],
+      'kolkata': [22.5726, 88.3639],
+      'pune': [18.5204, 73.8567],
       'united states': [37.0902, -95.7129],
+      'united states of america': [37.0902, -95.7129],
       'usa': [37.0902, -95.7129],
       'us': [37.0902, -95.7129],
       'california': [36.7783, -119.4179],
       'san francisco': [37.7749, -122.4194],
+      'los angeles': [34.0522, -118.2437],
       'new york': [40.7128, -74.0060],
+      'washington': [38.9072, -77.0369],
+      'texas': [31.9686, -99.9018],
+      'chicago': [41.8781, -87.6298],
       'london': [51.5074, -0.1278],
       'united kingdom': [55.3781, -3.4360],
       'uk': [55.3781, -3.4360],
+      'great britain': [55.3781, -3.4360],
+      'england': [52.3555, -1.1743],
       'germany': [51.1657, 10.4515],
+      'berlin': [52.5200, 13.4050],
       'france': [46.2276, 2.2137],
+      'paris': [48.8566, 2.3522],
       'singapore': [1.3521, 103.8198],
       'canada': [56.1304, -106.3468],
-      'australia': [-25.2744, 133.7751],
+      'toronto': [43.6532, -79.3832],
+      'vancouver': [49.2827, -123.1207],
       'tokyo': [35.6762, 139.6503],
       'japan': [36.2048, 138.2529],
       'dubai': [25.2048, 55.2708],
       'uae': [23.4241, 53.8478],
+      'united arab emirates': [23.4241, 53.8478],
+      'russia': [61.5240, 105.3188],
+      'moscow': [55.7558, 37.6173],
+      'china': [35.8617, 104.1954],
+      'beijing': [39.9042, 116.4074],
+      'brazil': [-14.2350, -51.9253],
+      'south africa': [-30.5595, 22.9375],
+      'italy': [41.8719, 12.5674],
+      'rome': [41.9028, 12.4964],
+      'spain': [40.4637, -3.7492],
+      'madrid': [40.4168, -3.7038],
+      'mexico': [23.6345, -102.5528],
+      'netherlands': [52.1326, 5.2913],
+      'amsterdam': [52.3676, 4.9041],
+      'switzerland': [46.8182, 8.2275],
+      'sweden': [60.1282, 18.6435],
+      'norway': [60.4720, 8.4689],
+      'poland': [51.9194, 19.1451],
+      'turkey': [38.9637, 35.2433],
+      'saudi arabia': [23.8859, 45.0792],
+      'israel': [31.0461, 34.8516],
+      'egypt': [26.8206, 30.8025],
+      'south korea': [35.9078, 127.7669],
+      'seoul': [37.5665, 126.9780],
+      'new zealand': [-40.9006, 174.8860],
+      'ireland': [53.1424, -7.6921],
+      'dublin': [53.3498, -6.2603],
+      'pakistan': [30.3753, 69.3451],
+      'bangladesh': [23.6850, 90.3563],
+      'sri lanka': [7.8731, 80.7718],
+      'indonesia': [-0.7893, 113.9213],
+      'malaysia': [4.2105, 101.9758],
+      'philippines': [12.8797, 121.7740],
+      'vietnam': [14.0583, 108.2772],
+      'thailand': [15.8700, 100.9925],
+      'ukraine': [48.3794, 31.1656],
     };
 
     const resolveCoords = (e: any): [number, number] | null => {
@@ -257,16 +312,24 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         if (!isNaN(gLat) && !isNaN(gLng) && gLat !== 0 && gLng !== 0) return [gLat, gLng];
       }
       const textMatches = [
-        e.metadata?.city,
         e.metadata?.country,
+        e.metadata?.city,
         e.metadata?.location,
         e.metadata?.place_name,
         e.type?.toLowerCase?.().includes('location') ? e.value : null,
       ].filter(Boolean).map((s: string) => String(s).toLowerCase().trim());
 
+      const sortedKeys = Object.keys(KNOWN_GEO).sort((a, b) => b.length - a.length);
+
       for (const place of textMatches) {
-        for (const [key, coords] of Object.entries(KNOWN_GEO)) {
-          if (place === key || place.includes(key)) return coords;
+        if (KNOWN_GEO[place]) return KNOWN_GEO[place];
+        for (const key of sortedKeys) {
+          if (key.length <= 3) {
+            const rx = new RegExp(`(^|[^a-zA-Z])${key}([^a-zA-Z]|$)`, 'i');
+            if (rx.test(place)) return KNOWN_GEO[key];
+          } else if (place.includes(key)) {
+            return KNOWN_GEO[key];
+          }
         }
       }
       return null;
@@ -276,19 +339,21 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     entities.forEach((e, idx) => {
       const coords = resolveCoords(e);
       if (!coords) return;
+      const isIp = e.type?.toLowerCase().includes('ip');
+      const cleanSummary = (e.metadata?.summary as string) || (e.metadata?.description as string) || (e.metadata?.publisher ? `Publisher: ${e.metadata.publisher}` : '') || '';
       list.push({
         id: e.id || `geo-${idx}`,
         name: e.value,
         type: e.type,
-        ip: e.value,
+        ip: isIp ? e.value : (e.metadata?.ip as string) || undefined,
         city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
         country: (e.metadata?.country as string) || '',
         lat: coords[0],
         lng: coords[1],
         threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
         source: e.sources?.[0] || 'Investigation Telemetry',
-        timestamp: e.first_seen || (e.metadata?.timestamp as string) || '',
-        details: JSON.stringify(e.metadata || {}),
+        timestamp: e.first_seen || (e.metadata?.timestamp as string) || (e.metadata?.publication_date as string) || '',
+        details: cleanSummary,
       });
     });
     return list;
@@ -960,12 +1025,14 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           {/* VEHICLE REGISTRATION & ANPR CAMERA SIGHTINGS (When Vehicle Target) */}
           {(() => {
             const vehicleEntity = entities.find(
-              (e) => e.type?.toLowerCase() === 'vehicle' || e.type?.toLowerCase() === 'vehicle_plate'
+              (e) => (e.type?.toLowerCase() === 'vehicle' || e.type?.toLowerCase() === 'vehicle_plate') &&
+                     Boolean(e.metadata?.syntax_valid && /\d/.test(e.value))
             );
-            const isVehicleTarget = investigation.target_type?.toLowerCase() === 'vehicle' || Boolean(vehicleEntity);
-            const targetPlate = vehicleEntity ? vehicleEntity.value : investigation.target;
+            const isVehicleTarget = (investigation.target_type?.toLowerCase() === 'vehicle' || investigation.target_type?.toLowerCase() === 'vehicle_plate') &&
+                                    /\d/.test(investigation.target);
 
-            if (isVehicleTarget) {
+            if (isVehicleTarget || vehicleEntity) {
+              const targetPlate = vehicleEntity ? vehicleEntity.value : investigation.target;
               return (
                 <VehicleCameraIntelligence
                   plateNumber={targetPlate}

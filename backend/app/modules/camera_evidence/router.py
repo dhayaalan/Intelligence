@@ -148,6 +148,13 @@ async def process_anpr_endpoint(
     Decodes video footage and runs automated number plate recognition against target plate.
     Generates candidate sightings with timecodes and plate crops.
     """
+    target_clean = (payload.target_plate or "").strip().upper()
+    if not target_clean or not any(c.isdigit() for c in target_clean):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target plate '{payload.target_plate}' does not conform to recognized vehicle registration syntax."
+        )
+
     # Identify camera source
     camera = None
     if payload.source_id:
