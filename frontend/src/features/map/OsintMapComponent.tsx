@@ -129,27 +129,10 @@ export const OsintMapComponent: React.FC<OsintMapProps> = ({
   const [selectedLoc, setSelectedLoc] = useState<GeoLocationItem | null>(locations[0] || null);
   const [isGreyscale, setIsGreyscale] = useState(false);
 
-  // If no geographic locations exist, show the clean empty state
-  if (!locations || locations.length === 0) {
-    return (
-      <div className="h-full min-h-[380px] rounded-lg border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
-          <Globe className="w-6 h-6" />
-        </div>
-        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 font-sans">
-          No geographic intelligence found for this search.
-        </h4>
-        <p className="text-xs text-zinc-500 max-w-sm mt-1 font-mono">
-          Query targets (e.g. non-routable hostnames or unmapped emails) did not resolve to physical IP geolocations or GPS coordinates.
-        </p>
-      </div>
-    );
-  }
-
-  const center: [number, number] = [
-    locations[0]?.lat || 48.8566,
-    locations[0]?.lng || 2.3522,
-  ];
+  const center: [number, number] = locations.length > 0
+    ? [locations[0].lat, locations[0].lng]
+    : [20.5937, 78.9629];
+  const defaultZoom = locations.length > 0 ? 4 : 2;
 
   return (
     <div className="flex flex-col h-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-sm">
@@ -192,7 +175,7 @@ export const OsintMapComponent: React.FC<OsintMapProps> = ({
       <div className={`relative flex-1 min-h-[440px] w-full bg-zinc-100 ${isGreyscale ? '[&_.leaflet-tile]:filter [&_.leaflet-tile]:grayscale [&_.leaflet-tile]:contrast-125' : ''}`}>
         <MapContainer
           center={center}
-          zoom={4}
+          zoom={defaultZoom}
           scrollWheelZoom={true}
           style={{ width: '100%', height: '100%', minHeight: '440px', zIndex: 1 }}
         >

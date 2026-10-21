@@ -48,6 +48,7 @@ import {
 import { Investigation, Entity, Evidence, MediaRecord } from '../../types';
 import { apiRequest } from '../../core/api/client';
 import { Badge } from '../../components/ui/Badge';
+import { OsintMapComponent, GeoLocationItem } from '../map/OsintMapComponent';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Dialog } from '../../components/ui/Dialog';
@@ -207,17 +208,90 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
   }, [profileEntities, profilePage, profilePageSize]);
 
   // Geolocation entities
-  const geoLocations = useMemo(() => {
-    return entities.filter(
-      (e) =>
-        e.type === 'LOCATION' ||
-        e.type === 'IP' ||
-        (e as any).type?.toLowerCase?.() === 'location' ||
-        (e as any).type?.toLowerCase?.() === 'ip' ||
-        e.metadata?.coordinates ||
-        e.metadata?.latitude ||
-        e.metadata?.geo
-    );
+  const geoLocations: GeoLocationItem[] = useMemo(() => {
+    const KNOWN_GEO: Record<string, [number, number]> = {
+      'india': [20.5937, 78.9629],
+      'tamil nadu': [11.1271, 78.6569],
+      'chennai': [13.0827, 80.2707],
+      'bangalore': [12.9716, 77.5946],
+      'bengaluru': [12.9716, 77.5946],
+      'mumbai': [19.0760, 72.8777],
+      'delhi': [28.6139, 77.2090],
+      'hyderabad': [17.3850, 78.4867],
+      'united states': [37.0902, -95.7129],
+      'usa': [37.0902, -95.7129],
+      'us': [37.0902, -95.7129],
+      'california': [36.7783, -119.4179],
+      'san francisco': [37.7749, -122.4194],
+      'new york': [40.7128, -74.0060],
+      'london': [51.5074, -0.1278],
+      'united kingdom': [55.3781, -3.4360],
+      'uk': [55.3781, -3.4360],
+      'germany': [51.1657, 10.4515],
+      'france': [46.2276, 2.2137],
+      'singapore': [1.3521, 103.8198],
+      'canada': [56.1304, -106.3468],
+      'australia': [-25.2744, 133.7751],
+      'tokyo': [35.6762, 139.6503],
+      'japan': [36.2048, 138.2529],
+      'dubai': [25.2048, 55.2708],
+      'uae': [23.4241, 53.8478],
+    };
+
+    const resolveCoords = (e: any): [number, number] | null => {
+      const rawLat = Number(e.metadata?.latitude ?? e.metadata?.lat);
+      const rawLng = Number(e.metadata?.longitude ?? e.metadata?.lng);
+      if (!isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0) return [rawLat, rawLng];
+      if (Array.isArray(e.metadata?.coordinates) && e.metadata.coordinates.length >= 2) {
+        const c0 = Number(e.metadata.coordinates[0]);
+        const c1 = Number(e.metadata.coordinates[1]);
+        if (!isNaN(c0) && !isNaN(c1)) return [c0, c1];
+      }
+      if (typeof e.metadata?.coordinates === 'string') {
+        const parts = e.metadata.coordinates.split(',').map((s: string) => Number(s.trim()));
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return [parts[0], parts[1]];
+      }
+      if (e.metadata?.geo) {
+        const gLat = Number(e.metadata.geo.latitude ?? e.metadata.geo.lat);
+        const gLng = Number(e.metadata.geo.longitude ?? e.metadata.geo.lng);
+        if (!isNaN(gLat) && !isNaN(gLng) && gLat !== 0 && gLng !== 0) return [gLat, gLng];
+      }
+      const textMatches = [
+        e.metadata?.city,
+        e.metadata?.country,
+        e.metadata?.location,
+        e.metadata?.place_name,
+        e.type?.toLowerCase?.().includes('location') ? e.value : null,
+      ].filter(Boolean).map((s: string) => String(s).toLowerCase().trim());
+
+      for (const place of textMatches) {
+        for (const [key, coords] of Object.entries(KNOWN_GEO)) {
+          if (place === key || place.includes(key)) return coords;
+        }
+      }
+      return null;
+    };
+
+    const list: GeoLocationItem[] = [];
+    entities.forEach((e, idx) => {
+      const coords = resolveCoords(e);
+      if (!coords) return;
+      list.push({
+        id: e.id || `geo-${idx}`,
+        name: e.value,
+        type: e.type,
+        ip: e.value,
+        city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
+        country: (e.metadata?.country as string) || '',
+        lat: coords[0],
+        lng: coords[1],
+        threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
+        source: e.sources?.[0] || 'Investigation Telemetry',
+        timestamp: e.first_seen || (e.metadata?.timestamp as string) || '',
+        details: JSON.stringify(e.metadata || {}),
+      });
+    });
+    return list;
   }, [entities]);
 
   // Synthesize or map correlated graph nodes
@@ -1685,31 +1759,36 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-5 space-y-4">
+            {/* Live Interactive Map Canvas */}
+            <div className="h-[460px] rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 shadow-xs">
+              <OsintMapComponent locations={geoLocations} />
+            </div>
+
             {geoLocations.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 font-mono text-xs">
-                No physical locations or geographic coordinate indicators discovered for this investigation.
+              <div className="py-6 px-4 text-center text-slate-400 font-mono text-xs rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                Live radar active &bull; 0 physical coordinate indicators recorded in this case.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {geoLocations.map((loc, idx) => (
                   <div
-                    key={idx}
+                    key={loc.id || idx}
                     className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0c101d] space-y-2 font-mono text-xs shadow-xs"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white truncate">
-                        {loc.value}
+                        {loc.name}
                       </span>
                       <Badge variant="mono" size="sm" className="text-[10px]">
                         {loc.type}
                       </Badge>
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                      Jurisdiction: {loc.metadata?.country || loc.metadata?.state || 'Global'}
+                      Jurisdiction: {loc.city ? `${loc.city}, ${loc.country}` : (loc.country || 'Global')} &bull; ({loc.lat.toFixed(4)}, {loc.lng.toFixed(4)})
                     </p>
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
-                      <span>Confidence: {typeof loc.confidence === 'number' ? `${(loc.confidence * 100).toFixed(0)}%` : '95%'}</span>
-                      <span>Source: {(loc.sources || []).join(', ') || 'Geo Intel'}</span>
+                      <span>Status: {loc.threatLevel}</span>
+                      <span>Source: {loc.source}</span>
                     </div>
                   </div>
                 ))}

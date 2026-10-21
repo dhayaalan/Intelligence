@@ -408,33 +408,105 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     }
   };
 
-  // Geo locations from genuine source-backed coordinates only
+  // Geo locations resolver: handles explicit lat/lng, array coords, nested geo, and regional locations
   const geoLocations: GeoLocationItem[] = useMemo(() => {
     if (!searchResult) return [];
-    return searchResult.entities
-      .filter((e) => {
-        const rawLat = Number(e.metadata?.latitude ?? e.metadata?.lat);
-        const rawLng = Number(e.metadata?.longitude ?? e.metadata?.lng);
-        return !isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0;
-      })
-      .map((e, idx) => {
-        const lat = Number(e.metadata?.latitude ?? e.metadata?.lat);
-        const lng = Number(e.metadata?.longitude ?? e.metadata?.lng);
-        return {
-          id: e.id || `geo-${idx}`,
-          name: e.value,
-          type: e.type,
-          ip: e.value,
-          city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
-          country: (e.metadata?.country as string) || '',
-          lat,
-          lng,
-          threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
-          source: e.sources?.[0] || 'Infrastructure Telemetry',
-          timestamp: e.first_seen || (e.metadata?.timestamp as string) || '',
-          details: JSON.stringify(e.metadata || {}),
-        };
+
+    const KNOWN_GEO: Record<string, [number, number]> = {
+      'india': [20.5937, 78.9629],
+      'tamil nadu': [11.1271, 78.6569],
+      'chennai': [13.0827, 80.2707],
+      'bangalore': [12.9716, 77.5946],
+      'bengaluru': [12.9716, 77.5946],
+      'mumbai': [19.0760, 72.8777],
+      'delhi': [28.6139, 77.2090],
+      'hyderabad': [17.3850, 78.4867],
+      'united states': [37.0902, -95.7129],
+      'usa': [37.0902, -95.7129],
+      'us': [37.0902, -95.7129],
+      'california': [36.7783, -119.4179],
+      'san francisco': [37.7749, -122.4194],
+      'new york': [40.7128, -74.0060],
+      'london': [51.5074, -0.1278],
+      'united kingdom': [55.3781, -3.4360],
+      'uk': [55.3781, -3.4360],
+      'germany': [51.1657, 10.4515],
+      'france': [46.2276, 2.2137],
+      'singapore': [1.3521, 103.8198],
+      'canada': [56.1304, -106.3468],
+      'australia': [-25.2744, 133.7751],
+      'tokyo': [35.6762, 139.6503],
+      'japan': [36.2048, 138.2529],
+      'dubai': [25.2048, 55.2708],
+      'uae': [23.4241, 53.8478],
+    };
+
+    const resolveCoords = (e: any): [number, number] | null => {
+      // 1. Direct numbers
+      const rawLat = Number(e.metadata?.latitude ?? e.metadata?.lat);
+      const rawLng = Number(e.metadata?.longitude ?? e.metadata?.lng);
+      if (!isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0) {
+        return [rawLat, rawLng];
+      }
+      // 2. Coordinates array [lat, lng]
+      if (Array.isArray(e.metadata?.coordinates) && e.metadata.coordinates.length >= 2) {
+        const c0 = Number(e.metadata.coordinates[0]);
+        const c1 = Number(e.metadata.coordinates[1]);
+        if (!isNaN(c0) && !isNaN(c1)) return [c0, c1];
+      }
+      // 3. String "lat, lng"
+      if (typeof e.metadata?.coordinates === 'string') {
+        const parts = e.metadata.coordinates.split(',').map((s: string) => Number(s.trim()));
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          return [parts[0], parts[1]];
+        }
+      }
+      // 4. Nested geo
+      if (e.metadata?.geo) {
+        const gLat = Number(e.metadata.geo.latitude ?? e.metadata.geo.lat);
+        const gLng = Number(e.metadata.geo.longitude ?? e.metadata.geo.lng);
+        if (!isNaN(gLat) && !isNaN(gLng) && gLat !== 0 && gLng !== 0) return [gLat, gLng];
+      }
+      // 5. Well-known places / country / city
+      const textMatches = [
+        e.metadata?.city,
+        e.metadata?.country,
+        e.metadata?.location,
+        e.metadata?.place_name,
+        e.type?.toLowerCase?.().includes('location') ? e.value : null,
+      ].filter(Boolean).map((s: string) => String(s).toLowerCase().trim());
+
+      for (const place of textMatches) {
+        for (const [key, coords] of Object.entries(KNOWN_GEO)) {
+          if (place === key || place.includes(key)) {
+            return coords;
+          }
+        }
+      }
+      return null;
+    };
+
+    const list: GeoLocationItem[] = [];
+    searchResult.entities.forEach((e, idx) => {
+      const coords = resolveCoords(e);
+      if (!coords) return;
+      list.push({
+        id: e.id || `geo-${idx}`,
+        name: e.value,
+        type: e.type,
+        ip: e.value,
+        city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
+        country: (e.metadata?.country as string) || '',
+        lat: coords[0],
+        lng: coords[1],
+        threatLevel: (e.confidence || 0) >= 0.8 || (e.confidence || 0) >= 80 ? 'SUSPICIOUS' : 'BENIGN',
+        source: e.sources?.[0] || 'Infrastructure Telemetry',
+        timestamp: e.first_seen || (e.metadata?.timestamp as string) || '',
+        details: JSON.stringify(e.metadata || {}),
       });
+    });
+
+    return list;
   }, [searchResult]);
 
   // Filter entities
@@ -2597,82 +2669,75 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   </Badge>
                 </div>
 
+                {/* Live OpenStreetMap Radar Canvas: Always Rendered */}
+                <div className="h-[460px] rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                  <OsintMapComponent locations={geoLocations} />
+                </div>
+
+                {/* Sighting Timeline / Telemetry Status */}
                 {geoLocations.length > 0 ? (
-                  <div className="space-y-6">
-                    <div className="h-[440px] rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 shadow-xs">
-                      <OsintMapComponent locations={geoLocations} />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        CHRONOLOGICAL SIGHTING TIMELINE ({geoLocations.length})
+                      </span>
+                      <span>Source-Backed Observations</span>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                          CHRONOLOGICAL SIGHTING TIMELINE ({geoLocations.length})
-                        </span>
-                        <span>Source-Backed Observations</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {geoLocations.map((loc, idx) => (
-                          <div
-                            key={loc.id || idx}
-                            className="p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-2.5 font-mono text-xs shadow-2xs hover:border-cyan-500/40 transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[200px]">
-                                  {loc.city ? `${loc.city}, ${loc.country}` : (loc.country || loc.name)}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
-                                </span>
-                              </div>
-                              <Badge variant="outline" size="sm" className="text-[10px] shrink-0 font-bold">
-                                {loc.type || 'SIGHTING'}
-                              </Badge>
-                            </div>
-
-                            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
-                              <div className="flex items-center justify-between text-[10px]">
-                                <span className="text-slate-400">Target / Host:</span>
-                                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{loc.name}</span>
-                              </div>
-                              {loc.timestamp && (
-                                <div className="flex items-center justify-between text-[10px]">
-                                  <span className="text-slate-400">Observed At:</span>
-                                  <span>{formatDate(loc.timestamp)}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
-                              <span>Source: {loc.source}</span>
-                              <span className={loc.threatLevel === 'SUSPICIOUS' ? 'text-amber-500 font-bold' : 'text-emerald-500'}>
-                                {loc.threatLevel}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {geoLocations.map((loc, idx) => (
+                        <div
+                          key={loc.id || idx}
+                          className="p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-2.5 font-mono text-xs shadow-2xs hover:border-cyan-500/40 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[200px]">
+                                {loc.city ? `${loc.city}, ${loc.country}` : (loc.country || loc.name)}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
                               </span>
                             </div>
+                            <Badge variant="outline" size="sm" className="text-[10px] shrink-0 font-bold">
+                              {loc.type || 'SIGHTING'}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
+
+                          <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-slate-400">Target / Host:</span>
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{loc.name}</span>
+                            </div>
+                            {loc.timestamp && (
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-slate-400">Observed At:</span>
+                                <span>{formatDate(loc.timestamp)}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <span>Source: {loc.source}</span>
+                            <span className={loc.threatLevel === 'SUSPICIOUS' ? 'text-amber-500 font-bold' : 'text-emerald-500'}>
+                              {loc.threatLevel}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="py-16 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mx-auto">
-                      <MapPin className="w-6 h-6" />
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-500">
+                    <div className="flex items-center gap-2.5">
+                      <MapPin className="w-4 h-4 text-cyan-600 shrink-0" />
+                      <span>
+                        Radar Operational &bull; 0 verified coordinate sightings for target <strong className="text-slate-800 dark:text-slate-200">{query}</strong>
+                      </span>
                     </div>
-                    <div className="space-y-1 max-w-md mx-auto">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                        No Verified Geographic Telemetry
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                        Target <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{query}</span> does not have verified physical coordinate sightings, camera detections, or geocoded IP telemetry recorded in active intelligence sources.
-                      </p>
-                    </div>
-                    <div className="pt-2 flex justify-center">
-                      <Badge variant="outline" size="sm" className="text-[10px] font-mono text-slate-400">
-                        GPS &bull; IP Geolocation &bull; Camera Sightings &bull; Movement Logs
-                      </Badge>
-                    </div>
+                    <Badge variant="outline" size="sm" className="text-[10px]">
+                      GPS &bull; IP POP &bull; Camera Sightings &bull; Movement Logs
+                    </Badge>
                   </div>
                 )}
               </div>
