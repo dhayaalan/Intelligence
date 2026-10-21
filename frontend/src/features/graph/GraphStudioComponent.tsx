@@ -37,6 +37,7 @@ import {
   FileText,
   Pin,
   ExternalLink,
+  Crosshair,
 } from 'lucide-react';
 
 interface Props {
@@ -181,6 +182,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
   const [hoveredTooltip, setHoveredTooltip] = useState<HoverTooltipData | null>(null);
   const [expandedBranches, setExpandedBranches] = useState<Record<string, { nodeIds: string[]; edgeIds: string[] }>>({});
   const [userPinnedEntities, setUserPinnedEntities] = useState<Entity[]>([]);
+  const [customMasterNode, setCustomMasterNode] = useState<Entity | null>(null);
   const [isExpanding, setIsExpanding] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
 
@@ -200,16 +202,23 @@ export const GraphStudioComponent: React.FC<Props> = ({
       }
     });
 
+    // Check if any entity has metadata is_search_target or is_seed_input
+    const targetEntity = entities.find(
+      (e) => Boolean((e.metadata as any)?.is_search_target) || Boolean((e.metadata as any)?.is_seed_input)
+    );
+
     let maxDeg = -1;
-    let candidate: Entity | null = null;
-    entities.forEach((e) => {
-      const key = (e.value || (e as any).name || e.id || '').toLowerCase().trim();
-      const d = deg[key] || 0;
-      if (d > maxDeg) {
-        maxDeg = d;
-        candidate = e;
-      }
-    });
+    let candidate: Entity | null = targetEntity || null;
+    if (!candidate) {
+      entities.forEach((e) => {
+        const key = (e.value || (e as any).name || e.id || '').toLowerCase().trim();
+        const d = deg[key] || 0;
+        if (d > maxDeg) {
+          maxDeg = d;
+          candidate = e;
+        }
+      });
+    }
 
     return {
       connectedKeys: conn,
@@ -218,7 +227,22 @@ export const GraphStudioComponent: React.FC<Props> = ({
     };
   }, [entities, relationships]);
 
-  // Update selected entity when rootCandidate or entities change
+  // Selected or active master node for the graph
+  const effectiveMasterNode = useMemo(() => {
+    if (
+      customMasterNode &&
+      entities.some(
+        (e) =>
+          (e.value || (e as any).name || e.id) ===
+          (customMasterNode.value || (customMasterNode as any).name || customMasterNode.id)
+      )
+    ) {
+      return customMasterNode;
+    }
+    return rootCandidate;
+  }, [customMasterNode, rootCandidate, entities]);
+
+  // Update selected entity when effectiveMasterNode or entities change
   useEffect(() => {
     const isCurrentEntityValid =
       selectedEntity &&
@@ -229,12 +253,12 @@ export const GraphStudioComponent: React.FC<Props> = ({
       );
 
     if (!isCurrentEntityValid) {
-      setSelectedEntity(rootCandidate);
+      setSelectedEntity(effectiveMasterNode);
     }
     setSelectedEdgeData(null);
     setExpandedBranches({});
     setUserPinnedEntities([]);
-  }, [entities, rootCandidate]);
+  }, [entities, effectiveMasterNode]);
 
   // 2. Separate Connected & Unlinked Entities
   const { connectedEntitiesList, unlinkedEntitiesList, categoryStats } = useMemo(() => {
@@ -268,8 +292,8 @@ export const GraphStudioComponent: React.FC<Props> = ({
 
   // Filtered entities for Cytoscape Canvas
   const filteredEntities = useMemo(() => {
-    // If no relationships exist yet or user toggled unlinked on canvas, show all entities so the canvas is never empty
-    const sourceList = (showUnlinkedOnCanvas || connectedEntitiesList.length === 0) ? entities : connectedEntitiesList;
+    // When a specific category filter is chosen, always search from the complete entities collection so matching category entities are never hidden
+    const sourceList = (showUnlinkedOnCanvas || connectedEntitiesList.length === 0 || filterCategory !== 'ALL') ? entities : connectedEntitiesList;
     const filtered = sourceList.filter((e) => {
       if (filterCategory !== 'ALL' && getEntityCategory(e.type) !== filterCategory) return false;
       if (searchFilter.trim()) {
@@ -283,12 +307,13 @@ export const GraphStudioComponent: React.FC<Props> = ({
       return true;
     });
 
-    // Ensure rootCandidate is always present if available
-    if (rootCandidate && !filtered.some(e => (e.value || (e as any).name || e.id) === (rootCandidate.value || (rootCandidate as any).name || rootCandidate.id))) {
-      filtered.unshift(rootCandidate);
+    // Ensure effectiveMasterNode is always present if available
+    const master = effectiveMasterNode;
+    if (master && !filtered.some(e => (e.value || (e as any).name || e.id) === (master.value || (master as any).name || master.id))) {
+      filtered.unshift(master);
     }
     return filtered;
-  }, [entities, connectedEntitiesList, showUnlinkedOnCanvas, filterCategory, searchFilter, rootCandidate]);
+  }, [entities, connectedEntitiesList, showUnlinkedOnCanvas, filterCategory, searchFilter, effectiveMasterNode]);
 
   // Filtered unlinked list for Unlinked Intelligence Tray
   const filteredUnlinkedTray = useMemo(() => {
@@ -309,7 +334,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
   // 3. Build Cytoscape Elements with embedded images and legible pill labels
   const elements = useMemo(() => {
     const elems: cytoscape.ElementDefinition[] = [];
-    const rootVal = (selectedEntity?.value || rootCandidate?.value || '').toLowerCase().trim();
+    const masterVal = (effectiveMasterNode?.value || (effectiveMasterNode as any)?.name || effectiveMasterNode?.id || '').toLowerCase().trim();
 
     const entMap = new Map<string, string>();
     filteredEntities.forEach((ent) => {
@@ -319,7 +344,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
       if (ent.id) entMap.set(ent.id.toLowerCase(), id);
 
       const cat = getEntityCategory(ent.type);
-      const isRoot = val.toLowerCase() === rootVal;
+      const isRoot = val.toLowerCase() === masterVal;
       const deg = degrees[val.toLowerCase()] || 0;
       const size = isRoot ? 66 : Math.min(68, Math.max(46, 46 + deg * 3));
       const bgImage = getEntityImage(ent, cat);
@@ -372,8 +397,8 @@ export const GraphStudioComponent: React.FC<Props> = ({
     });
 
     // Add user-pinned virtual edges to root
-    if (rootCandidate) {
-      const rootId = entMap.get((rootCandidate.value || '').toLowerCase());
+    if (effectiveMasterNode) {
+      const rootId = entMap.get(masterVal);
       if (rootId) {
         userPinnedEntities.forEach((pinned, idx) => {
           const pVal = (pinned.value || (pinned as any).name || pinned.id || '').toLowerCase().trim();
@@ -391,9 +416,42 @@ export const GraphStudioComponent: React.FC<Props> = ({
                   label: 'pinned indicator',
                   lineStyle: 'dashed',
                   rawRel: {
-                    source_entity_value: rootCandidate.value,
+                    source_entity_value: effectiveMasterNode.value,
                     target_entity_value: pinned.value,
                     relationship_type: 'PINNED_INDICATOR',
+                    is_inferred: true,
+                  },
+                },
+              });
+            }
+          }
+        });
+
+        // Fallback visual connection: Guarantee that any entity on canvas is connected to the master node if it has no edge
+        filteredEntities.forEach((ent, idx) => {
+          const val = (ent.value || (ent as any).name || ent.id || '').toLowerCase().trim();
+          const entId = entMap.get(val);
+          if (entId && entId !== rootId) {
+            const hasEdge = Array.from(seenEdges).some(
+              (k) => k.startsWith(`${entId}->`) || k.endsWith(`->${entId}`)
+            );
+            if (!hasEdge) {
+              const edgeKey = `auto_${rootId}->${entId}`;
+              seenEdges.add(edgeKey);
+              const cat = getEntityCategory(ent.type);
+              const edgeLabel = cat === 'DOMAIN' ? 'domain asset' : (cat === 'VEHICLE' ? 'registered vehicle' : (cat === 'THREAT_INDICATOR' ? 'threat indicator' : 'associated with'));
+              elems.push({
+                group: 'edges',
+                data: {
+                  id: `auto_edge_${idx}_${rootId}_${entId}`,
+                  source: rootId,
+                  target: entId,
+                  label: edgeLabel,
+                  lineStyle: 'dashed',
+                  rawRel: {
+                    source_entity_value: effectiveMasterNode.value,
+                    target_entity_value: ent.value,
+                    relationship_type: 'ASSOCIATED_WITH',
                     is_inferred: true,
                   },
                 },
@@ -405,7 +463,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
     }
 
     return elems;
-  }, [filteredEntities, relationships, selectedEntity, rootCandidate, degrees, userPinnedEntities]);
+  }, [filteredEntities, relationships, selectedEntity, effectiveMasterNode, degrees, userPinnedEntities]);
 
   // 4. Initialize Cytoscape Instance
   useEffect(() => {
@@ -1516,6 +1574,12 @@ export const GraphStudioComponent: React.FC<Props> = ({
                       {displayName}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      {(selectedEntity.value || (selectedEntity as any).name || selectedEntity.id) ===
+                        (effectiveMasterNode?.value || (effectiveMasterNode as any)?.name || effectiveMasterNode?.id) && (
+                        <Badge variant="success" className="font-mono text-[10px] bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800">
+                          MASTER NODE
+                        </Badge>
+                      )}
                       <Badge variant="outline" className="font-mono text-[10px] uppercase">
                         {category}
                       </Badge>
@@ -1525,7 +1589,7 @@ export const GraphStudioComponent: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Expansion Actions */}
+                  {/* Expansion & Master Node Actions */}
                   <div className="flex items-center gap-2 pt-1">
                     <button
                       type="button"
@@ -1536,6 +1600,40 @@ export const GraphStudioComponent: React.FC<Props> = ({
                     >
                       {isExpanding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Maximize2 className="w-3.5 h-3.5" />}
                       <span>Expand 1-Hop</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isCurrentlyMaster =
+                          (selectedEntity.value || (selectedEntity as any).name || selectedEntity.id) ===
+                          (effectiveMasterNode?.value || (effectiveMasterNode as any)?.name || effectiveMasterNode?.id);
+                        if (isCurrentlyMaster) {
+                          setCustomMasterNode(null);
+                          setFeedback({ message: 'Reset master node to default search root', type: 'info' });
+                        } else {
+                          setCustomMasterNode(selectedEntity);
+                          setFeedback({
+                            message: `Set '${displayName}' as Master Node`,
+                            type: 'success',
+                          });
+                        }
+                      }}
+                      className={`inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border font-mono text-xs font-semibold transition-colors cursor-pointer ${
+                        (selectedEntity.value || (selectedEntity as any).name || selectedEntity.id) ===
+                        (effectiveMasterNode?.value || (effectiveMasterNode as any)?.name || effectiveMasterNode?.id)
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-500'
+                          : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                      title="Set or reset this entity as the central Master Node for graph topology"
+                    >
+                      <Crosshair className="w-3.5 h-3.5" />
+                      <span>
+                        {(selectedEntity.value || (selectedEntity as any).name || selectedEntity.id) ===
+                        (effectiveMasterNode?.value || (effectiveMasterNode as any)?.name || effectiveMasterNode?.id)
+                          ? 'Master'
+                          : 'Set Master'}
+                      </span>
                     </button>
 
                     <button

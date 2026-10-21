@@ -696,6 +696,44 @@ class SearchOrchestrator:
                         }
                     ))
 
+        # Guarantee master query node presence and connect all discovered entities to master node
+        if corr_entities and not (is_identifier and not verified_entities):
+            root_exists = any(e.value.strip().lower() == effective_query.strip().lower() for e in corr_entities)
+            if not root_exists:
+                corr_entities.insert(0, EntityPayload(
+                    type=EntityType.KEYWORD,
+                    value=effective_query,
+                    confidence=1.0,
+                    sources=["search_query"],
+                    metadata={"is_search_target": True, "is_seed_input": True, "verification_status": "UNASSESSED"}
+                ))
+
+            root_val = effective_query.strip().lower()
+            connected_vals = set()
+            for r in corr_relationships:
+                connected_vals.add(r.source_entity_value.strip().lower())
+                connected_vals.add(r.target_entity_value.strip().lower())
+
+            for ent in corr_entities:
+                e_val = ent.value.strip().lower()
+                if e_val != root_val and e_val not in connected_vals:
+                    rel_type = (
+                        RelationshipType.HAS_IDENTIFIER
+                        if ent.type in [EntityType.USERNAME, EntityType.EMAIL, EntityType.PHONE]
+                        else RelationshipType.ASSOCIATED_WITH
+                    )
+                    corr_relationships.append(RelationshipPayload(
+                        id=f"rel_master_{uuid.uuid4().hex[:8]}",
+                        source_entity_value=effective_query,
+                        target_entity_value=ent.value,
+                        relationship_type=rel_type,
+                        confidence=ent.confidence or 0.8,
+                        basis="DIRECT_OBSERVATION",
+                        methodology="investigative_correlation",
+                        sources=ent.sources or ["search_orchestrator"]
+                    ))
+                    connected_vals.add(e_val)
+
         # Update running provider execution statuses with authentic results count
         for pe in provider_executions:
             if pe.status == ProviderExecutionStatus.RUNNING.value:

@@ -184,10 +184,35 @@ class ThreatIntelligenceModule(IntelligenceModule):
             sources.append(pid)
             raw = resp.raw_data or {}
             
-            # Incorporate normalized entities
+            # Incorporate relationships if emitted by provider
+            for rel_dict in raw.get("relationships", []):
+                try:
+                    relationships.append(RelationshipPayload(**rel_dict))
+                except Exception:
+                    pass
+
+            # Incorporate normalized entities and connect to search target
+            existing_pairs = {(r.source_entity_value.lower(), r.target_entity_value.lower()) for r in relationships}
             for ent_dict in raw.get("entities", []):
                 try:
-                    entities.append(EntityPayload(**ent_dict))
+                    pe = EntityPayload(**ent_dict)
+                    entities.append(pe)
+                    if pe.value.lower() != context.query.lower():
+                        pair = (context.query.lower(), pe.value.lower())
+                        rev_pair = (pe.value.lower(), context.query.lower())
+                        if pair not in existing_pairs and rev_pair not in existing_pairs:
+                            rel_type = RelationshipType.ASSOCIATED_WITH
+                            relationships.append(RelationshipPayload(
+                                id=f"rel_ti_{uuid.uuid4().hex[:8]}",
+                                source_entity_value=context.query,
+                                target_entity_value=pe.value,
+                                relationship_type=rel_type,
+                                confidence=pe.confidence or 0.85,
+                                basis="DIRECT_OBSERVATION",
+                                methodology=f"threat_intel_{pid}",
+                                sources=[pid]
+                            ))
+                            existing_pairs.add(pair)
                 except Exception:
                     pass
 
