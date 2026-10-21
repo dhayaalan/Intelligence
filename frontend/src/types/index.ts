@@ -314,3 +314,63 @@ export interface ProviderStats {
   categories: Record<string, number>;
 }
 
+export type ANPRMatchStatus =
+  | 'NO_MATCH'
+  | 'POSSIBLE_MATCH'
+  | 'CANDIDATE_MATCH'
+  | 'HUMAN_CONFIRMED'
+  | 'HUMAN_REJECTED'
+  | 'INCONCLUSIVE';
+
+export interface CameraSourceRecord {
+  source_id: string;
+  operator: string;
+  name: string;
+  source_url: string;
+  geographic_coverage: string;
+  latitude?: number;
+  longitude?: number;
+  feed_type: 'SNAPSHOT_SERIES' | 'VIDEO_CLIP' | 'LIVE_STREAM';
+  access_method: string;
+  licensing_status: string;
+  availability: 'AVAILABLE' | 'RESTRICTED' | 'CONFIGURATION_REQUIRED' | 'OFFLINE';
+  last_checked: string;
+  auth_requirements: string;
+  retention_restrictions: string;
+  is_public_catalog: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface ANPRDetectionRecord {
+  detection_id: string;
+  investigation_id?: string;
+  case_id?: string;
+  tenant_id: string;
+  camera_id: string;
+  camera_operator: string;
+  camera_location_name: string;
+  camera_coordinates?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  video_reference: string;
+  frame_number: number;
+  timecode_seconds: number;
+  source_timestamp?: string;
+  raw_ocr_text: string;
+  normalized_candidate_plate: string;
+  alternative_candidates: string[];
+  target_plate: string;
+  confidence: number;
+  match_status: ANPRMatchStatus;
+  human_reviewer_id?: string;
+  reviewed_at?: string;
+  review_decision_notes?: string;
+  frame_preview_data?: string;
+  plate_crop_data?: string;
+  evidence_id?: string;
+  detector_version: string;
+  processed_at: string;
+  limitations?: string;
+}
+

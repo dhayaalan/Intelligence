@@ -358,6 +358,23 @@ class PivotDiscoveryEngine:
                     )
                     seen_queries.add(jurisdiction.lower())
 
+                pivots.append(
+                    PivotCandidate(
+                        pivot_id=f"pvt_vcam_{hashlib.md5(val.encode()).hexdigest()[:8]}",
+                        pivot_query=val,
+                        pivot_target_type="VEHICLE",
+                        pivot_type="camera_evidence_anpr",
+                        target_modules=["geo_intelligence"],
+                        relationship="SIGHTED_BY_CAMERA",
+                        parent_entity_value=val,
+                        parent_entity_type="VEHICLE",
+                        confidence=0.88,
+                        recommended_action=f"Scan authorized checkpoint footage and public camera feeds for plate '{val}'.",
+                        why_it_matters=f"Identifies physical sightings and discrete timestamped observations for vehicle '{val}'.",
+                        sources=sources or ["Camera Evidence Recon"]
+                    )
+                )
+
             # 10. Social Media URL / Post Pivot -> Author Handle & Content Forensics
             elif e_type in ["social_url", "post", "social_post"]:
                 author = meta.get("author") or meta.get("author_id")

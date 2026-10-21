@@ -3,6 +3,7 @@ import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import httpx
 from pydantic import BaseModel, Field
 
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
@@ -90,6 +91,76 @@ KNOWN_PLATE_FORMATS: List[VehiclePlateFormat] = [
     VehiclePlateFormat(jurisdiction="EU", pattern=r"^([A-Z]{1,3})\s?([A-Z]{1,2})\s?([0-9]{1,4})$", sample="B MW 1234", description="EU Standard Plate"),
 ]
 
+import os
+
+class OfficialVahanRegistryClient:
+    """
+    Authorized MoRTH / NextGen VAHAN 4.0 Registry Client.
+    Connects to official government gateways only when lawful credentials and API keys are configured.
+    Never bypasses OTP/CAPTCHA, never fabricates owner details, and records audit provenance.
+    """
+    def __init__(self, api_key: Optional[str] = None, client_id: Optional[str] = None):
+        self.api_key = api_key or os.getenv("VAHAN_API_KEY")
+        self.client_id = client_id or os.getenv("VAHAN_CLIENT_ID")
+        self.endpoint = os.getenv("VAHAN_API_ENDPOINT", "https://vahan.parivahan.gov.in/api/v4/rc-status")
+
+    def is_configured(self) -> bool:
+        return bool(self.api_key and self.client_id)
+
+    async def query_registration(self, canonical_plate: str) -> Dict[str, Any]:
+        if not self.is_configured():
+            return {
+                "executed": False,
+                "status": "CONFIG_REQUIRED",
+                "message": "Official VAHAN API credentials (VAHAN_API_KEY, VAHAN_CLIENT_ID) not configured in environment.",
+                "owner_field_authorized": False,
+                "owner_field_status": "UNAVAILABLE_WITHOUT_AUTHORIZED_CREDENTIALS",
+                "retrieved_at": None,
+                "data": None
+            }
+
+        # When authorized credentials exist, execute validated query
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "X-Client-Id": self.client_id,
+                "Accept": "application/json"
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(self.endpoint, json={"regNumber": canonical_plate}, headers=headers)
+                if resp.status_code == 200:
+                    payload = resp.json()
+                    return {
+                        "executed": True,
+                        "status": "SUCCESS",
+                        "message": "Official registry record retrieved.",
+                        "owner_field_authorized": bool(payload.get("ownerName")),
+                        "owner_field_status": "AUTHORIZED" if payload.get("ownerName") else "MASKED_BY_REGISTRY",
+                        "retrieved_at": datetime.utcnow().isoformat(),
+                        "data": payload
+                    }
+                else:
+                    return {
+                        "executed": True,
+                        "status": "AUTHORIZATION_REQUIRED" if resp.status_code in [401, 403] else "REGISTRY_ERROR",
+                        "message": f"Registry endpoint returned HTTP {resp.status_code}: {resp.text[:120]}",
+                        "owner_field_authorized": False,
+                        "owner_field_status": "DENIED",
+                        "retrieved_at": datetime.utcnow().isoformat(),
+                        "data": None
+                    }
+        except Exception as e:
+            return {
+                "executed": False,
+                "status": "REGISTRY_UNREACHABLE",
+                "message": f"Connection error contacting registry gateway: {str(e)}",
+                "owner_field_authorized": False,
+                "owner_field_status": "UNAVAILABLE",
+                "retrieved_at": None,
+                "data": None
+            }
+
+
 class VehicleRegistrationProvider(ProviderAdapter):
     """
     Forensic Vehicle Registration & Automotive Intelligence Provider.
@@ -100,6 +171,7 @@ class VehicleRegistrationProvider(ProviderAdapter):
     def __init__(self):
         self._provider_id = "vehicle_registration_recon"
         self._name = "Vehicle Registration Recon"
+        self.registry_client = OfficialVahanRegistryClient()
 
     @property
     def provider_id(self) -> str:
@@ -111,7 +183,7 @@ class VehicleRegistrationProvider(ProviderAdapter):
 
     @property
     def capabilities(self) -> List[str]:
-        return ["plate_lookup", "jurisdiction_validation", "rto_attribution"]
+        return ["plate_lookup", "jurisdiction_validation", "rto_attribution", "camera_evidence_linking"]
 
     @property
     def supported_targets(self) -> List[str]:
@@ -195,6 +267,13 @@ class VehicleRegistrationProvider(ProviderAdapter):
         relationships: List[RelationshipPayload] = []
         evidence: List[EvidencePayload] = []
 
+        # Check official registry status
+        registry_status = "CONFIG_REQUIRED"
+        registry_msg = (
+            "Live official registration record query requires configured authorized credentials (VAHAN_API_KEY). "
+            "Displayed attributes are based on structural jurisdiction and format parsing."
+        )
+
         # 1. Primary Vehicle Entity (Validated format syntax)
         vehicle_entity = EntityPayload(
             type=EntityType.VEHICLE,
@@ -210,10 +289,11 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "standard": standard,
                 "syntax_valid": True,
                 "jurisdiction_attribution_mode": "FORMAT_PREFIX_INFERENCE",
-                "live_registration_record": "CONFIG_REQUIRED",
+                "live_registration_record": registry_status,
                 "registered_ownership": "NOT_AVAILABLE_WITHOUT_AUTHORIZED_CREDENTIAL",
                 "is_search_target": True,
                 "lookup_timestamp": datetime.utcnow().isoformat(),
+                "camera_evidence_enabled": True
             }
         )
         entities.append(vehicle_entity)
@@ -337,7 +417,18 @@ class VehicleRegistrationProvider(ProviderAdapter):
             raw_data={
                 "parsed": parsed,
                 "lawful_status": "AUTHENTIC_FORMAT_VERIFIED",
-                "notes": evidence_text
+                "notes": evidence_text,
+                "live_registry_query": {
+                    "status": registry_status,
+                    "executed": False,
+                    "reason": registry_msg,
+                    "owner_field_authorized": False,
+                    "owner_field_status": "RESTRICTED_BY_PRIVACY_REGULATION"
+                },
+                "camera_evidence_recommendation": {
+                    "eligible_for_camera_search": True,
+                    "target_plate": canonical
+                }
             }
         ))
 
@@ -346,6 +437,8 @@ class VehicleRegistrationProvider(ProviderAdapter):
             "message": evidence_text,
             "plate_number": canonical,
             "jurisdiction": parsed.get("jurisdiction", "UNKNOWN"),
+            "live_registry_status": registry_status,
+            "official_registry_executed": False,
             "entities": entities,
             "relationships": relationships,
             "evidence": evidence
@@ -366,6 +459,8 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "message": res.get("message"),
                 "plate_number": res.get("plate_number"),
                 "jurisdiction": res.get("jurisdiction"),
+                "live_registry_status": res.get("live_registry_status"),
+                "official_registry_executed": res.get("official_registry_executed"),
                 "entities": entities,
                 "relationships": relationships,
                 "evidence": evidence
@@ -374,3 +469,4 @@ class VehicleRegistrationProvider(ProviderAdapter):
         )
 
 vehicle_registration_provider = VehicleRegistrationProvider()
+

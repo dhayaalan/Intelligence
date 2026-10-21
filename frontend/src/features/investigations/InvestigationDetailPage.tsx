@@ -58,6 +58,7 @@ import { NewsArticleReaderView } from '../news_intelligence/NewsArticleReaderVie
 import { ImagesTab } from '../search/components/ImagesTab';
 import { VideosTab } from '../search/components/VideosTab';
 import { MediaViewerModal } from '../search/components/MediaViewerModal';
+import { VehicleCameraIntelligence } from './components/VehicleCameraIntelligence';
 
 export type TargetType = 'DOMAIN' | 'IP' | 'EMAIL' | 'USERNAME' | 'PHONE' | 'HASH' | 'CRYPTO' | 'URL' | 'PERSON' | 'ORGANIZATION';
 
@@ -104,6 +105,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     | 'all'
     | 'profiles'
     | 'media'
+    | 'images'
+    | 'videos'
     | 'news_intel'
     | 'relationships'
     | 'timeline_evidence'
@@ -835,10 +838,11 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
           { id: 'all', label: 'All Results', count: entities.length, icon: Database },
           { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
-          { id: 'media', label: 'Media', count: imageRecords.length + videoRecords.length, icon: Camera },
+          { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
+          { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Film },
           { id: 'news_intel', label: 'News & Intelligence', count: (newsRecord ? 1 : 0) + keyFindingsList.length, icon: Newspaper },
-          { id: 'relationships', label: 'Relationships', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
-          { id: 'timeline_evidence', label: 'Timeline & Evidence', count: evidenceList.length, icon: Lock },
+          { id: 'timeline_evidence', label: 'Locations & Timeline', count: evidenceList.length, icon: MapPin },
+          { id: 'relationships', label: 'Relationships & Evidence', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -875,6 +879,27 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
       {/* TAB 1: OVERVIEW (Investigator Command Center - Section 14-18, 39, 40) */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* VEHICLE REGISTRATION & ANPR CAMERA SIGHTINGS (When Vehicle Target) */}
+          {(() => {
+            const vehicleEntity = entities.find(
+              (e) => e.type?.toLowerCase() === 'vehicle' || e.type?.toLowerCase() === 'vehicle_plate'
+            );
+            const isVehicleTarget = investigation.target_type?.toLowerCase() === 'vehicle' || Boolean(vehicleEntity);
+            const targetPlate = vehicleEntity ? vehicleEntity.value : investigation.target;
+
+            if (isVehicleTarget) {
+              return (
+                <VehicleCameraIntelligence
+                  plateNumber={targetPlate}
+                  vehicleEntity={vehicleEntity}
+                  investigationId={investigation.id}
+                  caseId={investigation.tenant_id}
+                />
+              );
+            }
+            return null;
+          })()}
+
           {/* INVESTIGATION HEALTH (Section 39) */}
           <div className="p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
@@ -1534,8 +1559,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
-      {/* TAB 4: MEDIA (Source-Backed Images & Videos with Toggle) */}
-      {activeTab === 'media' && (
+      {/* TAB 4: MEDIA, IMAGES & VIDEOS (First-Class Visual Intelligence) */}
+      {(activeTab === 'media' || activeTab === 'images' || activeTab === 'videos') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -1550,10 +1575,13 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setMediaSubTab('images')}
+                onClick={() => {
+                  setActiveTab('images');
+                  setMediaSubTab('images');
+                }}
                 className={cn(
                   'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
-                  mediaSubTab === 'images'
+                  activeTab === 'images' || (activeTab === 'media' && mediaSubTab === 'images')
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 )}
@@ -1563,10 +1591,13 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
               </button>
               <button
                 type="button"
-                onClick={() => setMediaSubTab('videos')}
+                onClick={() => {
+                  setActiveTab('videos');
+                  setMediaSubTab('videos');
+                }}
                 className={cn(
                   'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
-                  mediaSubTab === 'videos'
+                  activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos')
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 )}
@@ -1577,18 +1608,18 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-5">
-            {mediaSubTab === 'images' ? (
-              <ImagesTab
-                images={imageRecords}
-                query={investigation?.target || ''}
-                onSelectImage={(m) => setSelectedMedia(m)}
-                sourcesEvaluated={sourceStats.length}
-              />
-            ) : (
+            {activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos') ? (
               <VideosTab
                 videos={videoRecords}
                 query={investigation?.target || ''}
                 onSelectVideo={(m) => setSelectedMedia(m)}
+                sourcesEvaluated={sourceStats.length}
+              />
+            ) : (
+              <ImagesTab
+                images={imageRecords}
+                query={investigation?.target || ''}
+                onSelectImage={(m) => setSelectedMedia(m)}
                 sourcesEvaluated={sourceStats.length}
               />
             )}

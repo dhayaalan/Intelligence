@@ -15,17 +15,20 @@ from app.search.schemas import MediaRecord
 def is_safe_media_url(url: str) -> bool:
     if not url or not isinstance(url, str):
         return False
-    u = url.strip().lower()
-    if not (u.startswith("http://") or u.startswith("https://")):
+    u = url.strip()
+    if u.startswith("data:image/"):
+        return True
+    u_lower = u.lower()
+    if not (u_lower.startswith("http://") or u_lower.startswith("https://")):
         return False
     # SSRF protection: reject local and internal addresses
     bad_hosts = ["localhost", "127.0.0.1", "0.0.0.0", "169.254.", "::1", "metadata.google.internal"]
     for bh in bad_hosts:
-        if f"://{bh}" in u or f"@{bh}" in u:
+        if f"://{bh}" in u_lower or f"@{bh}" in u_lower:
             return False
     # Filter out text documents / scripts
     bad_exts = [".html", ".htm", ".php", ".asp", ".aspx", ".pdf", ".txt", ".json", ".xml"]
-    clean_path = u.split("?")[0].split("#")[0]
+    clean_path = u_lower.split("?")[0].split("#")[0]
     for be in bad_exts:
         if clean_path.endswith(be):
             return False
