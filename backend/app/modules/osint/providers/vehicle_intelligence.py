@@ -78,6 +78,132 @@ TAMIL_NADU_RTOS: Dict[str, str] = {
     "99": "Coimbatore West"
 }
 
+INDIA_STATE_COORDS: Dict[str, tuple] = {
+    "TN": (11.1271, 78.6569),
+    "KA": (15.3173, 75.7139),
+    "KL": (10.8505, 76.2711),
+    "AP": (15.9129, 79.7400),
+    "TS": (18.1124, 79.0193),
+    "MH": (19.7515, 75.7139),
+    "DL": (28.7041, 77.1025),
+    "UP": (26.8467, 80.9462),
+    "GJ": (22.2587, 71.1924),
+    "RJ": (27.0238, 74.2179),
+    "WB": (22.9868, 87.8550),
+    "MP": (22.9734, 78.6569),
+    "PB": (31.1471, 75.3412),
+    "HR": (29.0588, 76.0856),
+    "BR": (25.0961, 85.3131),
+    "OD": (20.9517, 85.0985),
+    "AS": (26.2006, 92.9376),
+    "JH": (23.6102, 85.2799),
+    "CG": (21.2787, 81.8661),
+    "UK": (30.0668, 79.0193),
+    "HP": (31.1048, 77.1734),
+    "TR": (23.9408, 91.9882),
+    "ML": (25.4670, 91.3662),
+    "MN": (24.6637, 93.9063),
+    "NL": (26.1584, 94.5624),
+    "GA": (15.2993, 74.1240),
+    "AR": (28.2180, 94.7278),
+    "MZ": (23.1645, 92.9376),
+    "SK": (27.5330, 88.5122),
+    "JK": (33.7782, 76.5762),
+    "LA": (34.1526, 77.5771),
+    "CH": (30.7333, 76.7794),
+    "PY": (11.9416, 79.8083),
+    "AN": (11.7401, 92.6586),
+    "DN": (20.1809, 73.0169),
+    "DD": (20.4283, 72.8397),
+    "LD": (10.5667, 72.6417),
+}
+
+TAMIL_NADU_RTO_COORDS: Dict[str, tuple] = {
+    "01": (13.0827, 80.2707),
+    "02": (13.0850, 80.2100),
+    "03": (13.1100, 80.2800),
+    "04": (13.0500, 80.2700),
+    "05": (13.1200, 80.2600),
+    "06": (13.0000, 80.2500),
+    "07": (12.9800, 80.2200),
+    "09": (13.0600, 80.2100),
+    "10": (13.0200, 80.1900),
+    "11": (12.9229, 80.1275),
+    "12": (13.0489, 80.0934),
+    "13": (13.1143, 80.1548),
+    "14": (12.9010, 80.2279),
+    "15": (11.6888, 79.2933),
+    "16": (12.2289, 79.6500),
+    "18": (13.1986, 80.1983),
+    "19": (12.6841, 79.9836),
+    "20": (13.1432, 79.9083),
+    "21": (12.8342, 79.7036),
+    "22": (12.9800, 80.1600),
+    "23": (12.9165, 79.1325),
+    "24": (12.5186, 78.2137),
+    "25": (12.2253, 79.0747),
+    "27": (11.6643, 78.1460),
+    "28": (11.2189, 78.1674),
+    "29": (12.1277, 78.1579),
+    "30": (11.6500, 78.1200),
+    "31": (11.7480, 79.7714),
+    "32": (11.9401, 79.4861),
+    "33": (11.3410, 77.7172),
+    "34": (11.3800, 77.8900),
+    "36": (11.4544, 77.4332),
+    "37": (10.9900, 76.9600),
+    "38": (11.0300, 76.9700),
+    "39": (11.1200, 77.3500),
+    "40": (11.2990, 76.9558),
+    "41": (10.6582, 77.0097),
+    "42": (11.0800, 77.3300),
+    "43": (11.4102, 76.6950),
+    "45": (10.7905, 78.7047),
+    "46": (11.2333, 78.8833),
+    "47": (10.9601, 78.0766),
+    "48": (11.4102, 76.6950),
+    "49": (10.7870, 79.1378),
+    "50": (10.7725, 79.6365),
+    "51": (10.7672, 79.8449),
+    "52": (11.4833, 77.8667),
+    "54": (11.6200, 78.1300),
+    "55": (10.3797, 78.8208),
+    "56": (11.3042, 77.5833),
+    "57": (10.3673, 77.9803),
+    "58": (9.9252, 78.1198),
+    "59": (9.9500, 78.1300),
+    "60": (10.0104, 77.4768),
+    "61": (11.1401, 79.0783),
+    "63": (9.8433, 78.4809),
+    "64": (9.9300, 78.1200),
+    "65": (9.3639, 78.8395),
+    "66": (11.0168, 76.9558),
+    "67": (9.5872, 77.9579),
+    "68": (10.9602, 79.3845),
+    "69": (8.7642, 78.1348),
+    "70": (12.7409, 77.8253),
+    "72": (8.7139, 77.7567),
+    "73": (12.9229, 79.3327),
+    "74": (8.1833, 77.4119),
+    "75": (8.3167, 77.2167),
+    "76": (8.9594, 77.3150),
+    "77": (11.5975, 78.6019),
+    "78": (10.7333, 77.5333),
+    "79": (9.1667, 77.5333),
+    "81": (10.8000, 78.7100),
+    "82": (11.1075, 79.6524),
+    "83": (12.6833, 78.6167),
+    "84": (9.5134, 77.6322),
+    "85": (12.9961, 80.0969),
+    "86": (12.9200, 79.3100),
+    "88": (11.2000, 78.1500),
+    "90": (11.6700, 78.1600),
+    "91": (11.5300, 79.3300),
+    "92": (8.4947, 78.1219),
+    "93": (11.7967, 77.8000),
+    "99": (11.0000, 76.9200)
+}
+
 class VehiclePlateFormat(BaseModel):
     jurisdiction: str
     pattern: str
@@ -216,6 +342,12 @@ class VehicleRegistrationProvider(ProviderAdapter):
             if state_code == "TN" and rto_padded in TAMIL_NADU_RTOS:
                 rto_office = f"RTO TN-{rto_padded} ({TAMIL_NADU_RTOS[rto_padded]})"
             
+            lat, lon = None, None
+            if state_code == "TN" and rto_padded in TAMIL_NADU_RTO_COORDS:
+                lat, lon = TAMIL_NADU_RTO_COORDS[rto_padded]
+            elif state_code in INDIA_STATE_COORDS:
+                lat, lon = INDIA_STATE_COORDS[state_code]
+
             return {
                 "jurisdiction": "IN",
                 "country": "India",
@@ -227,6 +359,9 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "registration_number": seq,
                 "canonical_plate": f"{state_code}{rto_padded}{series}{seq}",
                 "standard": "Indian High Security Registration Plate (HSRP) / VAHAN 4.0",
+                "latitude": lat,
+                "longitude": lon,
+                "coordinates": f"{lat}, {lon}" if lat is not None and lon is not None else None,
                 "matched": True
             }
 
@@ -239,6 +374,9 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "country": "United Kingdom",
                 "canonical_plate": f"{area}{age} {letters}",
                 "standard": "UK DVLA Standard Plate",
+                "latitude": 51.5074,
+                "longitude": -0.1278,
+                "coordinates": "51.5074, -0.1278",
                 "matched": True
             }
 
@@ -275,6 +413,9 @@ class VehicleRegistrationProvider(ProviderAdapter):
         state_name = parsed.get("state_name")
         rto_office = parsed.get("rto_office")
         standard = parsed.get("standard", "Standard Vehicle Registration")
+        lat = parsed.get("latitude")
+        lon = parsed.get("longitude")
+        coords_str = parsed.get("coordinates")
 
         entities: List[EntityPayload] = []
         relationships: List[RelationshipPayload] = []
@@ -300,6 +441,9 @@ class VehicleRegistrationProvider(ProviderAdapter):
                 "jurisdiction": f"{state_name}, {country}" if state_name else country,
                 "rto_office": rto_office,
                 "standard": standard,
+                "latitude": lat,
+                "longitude": lon,
+                "coordinates": coords_str,
                 "syntax_valid": True,
                 "jurisdiction_attribution_mode": "FORMAT_PREFIX_INFERENCE",
                 "live_registration_record": registry_status,
@@ -322,7 +466,10 @@ class VehicleRegistrationProvider(ProviderAdapter):
                     "organization_type": "Lawful Vehicle Licensing & Registration Authority",
                     "jurisdiction": f"{state_name}, {country}",
                     "rto_code": parsed.get("rto_code"),
-                    "attribution_basis": "PREFIX_SYNTAX_MAPPING"
+                    "attribution_basis": "PREFIX_SYNTAX_MAPPING",
+                    "latitude": lat,
+                    "longitude": lon,
+                    "coordinates": coords_str,
                 }
             )
             entities.append(rto_entity)
@@ -342,6 +489,13 @@ class VehicleRegistrationProvider(ProviderAdapter):
         # 3. Location Entity (State / Country)
         if state_name:
             location_val = f"{state_name}, {country}"
+            state_lat, state_lon = (
+                INDIA_STATE_COORDS.get(parsed.get("state_code", ""), (lat, lon))
+                if parsed.get("jurisdiction") == "IN"
+                else (lat, lon)
+            )
+            state_coords_str = f"{state_lat}, {state_lon}" if state_lat is not None and state_lon is not None else coords_str
+
             loc_entity = EntityPayload(
                 type=EntityType.LOCATION,
                 value=location_val,
@@ -351,7 +505,10 @@ class VehicleRegistrationProvider(ProviderAdapter):
                     "country": country,
                     "state": state_name,
                     "location_type": "State / Administrative Region",
-                    "attribution_basis": "JURISDICTION_PREFIX"
+                    "attribution_basis": "JURISDICTION_PREFIX",
+                    "latitude": state_lat,
+                    "longitude": state_lon,
+                    "coordinates": state_coords_str,
                 }
             )
             entities.append(loc_entity)

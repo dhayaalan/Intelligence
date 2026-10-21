@@ -421,9 +421,26 @@ export const SearchPage: React.FC<SearchPageProps> = ({
       'perth': [-31.9505, 115.8605],
       'india': [20.5937, 78.9629],
       'tamil nadu': [11.1271, 78.6569],
+      'tamilnadu': [11.1271, 78.6569],
+      'thiruchengode': [11.3800, 77.8900],
+      'tiruchengode': [11.3800, 77.8900],
+      'namakkal': [11.2189, 78.1674],
+      'salem': [11.6643, 78.1460],
+      'coimbatore': [11.0168, 76.9558],
+      'madurai': [9.9252, 78.1198],
+      'trichy': [10.7905, 78.7047],
+      'tiruchirappalli': [10.7905, 78.7047],
+      'erode': [11.3410, 77.7172],
+      'tirunelveli': [8.7139, 77.7567],
+      'vellore': [12.9165, 79.1325],
       'chennai': [13.0827, 80.2707],
       'bangalore': [12.9716, 77.5946],
       'bengaluru': [12.9716, 77.5946],
+      'kerala': [10.8505, 76.2711],
+      'karnataka': [15.3173, 75.7139],
+      'andhra pradesh': [15.9129, 79.7400],
+      'telangana': [18.1124, 79.0193],
+      'maharashtra': [19.7515, 75.7139],
       'mumbai': [19.0760, 72.8777],
       'delhi': [28.6139, 77.2090],
       'new delhi': [28.6139, 77.2090],
@@ -522,16 +539,26 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         const gLng = Number(e.metadata.geo.longitude ?? e.metadata.geo.lng);
         if (!isNaN(gLat) && !isNaN(gLng) && gLat !== 0 && gLng !== 0) return [gLat, gLng];
       }
-      // 5. Well-known places / country / city
-      const textMatches = [
-        e.metadata?.country,
+      // 5. Well-known places / country / city (specific region/city/state evaluated before broad country)
+      const specificMatches = [
+        e.metadata?.rto_office,
+        e.metadata?.district,
         e.metadata?.city,
+        e.metadata?.town,
+        e.metadata?.state,
+        e.type?.toLowerCase?.().includes('location') ? e.value : null,
         e.metadata?.location,
         e.metadata?.place_name,
-        e.type?.toLowerCase?.().includes('location') ? e.value : null,
+        e.metadata?.jurisdiction,
       ].filter(Boolean).map((s: string) => String(s).toLowerCase().trim());
 
-      // Sort keys descending by length so "australia" matches before short abbreviations like "us"
+      const fallbackMatches = [
+        e.metadata?.country,
+      ].filter(Boolean).map((s: string) => String(s).toLowerCase().trim());
+
+      const textMatches = [...specificMatches, ...fallbackMatches];
+
+      // Sort keys descending by length so longer names match before substrings
       const sortedKeys = Object.keys(KNOWN_GEO).sort((a, b) => b.length - a.length);
 
       for (const place of textMatches) {
@@ -539,6 +566,16 @@ export const SearchPage: React.FC<SearchPageProps> = ({
           return KNOWN_GEO[place];
         }
         for (const key of sortedKeys) {
+          // If place is a specific entity string (e.g. "Tamil Nadu, India"), don't let broad country 'india' preempt 'tamil nadu'
+          if (['india', 'united states', 'usa', 'us', 'united kingdom', 'uk'].includes(key)) {
+            const hasMoreSpecific = sortedKeys.some(
+              (k) => !['india', 'united states', 'usa', 'us', 'united kingdom', 'uk'].includes(k) && place.includes(k)
+            );
+            if (hasMoreSpecific) {
+              continue;
+            }
+          }
+
           if (key.length <= 3) {
             // Require exact word boundary for short country codes (e.g. "us", "uk", "uae")
             const rx = new RegExp(`(^|[^a-zA-Z])${key}([^a-zA-Z]|$)`, 'i');
@@ -564,7 +601,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         name: e.value,
         type: e.type,
         ip: isIp ? e.value : (e.metadata?.ip as string) || undefined,
-        city: (e.metadata?.city as string) || (e.metadata?.location as string) || '',
+        city: (e.metadata?.rto_office as string) || (e.metadata?.city as string) || (e.metadata?.state as string) || (e.metadata?.location as string) || '',
         country: (e.metadata?.country as string) || '',
         lat: coords[0],
         lng: coords[1],
