@@ -179,6 +179,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     | 'profiles'
     | 'media'
     | 'news_intel'
+    | 'locations_timeline'
+    | 'relationships_evidence'
     | 'relationships'
     | 'timeline_evidence'
     | 'entities'
@@ -1314,8 +1316,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
                   { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Video },
                   { id: 'news_intel', label: 'News & Intelligence', count: newsArticles.length + keyFindings.length, icon: Newspaper },
-                  { id: 'timeline_evidence', label: 'Locations & Timeline', count: searchResult.evidence.length, icon: MapPin },
-                  { id: 'relationships', label: 'Relationships & Evidence', count: searchResult.relationships.length, icon: Share2 },
+                  { id: 'locations_timeline', label: 'Location Timeline', count: geoLocations.length, icon: MapPin },
+                  { id: 'relationships_evidence', label: 'Relationships & Evidence', count: searchResult.relationships.length, icon: Share2 },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -2577,108 +2579,199 @@ export const SearchPage: React.FC<SearchPageProps> = ({
               </div>
             )}
 
-            {/* TAB: RELATIONSHIP GRAPH */}
-            {(activeTab === 'relationships' || (activeTab as string) === 'graph') && (
-              <div className="p-4 sm:p-5 space-y-4">
-                <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    INVESTIGATIVE LINK ANALYSIS & KNOWLEDGE GRAPH
-                  </span>
-                  <span>
-                    {searchResult.entities.length} TOTAL ENTITIES • {searchResult.relationships?.length || 0} RELATIONSHIPS
-                  </span>
-                </div>
-                <GraphStudioComponent
-                  investigationId={searchResult.investigation_id}
-                  entities={searchResult.entities}
-                  relationships={searchResult.relationships}
-                />
-              </div>
-            )}
-
-            {/* TAB: TIMELINE & EVIDENCE */}
-            {(activeTab === 'timeline_evidence' || (activeTab as string) === 'evidence') && (
+            {/* TAB: LOCATION TIMELINE */}
+            {(activeTab === 'locations_timeline' || (activeTab as string) === 'map' || (activeTab as string) === 'locations') && (
               <div className="p-4 sm:p-5 space-y-6">
-                {geoLocations.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                      <span>GEO-LOCATED INFRASTRUCTURE TARGETS</span>
-                      <span>{geoLocations.length} IDENTIFIED POINTS</span>
-                    </div>
-                    <div className="h-[420px] rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/90 dark:border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                      <span>Geospatial Radar & Location Timeline</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Chronological geospatial sightings, physical coordinates, and infrastructure telemetry.
+                    </p>
+                  </div>
+                  <Badge variant="mono" size="sm" className="font-mono text-[10px] self-start sm:self-auto">
+                    {geoLocations.length} VERIFIED LOCATIONS
+                  </Badge>
+                </div>
+
+                {geoLocations.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="h-[440px] rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 shadow-xs">
                       <OsintMapComponent locations={geoLocations} />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          CHRONOLOGICAL SIGHTING TIMELINE ({geoLocations.length})
+                        </span>
+                        <span>Source-Backed Observations</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {geoLocations.map((loc, idx) => (
+                          <div
+                            key={loc.id || idx}
+                            className="p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 space-y-2.5 font-mono text-xs shadow-2xs hover:border-cyan-500/40 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[200px]">
+                                  {loc.city ? `${loc.city}, ${loc.country}` : (loc.country || loc.name)}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
+                                </span>
+                              </div>
+                              <Badge variant="outline" size="sm" className="text-[10px] shrink-0 font-bold">
+                                {loc.type || 'SIGHTING'}
+                              </Badge>
+                            </div>
+
+                            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-slate-400">Target / Host:</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{loc.name}</span>
+                              </div>
+                              {loc.timestamp && (
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-slate-400">Observed At:</span>
+                                  <span>{formatDate(loc.timestamp)}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                              <span>Source: {loc.source}</span>
+                              <span className={loc.threatLevel === 'SUSPICIOUS' ? 'text-amber-500 font-bold' : 'text-emerald-500'}>
+                                {loc.threatLevel}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-16 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mx-auto">
+                      <MapPin className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1 max-w-md mx-auto">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        No Verified Geographic Telemetry
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Target <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{query}</span> does not have verified physical coordinate sightings, camera detections, or geocoded IP telemetry recorded in active intelligence sources.
+                      </p>
+                    </div>
+                    <div className="pt-2 flex justify-center">
+                      <Badge variant="outline" size="sm" className="text-[10px] font-mono text-slate-400">
+                        GPS &bull; IP Geolocation &bull; Camera Sightings &bull; Movement Logs
+                      </Badge>
                     </div>
                   </div>
                 )}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs font-mono text-slate-500">
-                  <span>CRYPTOGRAPHIC EVIDENCE RECORDS</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                    SHA-256 Provenance Verified
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {paginatedEvidence.length === 0 ? (
-                    <div className="py-8 text-center text-slate-500 text-xs font-mono">
-                      No evidence records collected for this target.
-                    </div>
-                  ) : (
-                    paginatedEvidence.map((ev, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200/90 rounded-xl p-3.5 space-y-2 dark:border-slate-800"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" size="sm" className="font-bold">
-                              {ev.provider || ev.module}
-                            </Badge>
-                            <span className="text-slate-600 dark:text-slate-400">{ev.collection_method}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">{formatDate(ev.timestamp)}</span>
-                        </div>
-
-                        <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[11px] font-mono break-all text-slate-700 dark:text-slate-300">
-                          {typeof ev.raw_data === 'string'
-                            ? ev.raw_data
-                            : JSON.stringify(ev.raw_data, null, 2)}
-                        </div>
-
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
-                          <div className="flex items-center gap-1 truncate max-w-md">
-                            <span>HASH:</span>
-                            <code className="text-slate-600 dark:text-slate-300 truncate">{ev.hash}</code>
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(ev.hash, 'hash')}
-                            className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                          >
-                            {copiedHash === ev.hash ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <Pagination
-                  currentPage={evidencePage}
-                  totalPages={Math.ceil(searchResult.evidence.length / evidencePageSize) || 1}
-                  totalItems={searchResult.evidence.length}
-                  pageSize={evidencePageSize}
-                  onPageChange={setEvidencePage}
-                  onPageSizeChange={(sz) => {
-                    setEvidencePageSize(sz);
-                    setEvidencePage(1);
-                  }}
-                  pageSizeOptions={[10, 25, 50]}
-                />
               </div>
+            )}
+
+            {/* TAB: RELATIONSHIPS & EVIDENCE */}
+            {(activeTab === 'relationships_evidence' || activeTab === 'relationships' || (activeTab as string) === 'graph' || (activeTab as string) === 'evidence') && (
+              <div className="p-4 sm:p-5 space-y-8">
+                {/* Knowledge Graph Studio */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-500 border-b border-slate-200/90 dark:border-slate-800 pb-2">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <Share2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>INVESTIGATIVE LINK ANALYSIS & KNOWLEDGE GRAPH</span>
+                    </span>
+                    <span>
+                      {searchResult.entities.length} TOTAL ENTITIES • {searchResult.relationships?.length || 0} RELATIONSHIPS
+                    </span>
+                  </div>
+                  <GraphStudioComponent
+                    investigationId={searchResult.investigation_id}
+                    entities={searchResult.entities}
+                    relationships={searchResult.relationships}
+                  />
+                </div>
+
+                {/* Cryptographic Evidence Records */}
+                <div className="space-y-4 pt-4 border-t border-slate-200/90 dark:border-slate-800">
+                  <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>CRYPTOGRAPHIC EVIDENCE RECORDS ({searchResult.evidence.length})</span>
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      SHA-256 Provenance Verified
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {paginatedEvidence.length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 text-xs font-mono">
+                        No evidence records collected for this target.
+                      </div>
+                    ) : (
+                      paginatedEvidence.map((ev, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200/90 rounded-xl p-3.5 space-y-2 dark:border-slate-800"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" size="sm" className="font-bold">
+                                {ev.provider || ev.module}
+                              </Badge>
+                              <span className="text-slate-600 dark:text-slate-400">{ev.collection_method}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">{formatDate(ev.timestamp)}</span>
+                          </div>
+
+                          <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[11px] font-mono break-all text-slate-700 dark:text-slate-300">
+                            {typeof ev.raw_data === 'string'
+                              ? ev.raw_data
+                              : JSON.stringify(ev.raw_data, null, 2)}
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
+                            <div className="flex items-center gap-1 truncate max-w-md">
+                              <span>HASH:</span>
+                              <code className="text-slate-600 dark:text-slate-300 truncate">{ev.hash}</code>
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(ev.hash, 'hash')}
+                              className="text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                            >
+                              {copiedHash === ev.hash ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <Pagination
+                    currentPage={evidencePage}
+                    totalPages={Math.ceil(searchResult.evidence.length / evidencePageSize) || 1}
+                    totalItems={searchResult.evidence.length}
+                    pageSize={evidencePageSize}
+                    onPageChange={setEvidencePage}
+                    onPageSizeChange={(sz) => {
+                      setEvidencePageSize(sz);
+                      setEvidencePage(1);
+                    }}
+                    pageSizeOptions={[10, 25, 50]}
+                  />
+                </div>
               </div>
             )}
 

@@ -108,12 +108,16 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     | 'images'
     | 'videos'
     | 'news_intel'
+    | 'locations_timeline'
+    | 'relationships_evidence'
     | 'relationships'
     | 'timeline_evidence'
     | 'findings'
     | 'leads'
     | 'entities'
     | 'map'
+    | 'locations'
+    | 'graph'
     | 'evidence'
     | 'sources'
     | 'timeline'
@@ -841,8 +845,8 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
           { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Film },
           { id: 'news_intel', label: 'News & Intelligence', count: (newsRecord ? 1 : 0) + keyFindingsList.length, icon: Newspaper },
-          { id: 'timeline_evidence', label: 'Locations & Timeline', count: evidenceList.length, icon: MapPin },
-          { id: 'relationships', label: 'Relationships & Evidence', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
+          { id: 'locations_timeline', label: 'Location Timeline', count: geoLocations.length, icon: MapPin },
+          { id: 'relationships_evidence', label: 'Relationships & Evidence', count: (investigation as any)?.relationships?.length || graphEntities.length, icon: Share2 },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -1628,7 +1632,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
       )}
 
       {/* TAB 5: RELATIONSHIP GRAPH */}
-      {activeTab === 'relationships' && (
+      {(activeTab === 'relationships_evidence' || activeTab === 'relationships' || activeTab === 'graph') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
@@ -1661,14 +1665,14 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
         </Card>
       )}
 
-      {/* TAB: GEOSPATIAL RADAR */}
-      {activeTab === 'map' && (
+      {/* TAB: LOCATION TIMELINE */}
+      {(activeTab === 'locations_timeline' || activeTab === 'map' || activeTab === 'locations') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                 <Globe className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                <span>Geospatial Radar & Location Telemetry</span>
+                <span>Geospatial Radar & Location Timeline</span>
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Regional geolocation mapping, jurisdiction coordinates, and infrastructure physical presence ({geoLocations.length} locations).
@@ -1716,7 +1720,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
       )}
 
       {/* TAB 7: TIMELINE & EVIDENCE */}
-      {(activeTab === 'timeline_evidence' || activeTab === 'evidence') && (
+      {(activeTab === 'relationships_evidence' || activeTab === 'relationships' || activeTab === 'timeline_evidence' || activeTab === 'evidence') && (
         <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
