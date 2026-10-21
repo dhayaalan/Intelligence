@@ -128,6 +128,28 @@ class PublicCameraCatalogService:
                 }
             ),
             CameraSourceRecord(
+                source_id="cam_in_smart_city_chennai",
+                operator="Greater Chennai Corporation & Traffic Police (ICCCC)",
+                name="Chennai Integrated Command and Control Centre (ICCCC) Traffic Feeds",
+                source_url="https://chennaicitytraffic.gov.in/icccc-live",
+                geographic_coverage="Chennai & Tamil Nadu Highways, India",
+                latitude=13.0827,
+                longitude=80.2707,
+                feed_type=CameraFeedType.SNAPSHOT_SERIES,
+                access_method=CameraAccessMethod.REST_API,
+                licensing_status="Smart Cities Mission Open Portal (Government of Tamil Nadu)",
+                availability=CameraAvailability.AVAILABLE,
+                auth_requirements="Public Traffic Awareness Endpoint",
+                retention_restrictions="Real-time junction snapshots; investigative retention subject to state guidelines.",
+                is_public_catalog=True,
+                metadata={
+                    "total_cameras": 1200,
+                    "refresh_interval_sec": 30,
+                    "jurisdiction": "IN",
+                    "state": "Tamil Nadu"
+                }
+            ),
+            CameraSourceRecord(
                 source_id="cam_in_nhai_tms",
                 operator="National Highways Authority of India (NHAI)",
                 name="NHAI Advanced Traffic Management & Toll Plaza CCTV Network",
@@ -145,6 +167,27 @@ class PublicCameraCatalogService:
                 metadata={
                     "jurisdiction": "IN",
                     "access_policy": "LAW_ENFORCEMENT_AUTHORIZED_GATEWAY_ONLY"
+                }
+            ),
+            CameraSourceRecord(
+                source_id="cam_in_delhi_traffic",
+                operator="Delhi Traffic Police Surveillance Division",
+                name="Delhi Urban Traffic Management & ITS Surveillance",
+                source_url="https://delhitrafficpolice.nic.in/cctv-traffic",
+                geographic_coverage="National Capital Region (NCR), Delhi, India",
+                latitude=28.7041,
+                longitude=77.1025,
+                feed_type=CameraFeedType.SNAPSHOT_SERIES,
+                access_method=CameraAccessMethod.REST_API,
+                licensing_status="Delhi Police Open Transit Intelligence",
+                availability=CameraAvailability.AVAILABLE,
+                auth_requirements="Public Open Transit Access",
+                retention_restrictions="Real-time corridor management snapshots.",
+                is_public_catalog=True,
+                metadata={
+                    "total_cameras": 2000,
+                    "refresh_interval_sec": 45,
+                    "jurisdiction": "IN"
                 }
             ),
         ]

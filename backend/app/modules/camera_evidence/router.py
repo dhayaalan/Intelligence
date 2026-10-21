@@ -201,6 +201,24 @@ async def process_anpr_endpoint(
             sample_interval_seconds=payload.sample_interval_seconds
         )
 
+        # Check cross-jurisdictional geographic anomaly
+        from app.modules.osint.providers.vehicle_intelligence import vehicle_registration_provider
+        parsed_plate = vehicle_registration_provider.parse_plate(target_clean)
+        plate_jurisdiction = parsed_plate.get("jurisdiction", "UNKNOWN")
+        camera_jurisdiction = camera.metadata.get("jurisdiction", "UNKNOWN") if camera.metadata else "UNKNOWN"
+
+        is_cross_anomaly = (
+            plate_jurisdiction != "UNKNOWN" and
+            camera_jurisdiction != "UNKNOWN" and
+            plate_jurisdiction != camera_jurisdiction
+        )
+        if is_cross_anomaly:
+            plate_country = parsed_plate.get("country", plate_jurisdiction)
+            cam_location = camera.geographic_coverage or camera_jurisdiction
+            for det in detections:
+                anomaly_note = f"⚠️ [CROSS-JURISDICTION ANOMALY: Domestic vehicle registered in {plate_country} matched on overseas feed in {cam_location}. Potential synthetic test or plate cloning.]"
+                det.review_decision_notes = f"{det.review_decision_notes} {anomaly_note}".strip() if det.review_decision_notes else anomaly_note
+
         audit_logger.log(
             tenant_id=current_user.tenant_id,
             user_id=current_user.id,
@@ -210,7 +228,8 @@ async def process_anpr_endpoint(
             details={
                 "target_plate": payload.target_plate,
                 "camera_id": camera.source_id,
-                "detections_found": len(detections)
+                "detections_found": len(detections),
+                "cross_jurisdiction_anomaly": is_cross_anomaly
             }
         )
 

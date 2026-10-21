@@ -49,21 +49,39 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
   const liveRegistry = meta.live_registration_record || 'CONFIG_REQUIRED';
   const regOwnership = meta.registered_ownership || 'NOT_AVAILABLE_WITHOUT_AUTHORIZED_CREDENTIAL';
 
-  // Load documented camera catalog
+  // Determine vehicle registration jurisdiction
+  const isIndiaPlate =
+    meta.country === 'India' ||
+    meta.jurisdiction?.includes('India') ||
+    /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/i.test((plateNumber || '').replace(/[\s\-_]/g, ''));
+
+  // Load documented camera catalog with jurisdiction-aware default selection
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
         const sources = await apiRequest<CameraSourceRecord[]>('/camera-evidence/catalog');
         setCatalog(sources || []);
         if (sources && sources.length > 0) {
-          setSelectedCameraId(sources[0].source_id);
+          const matchingSource = sources.find((s) =>
+            isIndiaPlate
+              ? s.metadata?.jurisdiction === 'IN' || s.geographic_coverage?.includes('India')
+              : meta.country && s.geographic_coverage?.includes(meta.country)
+          );
+          setSelectedCameraId(matchingSource ? matchingSource.source_id : sources[0].source_id);
         }
       } catch (err) {
         console.warn('Could not load camera catalog', err);
       }
     };
     fetchCatalog();
-  }, []);
+  }, [meta, plateNumber, isIndiaPlate]);
+
+  const selectedCamera = catalog.find((c) => c.source_id === selectedCameraId);
+  const isCrossJurisdictionAnomaly = Boolean(
+    selectedCamera &&
+    ((isIndiaPlate && selectedCamera.metadata?.jurisdiction && selectedCamera.metadata.jurisdiction !== 'IN') ||
+     (!isIndiaPlate && meta.country === 'United Kingdom' && selectedCamera.metadata?.jurisdiction && selectedCamera.metadata.jurisdiction !== 'UK'))
+  );
 
   // Load existing detections for target plate
   useEffect(() => {
@@ -241,13 +259,28 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
             <select
               value={selectedCameraId}
               onChange={(e) => setSelectedCameraId(e.target.value)}
-              className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 w-full focus:ring-2 focus:ring-blue-500"
+              className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 w-full focus:ring-2 focus:ring-blue-500 font-mono"
             >
-              {catalog.map((cam) => (
-                <option key={cam.source_id} value={cam.source_id}>
-                  {cam.name} ({cam.operator}) - {cam.feed_type}
-                </option>
-              ))}
+              {isIndiaPlate && (
+                <optgroup label="Recommended In-Jurisdiction Feeds (India)">
+                  {catalog
+                    .filter((c) => c.metadata?.jurisdiction === 'IN' || c.geographic_coverage?.includes('India'))
+                    .map((cam) => (
+                      <option key={cam.source_id} value={cam.source_id}>
+                        [IN] {cam.name} ({cam.operator})
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              <optgroup label={isIndiaPlate ? 'Overseas / External Portals (Cross-Jurisdiction)' : 'Available Camera Feeds'}>
+                {catalog
+                  .filter((c) => !isIndiaPlate || (c.metadata?.jurisdiction !== 'IN' && !c.geographic_coverage?.includes('India')))
+                  .map((cam) => (
+                    <option key={cam.source_id} value={cam.source_id}>
+                      [{cam.metadata?.jurisdiction || 'EXT'}] {cam.name} ({cam.operator})
+                    </option>
+                  ))}
+              </optgroup>
             </select>
           </div>
 
@@ -269,6 +302,21 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
             )}
           </button>
         </div>
+
+        {/* Cross-Jurisdiction Geographic Anomaly Banner */}
+        {isCrossJurisdictionAnomaly && (
+          <div className="mt-3 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Cross-Jurisdiction Teleportation Anomaly:</span> Target plate{' '}
+              <span className="font-mono font-bold uppercase">{plateNumber}</span> is an Indian domestic registration (
+              {meta.jurisdiction || 'Tamil Nadu, India'}), but the selected camera feed (
+              <span className="font-semibold">{selectedCamera?.name}</span>) is located in{' '}
+              <span className="font-semibold">{selectedCamera?.geographic_coverage}</span>. A domestic Indian plate
+              appearing on UK/London city cameras indicates synthetic testing, plate cloning, or an OCR false-positive.
+            </div>
+          </div>
+        )}
 
         {/* Candidate Sightings Grid */}
         <div className="mt-5">
