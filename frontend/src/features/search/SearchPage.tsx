@@ -65,6 +65,7 @@ import {
 import { ImagesTab } from './components/ImagesTab';
 import { VideosTab } from './components/VideosTab';
 import { MediaViewerModal } from './components/MediaViewerModal';
+import { VehicleCameraIntelligence } from '../investigations/components/VehicleCameraIntelligence';
 import { apiRequest } from '../../core/api/client';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -1310,10 +1311,11 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
                   { id: 'all', label: 'All Results', count: filteredEntities.length, icon: Database },
                   { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
-                  { id: 'media', label: 'Media', count: imageRecords.length + videoRecords.length, icon: Camera },
+                  { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
+                  { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Video },
                   { id: 'news_intel', label: 'News & Intelligence', count: newsArticles.length + keyFindings.length, icon: Newspaper },
-                  { id: 'relationships', label: 'Relationships', count: searchResult.relationships.length, icon: Share2 },
-                  { id: 'timeline_evidence', label: 'Timeline & Evidence', count: searchResult.evidence.length, icon: ShieldCheck },
+                  { id: 'timeline_evidence', label: 'Locations & Timeline', count: searchResult.evidence.length, icon: MapPin },
+                  { id: 'relationships', label: 'Relationships & Evidence', count: searchResult.relationships.length, icon: Share2 },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -1347,6 +1349,24 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             {/* TAB 1: OVERVIEW (Command Center Standard - Section 8, 9, 36) */}
             {activeTab === 'overview' && (
               <div className="p-5 sm:p-6 space-y-7">
+                {/* VEHICLE REGISTRATION & ANPR CAMERA SIGHTINGS (When Vehicle Target) */}
+                {(() => {
+                  const vehicleEntity = searchResult.entities.find(
+                    (e) => e.type?.toLowerCase() === 'vehicle' || e.type?.toLowerCase() === 'vehicle_plate'
+                  );
+                  const isVehicleTarget = searchResult.target_type?.toLowerCase() === 'vehicle' || Boolean(vehicleEntity);
+                  const targetPlate = vehicleEntity ? vehicleEntity.value : searchResult.query;
+
+                  if (isVehicleTarget) {
+                    return (
+                      <VehicleCameraIntelligence
+                        plateNumber={targetPlate}
+                        vehicleEntity={vehicleEntity}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
                 {/* INVESTIGATION SNAPSHOT: 9 Primary Metrics (Section 8) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -2503,10 +2523,13 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setMediaSubTab('images')}
+                      onClick={() => {
+                        setActiveTab('images');
+                        setMediaSubTab('images');
+                      }}
                       className={cn(
                         'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
-                        mediaSubTab === 'images'
+                        activeTab === 'images' || (activeTab === 'media' && mediaSubTab === 'images')
                           ? 'bg-indigo-600 text-white shadow-2xs'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                       )}
@@ -2516,10 +2539,13 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMediaSubTab('videos')}
+                      onClick={() => {
+                        setActiveTab('videos');
+                        setMediaSubTab('videos');
+                      }}
                       className={cn(
                         'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
-                        mediaSubTab === 'videos'
+                        activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos')
                           ? 'bg-indigo-600 text-white shadow-2xs'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                       )}
@@ -2533,18 +2559,18 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   </span>
                 </div>
 
-                {mediaSubTab === 'images' ? (
-                  <ImagesTab
-                    images={imageRecords}
-                    query={query}
-                    onSelectImage={(img) => setSelectedMedia(img)}
-                    sourcesEvaluated={executedProvidersCount}
-                  />
-                ) : (
+                {activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos') ? (
                   <VideosTab
                     videos={videoRecords}
                     query={query}
                     onSelectVideo={(vid) => setSelectedMedia(vid)}
+                    sourcesEvaluated={executedProvidersCount}
+                  />
+                ) : (
+                  <ImagesTab
+                    images={imageRecords}
+                    query={query}
+                    onSelectImage={(img) => setSelectedMedia(img)}
                     sourcesEvaluated={executedProvidersCount}
                   />
                 )}
