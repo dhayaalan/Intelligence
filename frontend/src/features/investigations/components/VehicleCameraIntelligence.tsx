@@ -17,10 +17,31 @@ import {
   Film,
   Pause,
   RotateCcw,
-  Maximize2
+  Maximize2,
+  Radio,
+  Globe,
+  Key,
+  ExternalLink,
+  Tv
 } from 'lucide-react';
 import { apiRequest } from '../../../core/api/client';
 import { Entity, CameraSourceRecord, ANPRDetectionRecord, ANPRMatchStatus } from '../../../types';
+
+interface ShodanCameraItem {
+  ip: string;
+  port: number;
+  product?: string;
+  org?: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  stream_url: string;
+  feed_type: string;
+  screenshot_url?: string;
+  asn?: string;
+  last_seen?: string;
+}
 
 interface VehicleCameraIntelligenceProps {
   plateNumber: string;
@@ -48,6 +69,15 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
   const [activeFrameStep, setActiveFrameStep] = useState(0);
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
   const [activeModalTab, setActiveModalTab] = useState<'video' | 'freeze_frame'>('video');
+
+  // Shodan Live Camera Radar State
+  const [activeCameraMode, setActiveCameraMode] = useState<'catalog' | 'shodan'>('catalog');
+  const [shodanCity, setShodanCity] = useState<string>('');
+  const [shodanLoading, setShodanLoading] = useState<boolean>(false);
+  const [shodanConfigured, setShodanConfigured] = useState<boolean>(true);
+  const [shodanMessage, setShodanMessage] = useState<string>('');
+  const [shodanCameras, setShodanCameras] = useState<ShodanCameraItem[]>([]);
+  const [streamingCameraIp, setStreamingCameraIp] = useState<string | null>(null);
 
   // Extract metadata from entity
   const meta = vehicleEntity?.metadata || {};
@@ -147,6 +177,63 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
     } catch (err) {
       console.error('ANPR processing error', err);
     } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDiscoverShodan = async () => {
+    setShodanLoading(true);
+    setShodanMessage('');
+    try {
+      const jurisdictionCode = isIndiaPlate ? 'IN' : (meta.country === 'United Kingdom' ? 'UK' : '');
+      const queryParams = new URLSearchParams();
+      if (jurisdictionCode) queryParams.append('jurisdiction', jurisdictionCode);
+      if (shodanCity.trim()) queryParams.append('city', shodanCity.trim());
+
+      const res = await apiRequest<{
+        configured: boolean;
+        api_key_status: string;
+        total_found: number;
+        message?: string;
+        cameras: ShodanCameraItem[];
+      }>(`/camera-evidence/shodan/discover?${queryParams.toString()}`);
+
+      if (res) {
+        setShodanConfigured(res.configured);
+        setShodanMessage(res.message || '');
+        setShodanCameras(res.cameras || []);
+      }
+    } catch (err: any) {
+      setShodanMessage('Error querying Shodan API: ' + (err?.message || err));
+    } finally {
+      setShodanLoading(false);
+    }
+  };
+
+  const handleStreamANPR = async (camera: ShodanCameraItem) => {
+    setStreamingCameraIp(camera.ip);
+    setIsProcessing(true);
+    try {
+      const res = await apiRequest<ANPRDetectionRecord[]>('/camera-evidence/stream-anpr', {
+        method: 'POST',
+        body: JSON.stringify({
+          stream_url: camera.stream_url,
+          target_plate: plateNumber,
+          source_name: `${camera.product || 'Surveillance Camera'} (${camera.city || camera.ip})`,
+          investigation_id: investigationId,
+          case_id: caseId,
+          max_frames: 30,
+        }),
+      });
+
+      if (res && res.length > 0) {
+        setDetections((prev) => [...res, ...prev]);
+        setActivePreviewDetection(res[0]);
+      }
+    } catch (err: any) {
+      alert(`Could not process stream ${camera.stream_url}: ` + (err?.message || 'Connection failed'));
+    } finally {
+      setStreamingCameraIp(null);
       setIsProcessing(false);
     }
   };
@@ -323,58 +410,243 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
-          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-              Camera Source:
-            </label>
-            <select
-              value={selectedCameraId}
-              onChange={(e) => setSelectedCameraId(e.target.value)}
-              className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 w-full focus:ring-2 focus:ring-blue-500 font-mono"
-            >
-              {isIndiaPlate && (
-                <optgroup label="Recommended In-Jurisdiction Feeds (India)">
+        {/* Source Mode Toggles */}
+        <div className="mt-4 flex items-center gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-3">
+          <button
+            type="button"
+            onClick={() => setActiveCameraMode('catalog')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeCameraMode === 'catalog'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Documented Catalog Feeds</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveCameraMode('shodan');
+              if (shodanCameras.length === 0 && !shodanLoading) {
+                handleDiscoverShodan();
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeCameraMode === 'shodan'
+                ? 'bg-purple-600 text-white shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>Shodan Live Surveillance Radar</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-purple-500/30 rounded text-purple-200">
+              Live RTSP
+            </span>
+          </button>
+        </div>
+
+        {/* MODE A: Documented Catalog Feeds */}
+        {activeCameraMode === 'catalog' && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
+            <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                Camera Source:
+              </label>
+              <select
+                value={selectedCameraId}
+                onChange={(e) => setSelectedCameraId(e.target.value)}
+                className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 w-full focus:ring-2 focus:ring-blue-500 font-mono"
+              >
+                {isIndiaPlate && (
+                  <optgroup label="Recommended In-Jurisdiction Feeds (India)">
+                    {catalog
+                      .filter((c) => c.metadata?.jurisdiction === 'IN' || c.geographic_coverage?.includes('India'))
+                      .map((cam) => (
+                        <option key={cam.source_id} value={cam.source_id}>
+                          [IN] {cam.name} ({cam.operator})
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                <optgroup label={isIndiaPlate ? 'Overseas / External Portals (Cross-Jurisdiction)' : 'Available Camera Feeds'}>
                   {catalog
-                    .filter((c) => c.metadata?.jurisdiction === 'IN' || c.geographic_coverage?.includes('India'))
+                    .filter((c) => !isIndiaPlate || (c.metadata?.jurisdiction !== 'IN' && !c.geographic_coverage?.includes('India')))
                     .map((cam) => (
                       <option key={cam.source_id} value={cam.source_id}>
-                        [IN] {cam.name} ({cam.operator})
+                        [{cam.metadata?.jurisdiction || 'EXT'}] {cam.name} ({cam.operator})
                       </option>
                     ))}
                 </optgroup>
-              )}
-              <optgroup label={isIndiaPlate ? 'Overseas / External Portals (Cross-Jurisdiction)' : 'Available Camera Feeds'}>
-                {catalog
-                  .filter((c) => !isIndiaPlate || (c.metadata?.jurisdiction !== 'IN' && !c.geographic_coverage?.includes('India')))
-                  .map((cam) => (
-                    <option key={cam.source_id} value={cam.source_id}>
-                      [{cam.metadata?.jurisdiction || 'EXT'}] {cam.name} ({cam.operator})
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
-          </div>
+              </select>
+            </div>
 
-          <button
-            onClick={handleRunANPR}
-            disabled={isProcessing}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-          >
-            {isProcessing ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                Decoding & Running OCR...
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5 fill-current" />
-                Run ANPR Scan
-              </>
+            <button
+              onClick={handleRunANPR}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+            >
+              {isProcessing ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Decoding & Running OCR...
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  Run ANPR Scan
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* MODE B: Shodan Live Surveillance Radar */}
+        {activeCameraMode === 'shodan' && (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50">
+              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Target Jurisdiction / City:
+                </span>
+                <input
+                  type="text"
+                  value={shodanCity}
+                  onChange={(e) => setShodanCity(e.target.value)}
+                  placeholder={isIndiaPlate ? "e.g. Chennai, Salem, Delhi" : "e.g. London, New York"}
+                  className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 flex-1 max-w-xs focus:ring-2 focus:ring-purple-500 font-mono"
+                  onKeyDown={(e) => e.key === 'Enter' && handleDiscoverShodan()}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDiscoverShodan}
+                disabled={shodanLoading}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                {shodanLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Querying Shodan API...
+                  </>
+                ) : (
+                  <>
+                    <Radio className="w-3.5 h-3.5" />
+                    Discover Live Cameras
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Shodan Unconfigured State */}
+            {!shodanConfigured && (
+              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                  <Key className="w-4 h-4" />
+                  <span>SHODAN_API_KEY Required in backend/.env</span>
+                </div>
+                <p>
+                  To stream live traffic cameras, CCTV video feeds, and RTSP streams directly from Shodan, add your Shodan API key to your backend environment configuration:
+                </p>
+                <div className="p-2 rounded bg-black/80 font-mono text-emerald-400 text-[11px] select-all">
+                  SHODAN_API_KEY=your_shodan_api_key_here
+                </div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                  Get a free or developer API key at{' '}
+                  <a
+                    href="https://account.shodan.io"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 dark:text-blue-400 underline font-semibold"
+                  >
+                    https://account.shodan.io
+                  </a>
+                  . Once configured, Sential dynamically discovers RTSP ports and streams real camera feeds.
+                </div>
+              </div>
             )}
-          </button>
-        </div>
+
+            {/* Discovered Cameras Cards */}
+            {shodanConfigured && shodanCameras.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                {shodanCameras.map((cam, idx) => {
+                  const isThisStreaming = streamingCameraIp === cam.ip;
+                  return (
+                    <div
+                      key={`${cam.ip}-${cam.port}-${idx}`}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-3 space-y-2 shadow-2xs hover:border-purple-400 transition-colors"
+                    >
+                      {cam.screenshot_url ? (
+                        <div className="aspect-video rounded-lg overflow-hidden bg-black relative">
+                          <img
+                            src={cam.screenshot_url}
+                            alt={cam.product || "Camera feed"}
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-black/70 text-white px-1.5 py-0.5 rounded">
+                            {cam.feed_type}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-lg bg-slate-900 flex flex-col items-center justify-center text-slate-500 gap-1">
+                          <Tv className="w-6 h-6 text-purple-400/60" />
+                          <span className="text-[10px] font-mono">{cam.feed_type} Stream</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                            {cam.product || 'Surveillance Feed'}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                            Port {cam.port}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono truncate">
+                          {cam.city ? `${cam.city}, ` : ''}{cam.country || 'Global IP'} • {cam.ip}
+                        </div>
+                        {cam.org && (
+                          <div className="text-[10px] text-slate-400 truncate">
+                            ISP: {cam.org}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStreamANPR(cam)}
+                        disabled={isProcessing}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-2xs"
+                      >
+                        {isThisStreaming ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            Ingesting & Running OCR...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3 h-3 fill-current" />
+                            Stream & Run ANPR
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {shodanConfigured && !shodanLoading && shodanCameras.length === 0 && (
+              <div className="p-5 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-xs">
+                {shodanMessage || 'Click "Discover Live Cameras" to scan for exposed traffic & CCTV camera feeds in this region.'}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Cross-Jurisdiction Geographic Anomaly Banner */}
         {isCrossJurisdictionAnomaly && (

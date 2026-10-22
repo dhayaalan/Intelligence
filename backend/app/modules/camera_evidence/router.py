@@ -7,9 +7,11 @@ bounded ANPR processing, and human-in-the-loop candidate review workflows.
 import os
 import shutil
 import tempfile
+import uuid
 from typing import List, Optional
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -44,6 +46,40 @@ class ProcessANPRRequest(BaseModel):
 class GenerateTestClipRequest(BaseModel):
     target_plate: str = "TN34MA8562"
     source_id: Optional[str] = "cam_tfl_jamcams"
+
+
+class ShodanCameraRecord(BaseModel):
+    ip: str
+    port: int
+    product: Optional[str] = "IP Camera / Video Feed"
+    org: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    stream_url: str
+    feed_type: str = "RTSP"
+    screenshot_url: Optional[str] = None
+    asn: Optional[str] = None
+    last_seen: Optional[str] = None
+
+
+class ShodanCameraDiscoveryResponse(BaseModel):
+    configured: bool
+    api_key_status: str
+    total_found: int = 0
+    query_used: str = ""
+    message: Optional[str] = None
+    cameras: List[ShodanCameraRecord] = []
+
+
+class StreamANPRRequest(BaseModel):
+    stream_url: str
+    target_plate: str
+    source_name: Optional[str] = "Live Stream Camera"
+    investigation_id: Optional[str] = None
+    case_id: Optional[str] = None
+    max_frames: int = 30
 
 
 @router.get("/catalog", response_model=List[CameraSourceRecord])
@@ -345,3 +381,197 @@ async def generate_test_clip(
         "filename": filename,
         "target_plate": payload.target_plate
     }
+
+
+@router.get("/shodan/discover", response_model=ShodanCameraDiscoveryResponse)
+async def discover_shodan_cameras(
+    query: Optional[str] = Query(None, description="Custom Shodan search query"),
+    jurisdiction: Optional[str] = Query(None, description="Jurisdiction code (e.g. IN, UK, US)"),
+    city: Optional[str] = Query(None, description="City filter"),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Discovers live traffic, CCTV, and surveillance camera feeds indexed by Shodan.
+    Honors zero-fabrication rules: requires a valid SHODAN_API_KEY.
+    """
+    api_key = os.getenv("SHODAN_API_KEY")
+    if not api_key:
+        return ShodanCameraDiscoveryResponse(
+            configured=False,
+            api_key_status="CONFIG_REQUIRED",
+            message="SHODAN_API_KEY is not configured in backend/.env. Add your Shodan API key to enable live camera discovery.",
+            cameras=[]
+        )
+
+    # Build smart query for traffic/cctv/rtsp surveillance feeds
+    parts = []
+    if query:
+        parts.append(query)
+    else:
+        parts.append("port:554")
+        if jurisdiction:
+            parts.append(f"country:{jurisdiction.upper()}")
+        if city:
+            parts.append(f'city:"{city}"')
+        parts.append("has_screenshot:true")
+
+    final_query = " ".join(parts)
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.shodan.io/shodan/host/search",
+                params={"key": api_key, "query": final_query}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                matches = data.get("matches", [])
+                cameras = []
+                for m in matches:
+                    ip = m.get("ip_str", "")
+                    port = m.get("port", 554)
+                    loc = m.get("location", {})
+                    product = m.get("product") or m.get("devicetype") or "IP Surveillance Camera"
+                    stream_url = f"rtsp://{ip}:{port}/" if port == 554 else f"http://{ip}:{port}/"
+                    screenshot_b64 = None
+                    opts = m.get("opts", {})
+                    if "screenshot" in opts:
+                        screenshot_b64 = f"data:image/jpeg;base64,{opts['screenshot']}"
+
+                    cameras.append(ShodanCameraRecord(
+                        ip=ip,
+                        port=port,
+                        product=product,
+                        org=m.get("org"),
+                        city=loc.get("city"),
+                        country=loc.get("country_name"),
+                        latitude=loc.get("latitude"),
+                        longitude=loc.get("longitude"),
+                        stream_url=stream_url,
+                        feed_type="RTSP" if port == 554 else "HTTP_MJPEG",
+                        screenshot_url=screenshot_b64,
+                        asn=m.get("asn"),
+                        last_seen=m.get("timestamp")
+                    ))
+
+                audit_logger.log(
+                    tenant_id=current_user.tenant_id,
+                    user_id=current_user.id,
+                    action="discover_shodan_cameras",
+                    resource_type="SHODAN_CAMERAS_DISCOVERED",
+                    resource_id=final_query,
+                    details={"total_found": len(cameras), "query": final_query}
+                )
+
+                return ShodanCameraDiscoveryResponse(
+                    configured=True,
+                    api_key_status="ACTIVE",
+                    total_found=data.get("total", len(cameras)),
+                    query_used=final_query,
+                    cameras=cameras
+                )
+            else:
+                return ShodanCameraDiscoveryResponse(
+                    configured=True,
+                    api_key_status="API_ERROR",
+                    message=f"Shodan API returned status {resp.status_code}: {resp.text[:200]}",
+                    query_used=final_query,
+                    cameras=[]
+                )
+    except Exception as e:
+        return ShodanCameraDiscoveryResponse(
+            configured=True,
+            api_key_status="CONNECTION_ERROR",
+            message=f"Error connecting to Shodan API: {str(e)}",
+            query_used=final_query,
+            cameras=[]
+        )
+
+
+@router.post("/stream-anpr", response_model=List[ANPRDetectionRecord])
+async def stream_anpr_endpoint(
+    payload: StreamANPRRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Connects to an RTSP or HTTP camera stream URL, captures sample video frames,
+    and runs automated number plate recognition against the target plate.
+    """
+    target_clean = (payload.target_plate or "").strip().upper()
+    if not target_clean or not any(c.isdigit() for c in target_clean):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target plate '{payload.target_plate}' does not conform to recognized vehicle registration syntax."
+        )
+
+    # Validate stream URL syntax
+    url = (payload.stream_url or "").strip()
+    if not (url.startswith("rtsp://") or url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stream URL must begin with rtsp://, http://, or https://"
+        )
+
+    temp_clip_name = f"stream_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:6]}.mp4"
+    temp_clip_path = os.path.join(FOOTAGE_UPLOAD_DIR, temp_clip_name)
+
+    import cv2
+    cap = cv2.VideoCapture(url)
+    if not cap.isOpened():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to connect to live stream at '{url}'. Ensure device is online and port is reachable."
+        )
+
+    frames = []
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+    fps = cap.get(cv2.CAP_PROP_FPS) or 20.0
+
+    count = 0
+    max_frames = min(payload.max_frames, 60)
+    while cap.isOpened() and count < max_frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frames.append(frame)
+        count += 1
+    cap.release()
+
+    if not frames:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Network stream connected, but no frames were delivered before timeout."
+        )
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(temp_clip_path, fourcc, fps, (width, height))
+    for f in frames:
+        out.write(f)
+    out.release()
+
+    camera = CameraSourceRecord(
+        source_id=f"cam_stream_{uuid.uuid4().hex[:6]}",
+        operator=payload.source_name or "Live Network Camera Stream",
+        name=payload.source_name or f"Stream ({url[:30]}...)",
+        source_url=url,
+        geographic_coverage="Live Surveillance Stream",
+        feed_type=CameraFeedType.VIDEO_CLIP,
+        availability=CameraAvailability.AVAILABLE,
+        auth_requirements="Public / Network Stream Access",
+        retention_restrictions="Live volatile feed",
+        is_public_catalog=False
+    )
+
+    detections = anpr_service.process_video_footage(
+        video_path=temp_clip_path,
+        target_plate=payload.target_plate,
+        camera=camera,
+        investigation_id=payload.investigation_id,
+        case_id=payload.case_id,
+        tenant_id=current_user.tenant_id,
+        max_duration_seconds=float(count / max(1.0, fps)),
+        sample_interval_seconds=1.0
+    )
+
+    return detections
