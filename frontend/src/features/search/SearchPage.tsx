@@ -196,6 +196,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     | 'evidence'
   >('overview');
   const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
+  const [newsIntelSubTab, setNewsIntelSubTab] = useState<'findings' | 'articles'>('findings');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaRecord | null>(null);
 
@@ -849,6 +850,15 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     };
   }, [searchResult, keyFindings, investigativeLeads, newsArticles, sourceStats]);
 
+  // Auto-align News & Intelligence sub-tab with available findings or news articles
+  useEffect(() => {
+    if (keyFindings.length > 0 && newsArticles.length === 0) {
+      setNewsIntelSubTab('findings');
+    } else if (newsArticles.length > 0 && keyFindings.length === 0) {
+      setNewsIntelSubTab('articles');
+    }
+  }, [keyFindings.length, newsArticles.length]);
+
   // Pipeline Trace stages (actual execution telemetry only)
   const pipelineStages: PipelineTraceStage[] = useMemo(() => {
     if (searchResult?.pipeline_trace && searchResult.pipeline_trace.length > 0) {
@@ -1498,7 +1508,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'relationships_evidence', label: 'Relationships & Evidence', count: searchResult.relationships.length, icon: Share2 },
                 ].map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+                  const isActive =
+                    activeTab === tab.id ||
+                    (tab.id === 'news_intel' && (activeTab === 'news' || activeTab === 'findings' || activeTab === 'infrastructure'));
                   return (
                     <button
                       key={tab.id}
@@ -2210,8 +2222,49 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             )}
 
             {/* TAB 3: KEY FINDINGS & INFRASTRUCTURE THREATS */}
-            {(activeTab === 'findings' || activeTab === 'infrastructure') && (
+            {(activeTab === 'findings' || activeTab === 'infrastructure' || (activeTab === 'news_intel' && newsIntelSubTab === 'findings')) && (
               <div className="p-5 sm:p-6 space-y-4">
+                {/* Sub-tab Navigation */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/90 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsIntelSubTab('findings');
+                        setActiveTab('news_intel');
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        newsIntelSubTab === 'findings'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Key Intelligence Findings ({keyFindings.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsIntelSubTab('articles');
+                        setActiveTab('news_intel');
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        newsIntelSubTab === 'articles'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <Newspaper className="w-3.5 h-3.5" />
+                      <span>News Wire Articles ({newsArticles.length})</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Defensible Provenance Guaranteed
+                  </span>
+                </div>
+
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <span className="text-xs font-mono text-slate-500 uppercase tracking-wider font-bold">
                     INVESTIGATION FINDINGS DOSSIER ({keyFindings.length} FINDINGS)
@@ -2372,8 +2425,49 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             )}
 
             {/* TAB 5: NEWS & MEDIA ARTICLES */}
-            {(activeTab === 'news_intel' || (activeTab as string) === 'news') && (
+            {((activeTab === 'news_intel' && newsIntelSubTab === 'articles') || (activeTab as string) === 'news') && (
               <div className="p-4 sm:p-5 space-y-4">
+                {/* Sub-tab Navigation */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/90 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsIntelSubTab('findings');
+                        setActiveTab('news_intel');
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        newsIntelSubTab === 'findings'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Key Intelligence Findings ({keyFindings.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsIntelSubTab('articles');
+                        setActiveTab('news_intel');
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                        newsIntelSubTab === 'articles'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      )}
+                    >
+                      <Newspaper className="w-3.5 h-3.5" />
+                      <span>News Wire Articles ({newsArticles.length})</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Multi-Wire Normalized Coverage • DisInfoLab Pipeline
+                  </span>
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
                     GLOBAL INVESTIGATIVE NEWS RESULTS ({newsArticles.length} ARTICLES COLLECTED)
