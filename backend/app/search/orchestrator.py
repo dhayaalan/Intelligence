@@ -285,9 +285,10 @@ class SearchOrchestrator:
         # Complete Relevant-Source Discovery & Capability Matching
         provider_declarations = [
             ("osint", "telecom_intelligence", "National Telecom & Carrier Registry", ["phone"]),
+            ("osint", "reverse_social_recon", "Reverse Social & Identity Correlator", ["phone", "email", "username", "person"]),
             ("osint", "vehicle_registration_recon", "Vehicle Registration & RTO Registry", ["vehicle", "vehicle_plate"]),
             ("osint", "image_osint", "Visual Intelligence & EXIF Engine", ["image", "url"]),
-            ("osint", "username_recon", "Social Username Profiler", ["username", "person"]),
+            ("osint", "username_recon", "Social Username Profiler", ["username", "person", "email"]),
             ("osint", "financial_intel", "Corporate & Financial Intelligence", ["organization", "company", "domain"]),
             ("osint", "wayback_cdx", "Wayback Historical Archive", ["domain", "url", "hostname"]),
             ("osint", "urlscan", "URLScan Web Telemetry", ["domain", "url", "ip"]),
@@ -605,7 +606,9 @@ class SearchOrchestrator:
                         # Reject uncorroborated identity ownership claims without supporting evidence IDs or verified registry
                         r_sources = sr.get("sources", [])
                         r_ev_ids = sr.get("evidence_ids", [])
-                        if r_type_str in ["OWNS", "SUBSCRIBER_OF", "HAS_IDENTIFIER"] and not r_ev_ids and not any("registry" in str(s).lower() or "itu" in str(s).lower() for s in r_sources):
+                        valid_source_tokens = ["registry", "itu", "social", "osint", "profile", "account", "identity", "gravatar", "github", "whatsapp", "telegram", "cross-identifier"]
+                        has_valid_source = any(any(tok in str(s).lower() for tok in valid_source_tokens) for s in r_sources)
+                        if r_type_str in ["OWNS", "SUBSCRIBER_OF", "HAS_IDENTIFIER", "HAS_ACCOUNT", "LINKED_PROFILE"] and not r_ev_ids and not has_valid_source:
                             continue
 
                         try:
@@ -653,14 +656,30 @@ class SearchOrchestrator:
                             metadata=doc.get("metadata", {})
                         ))
                     else:
-                        d_type = EntityType.ORGANIZATION if "jio" in mv.lower() else (EntityType.LOCATION if mv.lower() == "india" else EntityType.KEYWORD)
+                        rel_match = next((r for r in corr_relationships if r.target_entity_value.lower() == mv.lower() or r.source_entity_value.lower() == mv.lower()), None)
+                        rel_meta = rel_match.metadata if rel_match else {}
+                        is_social_handle = mv.startswith("@") or bool(rel_meta.get("platform")) or "social" in str(rel_meta.get("category", "")).lower()
+
+                        if is_social_handle:
+                            d_type = EntityType.USERNAME
+                            ent_meta = {
+                                "platform": rel_meta.get("platform", "Social Media"),
+                                "profile_url": rel_meta.get("profile_url"),
+                                "avatar_url": rel_meta.get("avatar_url"),
+                                "category": "Social Media",
+                                "is_graph_lead": True
+                            }
+                        else:
+                            d_type = EntityType.ORGANIZATION if "jio" in mv.lower() else (EntityType.LOCATION if mv.lower() == "india" else EntityType.KEYWORD)
+                            ent_meta = {"is_graph_lead": True, "verification_status": "UNCORROBORATED_GRAPH_LEAD"}
+
                         corr_entities.append(EntityPayload(
                             id=f"ent_{uuid.uuid4().hex[:8]}",
                             type=d_type,
                             value=mv,
-                            confidence=None,
+                            confidence=float(rel_match.confidence) if (rel_match and rel_match.confidence is not None) else 0.85,
                             sources=["relationship_graph"],
-                            metadata={"is_graph_lead": True, "verification_status": "UNCORROBORATED_GRAPH_LEAD"}
+                            metadata=ent_meta
                         ))
 
                 # Deduplicate entities by value

@@ -33,6 +33,7 @@ from app.modules.osint.providers.sec_edgar import SECEDGARProvider
 from app.modules.osint.providers.censys import CensysSearchProvider
 from app.modules.osint.providers.vehicle_intelligence import vehicle_registration_provider
 from app.modules.osint.providers.telecom_intelligence import telecom_intelligence_provider
+from app.modules.osint.providers.reverse_social_recon import reverse_social_recon_provider
 from app.core.provider_registry.registry import provider_registry
 from app.core.provider_registry.schemas import ProviderMetadata
 from app.module_sdk.provider_adapter import ProviderRequest
@@ -56,6 +57,7 @@ class OsintModule(IntelligenceModule):
         # 1. Primary Deep OSINT Providers
         primary_providers = [
             ("telecom_intelligence", telecom_intelligence_provider, "TELECOM_INTEL", ["carrier_lookup", "telecom_allocation", "jurisdiction_attribution"], ["phone"]),
+            ("reverse_social_recon", reverse_social_recon_provider, "SOCIAL_IDENTITY", ["reverse_email_social_lookup", "reverse_phone_social_lookup", "cross_identifier_correlation"], ["email", "phone", "username", "person"]),
             ("vehicle_registration_recon", vehicle_registration_provider, "VEHICLE_INTEL", ["plate_lookup", "jurisdiction_validation"], ["vehicle", "vehicle_plate"]),
             ("spiderfoot", SpiderFootProvider(), "AUTOMATION", ["domain", "ip", "subdomain"], ["domain", "ip"]),
             ("shodan", ShodanProvider(), "NETWORK_INTEL", ["ip", "domain", "ports", "cve"], ["ip", "domain"]),
