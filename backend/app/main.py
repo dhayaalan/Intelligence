@@ -13,6 +13,7 @@ from app.modules.example_intelligence.module import example_module
 from app.modules.news_intelligence.module import news_intelligence_module
 from app.modules.social_media_intelligence.module import social_media_intelligence_module
 from app.modules.geo_intelligence.module import geo_intelligence_module
+from app.modules.media_intelligence.module import media_intelligence_module
 
 
 app = FastAPI(
@@ -49,6 +50,7 @@ async def startup_event():
     module_registry.register(news_intelligence_module, default_enabled=True)
     module_registry.register(social_media_intelligence_module, default_enabled=True)
     module_registry.register(geo_intelligence_module, default_enabled=True)
+    module_registry.register(media_intelligence_module, default_enabled=True)
     # Test and demonstration plugins are registered disabled by default
     # to prevent synthetic or mocked data contamination in production searches
     module_registry.register(example_module, default_enabled=False)

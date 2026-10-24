@@ -26,6 +26,7 @@ class DataStore:
         self.ti_malware: Dict[str, Dict[str, Any]] = {}
         self.ti_campaigns: Dict[str, Dict[str, Any]] = {}
         self.ti_vulnerabilities: Dict[str, Dict[str, Any]] = {}
+        self.investigation_media_analyses: Dict[str, Dict[str, Any]] = {}
 
     def clear(self):
         with self._lock:

@@ -44,6 +44,7 @@ import {
   Video,
   Film,
   Image as ImageIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { Investigation, Entity, Evidence, MediaRecord } from '../../types';
 import { apiRequest } from '../../core/api/client';
@@ -60,6 +61,7 @@ import { ImagesTab } from '../search/components/ImagesTab';
 import { VideosTab } from '../search/components/VideosTab';
 import { MediaViewerModal } from '../search/components/MediaViewerModal';
 import { VehicleCameraIntelligence } from './components/VehicleCameraIntelligence';
+import { MediaForensicsPanel } from './components/MediaForensicsPanel';
 import { SocialResultsView, SocialResultItem } from '../social_intelligence/components/SocialResultsView';
 
 export type TargetType = 'DOMAIN' | 'IP' | 'EMAIL' | 'USERNAME' | 'PHONE' | 'HASH' | 'CRYPTO' | 'URL' | 'PERSON' | 'ORGANIZATION';
@@ -131,7 +133,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
 
   // Media state
   const [selectedMedia, setSelectedMedia] = useState<MediaRecord | null>(null);
-  const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
+  const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos' | 'forensics'>('images');
   const [mediaList, setMediaList] = useState<MediaRecord[]>([]);
 
   const imageRecords = useMemo(() => mediaList.filter((m) => m.media_type === 'image'), [mediaList]);
@@ -1930,6 +1932,22 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
               <button
                 type="button"
                 onClick={() => {
+                  setActiveTab('media');
+                  setMediaSubTab('forensics');
+                }}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                  activeTab === 'media' && mediaSubTab === 'forensics'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                )}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Forensics & Provenance</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setActiveTab('images');
                   setMediaSubTab('images');
                 }}
@@ -1962,7 +1980,13 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-5">
-            {activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos') ? (
+            {activeTab === 'media' && mediaSubTab === 'forensics' ? (
+              <MediaForensicsPanel
+                investigationId={investigationId}
+                onAnalysisLinked={() => loadAll()}
+                onNavigateToSearch={onNavigateToSearch}
+              />
+            ) : activeTab === 'videos' || (activeTab === 'media' && mediaSubTab === 'videos') ? (
               <VideosTab
                 videos={videoRecords}
                 query={investigation?.target || ''}

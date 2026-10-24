@@ -21,12 +21,14 @@ from app.api.v1.graph import router as graph_router
 from app.api.v1.geo import router as geo_router
 from app.ml_contracts.router import router as ml_router
 from app.modules.camera_evidence.router import router as camera_evidence_router
+from app.modules.media_intelligence.router import router as media_intelligence_router
 
 api_v1_router = APIRouter()
 
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(geo_router)
 api_v1_router.include_router(camera_evidence_router)
+api_v1_router.include_router(media_intelligence_router)
 api_v1_router.include_router(platform_router)
 api_v1_router.include_router(tools_router)
 api_v1_router.include_router(news_router)
