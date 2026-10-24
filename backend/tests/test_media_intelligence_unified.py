@@ -180,3 +180,99 @@ def test_investigation_media_analysis_lifecycle(analyst_headers):
     assert detail["id"] == analysis_id
     assert detail["primary_hash"] == img_res.sha256
     assert detail["image_result"]["quality"]["width"] == 300
+
+def test_api_media_intelligence_ssrf_protection(analyst_headers):
+    """Verify SSRF defenses block loopback, link-local, private, and metadata targets."""
+    # 1. Loopback attempt
+    res_loopback = client.post(
+        "/api/v1/media-intelligence/analyze/url",
+        json={"url": "http://127.0.0.1:8000/api/v1/health", "media_type": "image"},
+        headers=analyst_headers
+    )
+    assert res_loopback.status_code == 400
+    assert "SSRF" in res_loopback.text or "loopback" in res_loopback.text or "prohibited" in res_loopback.text
+
+    # 2. Localhost attempt
+    res_localhost = client.post(
+        "/api/v1/media-intelligence/analyze/url",
+        json={"url": "http://localhost:27017", "media_type": "image"},
+        headers=analyst_headers
+    )
+    assert res_localhost.status_code == 400
+
+    # 3. Cloud metadata attempt
+    res_metadata = client.post(
+        "/api/v1/media-intelligence/analyze/url",
+        json={"url": "http://169.254.169.254/latest/meta-data/", "media_type": "image"},
+        headers=analyst_headers
+    )
+    assert res_metadata.status_code == 400
+    assert "SSRF" in res_metadata.text or "cloud metadata" in res_metadata.text or "link-local" in res_metadata.text
+
+    # 4. Invalid scheme attempt
+    res_scheme = client.post(
+        "/api/v1/media-intelligence/analyze/url",
+        json={"url": "file:///etc/passwd", "media_type": "image"},
+        headers=analyst_headers
+    )
+    assert res_scheme.status_code == 400
+
+def test_api_media_intelligence_batch_images(analyst_headers):
+    """Verify POST /api/v1/media-intelligence/analyze/batch-images processes multiple files."""
+    img1 = create_sample_image("BATCH ITEM 1", "blue")
+    img2 = create_sample_image("BATCH ITEM 2", "green")
+    
+    files = [
+        ("files", ("item1.jpg", img1, "image/jpeg")),
+        ("files", ("item2.jpg", img2, "image/jpeg"))
+    ]
+    res = client.post(
+        "/api/v1/media-intelligence/analyze/batch-images",
+        files=files,
+        headers=analyst_headers
+    )
+    assert res.status_code == 200, res.text
+    items = res.json()
+    assert len(items) == 2
+    assert items[0]["sha256"] != items[1]["sha256"]
+    assert "analysis_id" in items[0]
+    assert "analysis_id" in items[1]
+
+def test_api_media_intelligence_tenant_analyses_listing(analyst_headers):
+    """Verify GET /api/v1/media-intelligence/analyses returns historical tenant analyses."""
+    res = client.get(
+        "/api/v1/media-intelligence/analyses?limit=10",
+        headers=analyst_headers
+    )
+    assert res.status_code == 200
+    records = res.json()
+    assert isinstance(records, list)
+    assert len(records) >= 1
+
+def test_api_media_intelligence_save_evidence(analyst_headers):
+    """Verify POST /api/v1/media-intelligence/save-evidence seals analysis into Evidence Vault."""
+    img = create_sample_image("VAULT SEAL EVIDENCE", "purple")
+    analysis = media_intelligence_service.analyze_image(img, filename="seal_target.jpg")
+
+    res = client.post(
+        "/api/v1/media-intelligence/save-evidence",
+        json={
+            "analysis_id": f"man_{uuid.uuid4().hex[:8]}",
+            "media_type": "image",
+            "filename": "seal_target.jpg",
+            "primary_hash": analysis.sha256,
+            "notes": "Cryptographically verified forensic asset sealed into vault.",
+            "forensics_summary": {
+                "dhash": analysis.dhash,
+                "phash": analysis.phash,
+                "megapixels": analysis.quality.megapixels
+            }
+        },
+        headers=analyst_headers
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["status"] == "sealed"
+    assert "evidence_id" in data
+    assert data["hash"] == analysis.sha256
+

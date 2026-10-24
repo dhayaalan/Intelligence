@@ -12,7 +12,10 @@ from app.tenancy.context import get_current_user
 from app.audit.logger import audit_logger
 from app.infrastructure.mongodb.client import mongo_manager
 from app.investigations.service import investigation_service
+from app.evidence.service import evidence_service
+from app.module_sdk.models import EvidencePayload
 from app.modules.media_intelligence.service import media_intelligence_service
+from app.modules.media_intelligence.ssrf import safe_fetch_media_url, SSRFSecurityError
 from app.modules.media_intelligence.models import (
     ImageForensicsResult, VideoForensicsResult, AudioForensicsResult,
     MediaComparisonRequest, MediaComparisonResponse, MediaAnalysisJobRecord
@@ -36,6 +39,60 @@ class LinkAnalysisRequest(BaseModel):
     video_result: Optional[VideoForensicsResult] = None
     audio_result: Optional[AudioForensicsResult] = None
 
+class SaveEvidenceFromAnalysisRequest(BaseModel):
+    analysis_id: str
+    media_type: str
+    filename: str
+    primary_hash: str
+    investigation_id: Optional[str] = None
+    notes: Optional[str] = None
+    forensics_summary: Optional[Dict[str, Any]] = None
+
+async def _persist_analysis_record(
+    tenant_id: str,
+    user_id: str,
+    user_name: str,
+    media_type: str,
+    filename: str,
+    primary_hash: str,
+    investigation_id: Optional[str] = None,
+    media_url: Optional[str] = None,
+    image_result: Optional[dict] = None,
+    video_result: Optional[dict] = None,
+    audio_result: Optional[dict] = None,
+) -> str:
+    """Helper to persist a verified media analysis in MongoDB and in-memory cache."""
+    from app.core.database import db
+    analysis_id = f"man_{uuid.uuid4().hex[:10]}"
+    doc = {
+        "id": analysis_id,
+        "tenant_id": tenant_id,
+        "investigation_id": investigation_id,
+        "user_id": user_id,
+        "user_name": user_name,
+        "media_type": media_type,
+        "filename": filename,
+        "media_url": media_url,
+        "primary_hash": primary_hash,
+        "image_result": image_result,
+        "video_result": video_result,
+        "audio_result": audio_result,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    with db._lock:
+        db.investigation_media_analyses[analysis_id] = doc
+
+    if mongo_manager.db is not None:
+        try:
+            await mongo_manager.db["investigation_media_analyses"].update_one(
+                {"id": analysis_id, "tenant_id": tenant_id},
+                {"$set": doc},
+                upsert=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist media analysis to MongoDB: {e}")
+    return analysis_id
+
 @router.get("/health")
 async def media_health():
     """Returns module preflight diagnostic status."""
@@ -43,11 +100,39 @@ async def media_health():
     health = await media_intelligence_module.health_check()
     return health.dict()
 
+@router.get("/analyses")
+async def list_media_analyses(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """Retrieves recent forensic media analyses for the current tenant."""
+    from app.core.database import db
+    if mongo_manager.db is not None:
+        try:
+            cursor = mongo_manager.db["investigation_media_analyses"].find(
+                {"tenant_id": current_user.tenant_id},
+                {"_id": 0}
+            ).sort("created_at", -1).limit(limit)
+            docs = await cursor.to_list(length=limit)
+            if docs:
+                return docs
+        except Exception as e:
+            logger.warning(f"Failed to query MongoDB for media analyses: {e}")
+
+    with db._lock:
+        records = [
+            doc for doc in db.investigation_media_analyses.values()
+            if doc.get("tenant_id") == current_user.tenant_id
+        ]
+        records.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return records[:limit]
+
 @router.post("/analyze/image", response_model=ImageForensicsResult)
 async def analyze_image_endpoint(
     file: Optional[UploadFile] = File(None),
     image_base64: Optional[str] = Form(None),
     filename: Optional[str] = Form("upload.jpg"),
+    investigation_id: Optional[str] = Form(None),
     current_user: UserRecord = Depends(get_current_user)
 ):
     """
@@ -62,7 +147,6 @@ async def analyze_image_endpoint(
         image_bytes = await file.read()
     elif image_base64:
         try:
-            # Strip data URL prefix if present
             clean_b64 = image_base64.split(",")[-1] if "," in image_base64 else image_base64
             image_bytes = base64.b64decode(clean_b64)
         except Exception:
@@ -76,6 +160,18 @@ async def analyze_image_endpoint(
 
     result = media_intelligence_service.analyze_image(image_bytes, filename=fn)
     
+    # Auto-persist analysis record for persistence across refreshes
+    await _persist_analysis_record(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        media_type="image",
+        filename=fn,
+        primary_hash=result.sha256,
+        investigation_id=investigation_id,
+        image_result=result.dict()
+    )
+
     audit_logger.log(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
@@ -86,11 +182,50 @@ async def analyze_image_endpoint(
     )
     return result
 
+@router.post("/analyze/batch-images")
+async def analyze_batch_images_endpoint(
+    files: List[UploadFile] = File(...),
+    investigation_id: Optional[str] = Form(None),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Processes multiple image files concurrently under memory-safe bounds.
+    Returns array of extracted forensic results.
+    """
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files uploaded for batch analysis")
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Batch limit is 10 images per request")
+
+    results = []
+    for file in files:
+        data = await file.read()
+        if len(data) == 0 or len(data) > media_intelligence_service.max_upload_size:
+            continue
+        fn = file.filename or "image.jpg"
+        res = media_intelligence_service.analyze_image(data, filename=fn)
+        res_dict = res.dict()
+        aid = await _persist_analysis_record(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            media_type="image",
+            filename=fn,
+            primary_hash=res.sha256,
+            investigation_id=investigation_id,
+            image_result=res_dict
+        )
+        res_dict["analysis_id"] = aid
+        results.append(res_dict)
+
+    return results
+
 @router.post("/analyze/video", response_model=VideoForensicsResult)
 async def analyze_video_endpoint(
     file: Optional[UploadFile] = File(None),
     video_base64: Optional[str] = Form(None),
     filename: Optional[str] = Form("video.mp4"),
+    investigation_id: Optional[str] = Form(None),
     current_user: UserRecord = Depends(get_current_user)
 ):
     """
@@ -117,6 +252,17 @@ async def analyze_video_endpoint(
 
     result = media_intelligence_service.analyze_video(video_bytes, filename=fn)
 
+    await _persist_analysis_record(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        media_type="video",
+        filename=fn,
+        primary_hash=result.sha256,
+        investigation_id=investigation_id,
+        video_result=result.dict()
+    )
+
     audit_logger.log(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
@@ -132,6 +278,7 @@ async def analyze_audio_endpoint(
     file: Optional[UploadFile] = File(None),
     audio_base64: Optional[str] = Form(None),
     filename: Optional[str] = Form("audio.wav"),
+    investigation_id: Optional[str] = Form(None),
     current_user: UserRecord = Depends(get_current_user)
 ):
     """
@@ -154,6 +301,18 @@ async def analyze_audio_endpoint(
         raise HTTPException(status_code=400, detail="No valid audio payload provided")
 
     result = media_intelligence_service.analyze_audio(audio_bytes, filename=fn)
+
+    await _persist_analysis_record(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        media_type="audio",
+        filename=fn,
+        primary_hash=result.sha256,
+        investigation_id=investigation_id,
+        audio_result=result.dict()
+    )
+
     return result
 
 @router.post("/analyze/url")
@@ -163,54 +322,171 @@ async def analyze_url_endpoint(
 ):
     """
     Downloads media from an investigator-provided URL and performs forensic extraction.
+    Enforces strict Server-Side Request Forgery (SSRF) boundary protections:
+    rejects loopback, private RFC1918, link-local, cloud metadata, and restricted ports.
     """
     url = req.url.strip()
-    if not url.startswith("http://") and not url.startswith("https://"):
-        raise HTTPException(status_code=400, detail="Invalid media URL: must begin with http:// or https://")
-
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                headers={"User-Agent": "Sential-Intelligence-Forensics/2.0 (+https://sential.io/security)"}
-            )
-            if resp.status_code != 200:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch media from URL (HTTP {resp.status_code})")
-            
-            content_type = resp.headers.get("content-type", "").lower()
-            raw_bytes = resp.content
-
-            if len(raw_bytes) == 0:
-                raise HTTPException(status_code=400, detail="Retrieved empty file from media URL")
-
-            if len(raw_bytes) > media_intelligence_service.max_upload_size:
-                raise HTTPException(status_code=413, detail="Remote media exceeds maximum upload limit")
-
-            # Determine type
-            determined_type = req.media_type
-            filename = url.split("?")[0].split("/")[-1] or "media_evidence"
-            
-            if "video" in content_type:
-                determined_type = "video"
-            elif "audio" in content_type:
-                determined_type = "audio"
-            elif "image" in content_type:
-                determined_type = "image"
-
-            if determined_type == "video":
-                analysis = media_intelligence_service.analyze_video(raw_bytes, filename=filename)
-                return {"media_type": "video", "result": analysis.dict()}
-            elif determined_type == "audio":
-                analysis = media_intelligence_service.analyze_audio(raw_bytes, filename=filename)
-                return {"media_type": "audio", "result": analysis.dict()}
-            else:
-                analysis = media_intelligence_service.analyze_image(raw_bytes, filename=filename)
-                return {"media_type": "image", "result": analysis.dict()}
-    except HTTPException:
-        raise
+        raw_bytes, content_type, filename = await safe_fetch_media_url(
+            url,
+            max_size_bytes=media_intelligence_service.max_upload_size
+        )
+    except SSRFSecurityError as ssrf_err:
+        logger.warning(f"SSRF violation blocked for URL '{url}': {ssrf_err}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Security Policy Rejection (SSRF): {str(ssrf_err)}"
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as e:
-        logger.error(f"Failed to fetch and analyze media URL: {e}", exc_info=True)
+        logger.error(f"Failed to fetch media from URL: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Forensic acquisition failed for URL: {str(e)}")
+
+    determined_type = req.media_type
+    if "video" in content_type:
+        determined_type = "video"
+    elif "audio" in content_type:
+        determined_type = "audio"
+    elif "image" in content_type:
+        determined_type = "image"
+
+    if determined_type == "video":
+        analysis = media_intelligence_service.analyze_video(raw_bytes, filename=filename)
+        res_dict = analysis.dict()
+        analysis_id = await _persist_analysis_record(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            media_type="video",
+            filename=filename,
+            primary_hash=analysis.sha256,
+            investigation_id=req.investigation_id,
+            media_url=url,
+            video_result=res_dict
+        )
+        return {"media_type": "video", "analysis_id": analysis_id, "result": res_dict}
+    elif determined_type == "audio":
+        analysis = media_intelligence_service.analyze_audio(raw_bytes, filename=filename)
+        res_dict = analysis.dict()
+        analysis_id = await _persist_analysis_record(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            media_type="audio",
+            filename=filename,
+            primary_hash=analysis.sha256,
+            investigation_id=req.investigation_id,
+            media_url=url,
+            audio_result=res_dict
+        )
+        return {"media_type": "audio", "analysis_id": analysis_id, "result": res_dict}
+    else:
+        analysis = media_intelligence_service.analyze_image(raw_bytes, filename=filename)
+        res_dict = analysis.dict()
+        analysis_id = await _persist_analysis_record(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            media_type="image",
+            filename=filename,
+            primary_hash=analysis.sha256,
+            investigation_id=req.investigation_id,
+            media_url=url,
+            image_result=res_dict
+        )
+        return {"media_type": "image", "analysis_id": analysis_id, "result": res_dict}
+
+@router.post("/analyze/evidence-asset/{evidence_id}")
+async def analyze_evidence_asset_endpoint(
+    evidence_id: str,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Ingests an existing artifact from the Evidence Vault and executes forensic analysis.
+    Preserves chain-of-custody link back to the originating evidence record.
+    """
+    ev = evidence_service.get_evidence(current_user.tenant_id, evidence_id)
+    if not ev:
+        raise HTTPException(status_code=404, detail="Evidence artifact not found in tenant vault")
+
+    raw_data = ev.raw_data or {}
+    b64_data = raw_data.get("image_base64") or raw_data.get("media_base64")
+    url_data = raw_data.get("url") or raw_data.get("media_url") or ev.reference
+
+    if b64_data:
+        try:
+            clean_b64 = b64_data.split(",")[-1] if "," in b64_data else b64_data
+            data_bytes = base64.b64decode(clean_b64)
+            res = media_intelligence_service.analyze_image(data_bytes, filename=f"evidence_{evidence_id}.jpg")
+            aid = await _persist_analysis_record(
+                tenant_id=current_user.tenant_id,
+                user_id=current_user.id,
+                user_name=current_user.name,
+                media_type="image",
+                filename=f"evidence_{evidence_id}.jpg",
+                primary_hash=res.sha256,
+                investigation_id=ev.investigation_id,
+                image_result=res.dict()
+            )
+            return {"status": "analyzed", "analysis_id": aid, "media_type": "image", "result": res.dict()}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to process evidence base64 data: {e}")
+    elif url_data and (url_data.startswith("http://") or url_data.startswith("https://")):
+        raw_bytes, content_type, filename = await safe_fetch_media_url(url_data)
+        res = media_intelligence_service.analyze_image(raw_bytes, filename=filename)
+        aid = await _persist_analysis_record(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            media_type="image",
+            filename=filename,
+            primary_hash=res.sha256,
+            investigation_id=ev.investigation_id,
+            media_url=url_data,
+            image_result=res.dict()
+        )
+        return {"status": "analyzed", "analysis_id": aid, "media_type": "image", "result": res.dict()}
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Evidence record does not contain an analyzable image payload or accessible media URL"
+        )
+
+@router.post("/save-evidence")
+async def save_media_to_evidence_vault(
+    req: SaveEvidenceFromAnalysisRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Seals a completed forensic media analysis directly into the immutable Evidence Vault.
+    Generates a cryptographic evidence record with tamper-evident SHA-256 hash.
+    """
+    ev_payload = EvidencePayload(
+        id=f"ev_media_{uuid.uuid4().hex[:10]}",
+        module="media_intelligence",
+        provider="forensic_media_engine",
+        source="media_forensics",
+        collection_method="FORENSIC_INGESTION",
+        reference=f"Media Asset: {req.filename} ({req.media_type})",
+        confidence=1.0,
+        hash=req.primary_hash,
+        raw_data={
+            "analysis_id": req.analysis_id,
+            "filename": req.filename,
+            "media_type": req.media_type,
+            "primary_hash": req.primary_hash,
+            "forensics_summary": req.forensics_summary,
+            "notes": req.notes,
+            "saved_by": current_user.name
+        }
+    )
+    saved_record = evidence_service.store_evidence(
+        tenant_id=current_user.tenant_id,
+        payload=ev_payload,
+        investigation_id=req.investigation_id
+    )
+    return {"status": "sealed", "evidence_id": saved_record.id, "hash": req.primary_hash}
 
 @router.post("/compare-hash", response_model=MediaComparisonResponse)
 async def compare_hashes_endpoint(
@@ -241,7 +517,6 @@ async def link_media_analysis_to_investigation(
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found in this tenant")
 
-    analysis_id = f"man_{uuid.uuid4().hex[:10]}"
     primary_hash = "unknown"
     if req.image_result:
         primary_hash = req.image_result.sha256
@@ -250,40 +525,21 @@ async def link_media_analysis_to_investigation(
     elif req.audio_result:
         primary_hash = req.audio_result.sha256
 
-    analysis_doc = {
-        "id": analysis_id,
-        "tenant_id": current_user.tenant_id,
-        "investigation_id": investigation_id,
-        "user_id": current_user.id,
-        "user_name": current_user.name,
-        "media_type": req.media_type,
-        "filename": req.filename,
-        "media_url": req.media_url,
-        "primary_hash": primary_hash,
-        "image_result": req.image_result.dict() if req.image_result else None,
-        "video_result": req.video_result.dict() if req.video_result else None,
-        "audio_result": req.audio_result.dict() if req.audio_result else None,
-        "created_at": datetime.utcnow().isoformat()
-    }
+    analysis_id = await _persist_analysis_record(
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_name=current_user.name,
+        media_type=req.media_type,
+        filename=req.filename,
+        primary_hash=primary_hash,
+        investigation_id=investigation_id,
+        media_url=req.media_url,
+        image_result=req.image_result.dict() if req.image_result else None,
+        video_result=req.video_result.dict() if req.video_result else None,
+        audio_result=req.audio_result.dict() if req.audio_result else None
+    )
 
-    from app.core.database import db
-
-    # Store in-memory
-    with db._lock:
-        db.investigation_media_analyses[analysis_id] = analysis_doc
-
-    # Store in MongoDB if available
-    if mongo_manager.db is not None:
-        try:
-            await mongo_manager.db["investigation_media_analyses"].update_one(
-                {"id": analysis_id, "tenant_id": current_user.tenant_id},
-                {"$set": analysis_doc},
-                upsert=True
-            )
-        except Exception as e:
-            logger.warning(f"Failed to persist media analysis to MongoDB: {e}")
-
-    # Also link to investigation's media array for instant gallery view
+    # Link to investigation's media array for instant gallery view
     media_item = {
         "id": analysis_id,
         "media_type": req.media_type,
@@ -360,4 +616,3 @@ async def get_investigation_media_analysis(
             return doc
 
     raise HTTPException(status_code=404, detail="Media analysis record not found")
-    return doc

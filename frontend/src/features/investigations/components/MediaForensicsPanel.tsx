@@ -147,17 +147,30 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
   const [analyzing, setAnalyzing] = useState(false);
   const [linking, setLinking] = useState(false);
   const [linkedSuccess, setLinkedSuccess] = useState(false);
+  const [vaultSealedSuccess, setVaultSealedSuccess] = useState(false);
+  const [sealingToVault, setSealingToVault] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+
+  // Collection mode & provenance tracking
+  const [collectionMode, setCollectionMode] = useState<'ON_DEMAND' | 'HISTORICAL' | 'SHOWCASE'>('SHOWCASE');
 
   // Analysis Results
   const [imageResult, setImageResult] = useState<ImageAnalysisResult | null>(null);
   const [videoResult, setVideoResult] = useState<VideoAnalysisResult | null>(null);
   const [audioResult, setAudioResult] = useState<AudioAnalysisResult | null>(null);
+  const [activeAnalysisId, setActiveAnalysisId] = useState<string | null>(null);
 
   // Attached Analyses history
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Batch Image & Vault Asset state
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchResults, setBatchResults] = useState<any[]>([]);
+  const [analyzingBatch, setAnalyzingBatch] = useState(false);
+  const [evidenceAssetId, setEvidenceAssetId] = useState('');
+  const [analyzingVaultAsset, setAnalyzingVaultAsset] = useState(false);
 
   // Perceptual Comparison state
   const [compareHash1, setCompareHash1] = useState('');
@@ -166,13 +179,19 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
   const [comparing, setComparing] = useState(false);
 
   const fetchHistory = async () => {
-    if (!investigationId) return;
     setLoadingHistory(true);
     try {
-      const res = await apiRequest<any[]>(
-        `/media-intelligence/investigations/${investigationId}/media-analyses`
-      );
-      setHistory(res || []);
+      if (investigationId) {
+        const res = await apiRequest<any[]>(
+          `/media-intelligence/investigations/${investigationId}/media-analyses`
+        );
+        setHistory(res || []);
+      } else {
+        const res = await apiRequest<any[]>(
+          `/media-intelligence/analyses?limit=50`
+        );
+        setHistory(res || []);
+      }
     } catch {
       // Non-blocking history load
     } finally {
@@ -213,8 +232,8 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
     setTimeout(() => setCopiedHash(null), 2000);
   };
 
-  // Intake mode and URL acquisition
-  const [intakeMode, setIntakeMode] = useState<'upload' | 'url'>('upload');
+  // Intake mode: File Upload, Multi-Image Batch, Remote URL (SSRF Protected), Evidence Vault Asset
+  const [intakeMode, setIntakeMode] = useState<'upload' | 'batch' | 'url' | 'vault'>('upload');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [analyzingUrl, setAnalyzingUrl] = useState(false);
   const [activeCaseTitle, setActiveCaseTitle] = useState<string | null>(null);
@@ -227,14 +246,137 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
     setAudioResult(null);
     setError(null);
     setActiveCaseTitle(null);
+    setActiveAnalysisId(null);
     setLinkedSuccess(false);
+    setVaultSealedSuccess(false);
+  };
+
+  const loadHistoricalAnalysis = (item: any) => {
+    setActiveCaseTitle(item.filename || 'Persisted Case Asset');
+    setActiveAnalysisId(item.id);
+    setLinkedSuccess(false);
+    setVaultSealedSuccess(false);
+    setError(null);
+    setSelectedFile(null);
+    setPreviewUrl(item.media_url || null);
+    setCollectionMode('HISTORICAL');
+
+    if (item.media_type === 'video' && item.video_result) {
+      setMediaType('video');
+      setVideoResult(item.video_result);
+      setImageResult(null);
+      setAudioResult(null);
+    } else if (item.media_type === 'audio' && item.audio_result) {
+      setMediaType('audio');
+      setAudioResult(item.audio_result);
+      setImageResult(null);
+      setVideoResult(null);
+    } else if (item.image_result) {
+      setMediaType('image');
+      setImageResult(item.image_result);
+      setVideoResult(null);
+      setAudioResult(null);
+    }
+  };
+
+  const sealToEvidenceVault = async () => {
+    const primaryHash = imageResult?.sha256 || videoResult?.sha256 || audioResult?.sha256;
+    if (!primaryHash) return;
+
+    setSealingToVault(true);
+    try {
+      await apiRequest('/media-intelligence/save-evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysis_id: activeAnalysisId || `man_${Date.now()}`,
+          media_type: mediaType,
+          filename: activeCaseTitle || selectedFile?.name || 'forensic_media_artifact',
+          primary_hash: primaryHash,
+          investigation_id: investigationId || undefined,
+          notes: 'Forensically verified asset sealed into immutable Evidence Vault with tamper-evident cryptographic hash.',
+          forensics_summary: {
+            collection_mode: collectionMode,
+            dhash: imageResult?.dhash,
+            phash: imageResult?.phash,
+            megapixels: imageResult?.quality?.megapixels,
+            exif_present: imageResult?.exif?.present,
+            c2pa_status: imageResult?.c2pa?.status
+          }
+        }),
+      });
+      setVaultSealedSuccess(true);
+      fetchHistory();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to seal into Evidence Vault');
+    } finally {
+      setSealingToVault(false);
+    }
+  };
+
+  const runBatchImageAnalysis = async () => {
+    if (batchFiles.length === 0) return;
+    setAnalyzingBatch(true);
+    setError(null);
+    const formData = new FormData();
+    batchFiles.forEach((file) => {
+      formData.append('files', file);
+    });
+    try {
+      const res = await apiRequest<any[]>('/media-intelligence/analyze/batch-images', {
+        method: 'POST',
+        body: formData,
+      });
+      setBatchResults(res || []);
+      if (res && res.length > 0) {
+        setImageResult(res[0]);
+        setActiveCaseTitle(`Batch Asset: ${batchFiles[0].name}`);
+        setCollectionMode('ON_DEMAND');
+        setMediaType('image');
+        fetchHistory();
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to process batch images');
+    } finally {
+      setAnalyzingBatch(false);
+    }
+  };
+
+  const runVaultAssetAnalysis = async () => {
+    if (!evidenceAssetId.trim()) {
+      setError('Please provide an Evidence Record ID to inspect');
+      return;
+    }
+    setAnalyzingVaultAsset(true);
+    setError(null);
+    try {
+      const res = await apiRequest<any>(`/media-intelligence/analyze/evidence-asset/${evidenceAssetId.trim()}`, {
+        method: 'POST',
+      });
+      if (res.media_type === 'image' && res.result) {
+        setImageResult(res.result);
+        setVideoResult(null);
+        setAudioResult(null);
+        setMediaType('image');
+        setActiveCaseTitle(`Evidence Vault Asset: ${evidenceAssetId}`);
+        setCollectionMode('ON_DEMAND');
+        fetchHistory();
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to analyze evidence vault asset');
+    } finally {
+      setAnalyzingVaultAsset(false);
+    }
   };
 
   const loadShowcaseCase = (caseId: 'traffic' | 'deepfake' | 'drone' | 'audio') => {
     setError(null);
     setLinkedSuccess(false);
+    setVaultSealedSuccess(false);
     setSelectedFile(null);
     setPreviewUrl(null);
+    setCollectionMode('SHOWCASE');
+    setActiveAnalysisId(null);
 
     if (caseId === 'traffic') {
       setMediaType('image');
@@ -415,6 +557,7 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
     setAnalyzingUrl(true);
     setError(null);
     setLinkedSuccess(false);
+    setVaultSealedSuccess(false);
 
     try {
       const res = await apiRequest<any>('/media-intelligence/analyze/url', {
@@ -422,6 +565,10 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
         body: JSON.stringify({ url: remoteUrl.trim(), media_type: mediaType }),
       });
       setActiveCaseTitle(`Remote URL: ${remoteUrl.split('?')[0].split('/').pop() || 'Evidence'}`);
+      setCollectionMode('ON_DEMAND');
+      if (res.analysis_id) {
+        setActiveAnalysisId(res.analysis_id);
+      }
       if (res.media_type === 'video') {
         setVideoResult(res.result);
         setImageResult(null);
@@ -438,6 +585,7 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
         setAudioResult(null);
         setMediaType('image');
       }
+      fetchHistory();
     } catch (err: any) {
       setError(err?.message || 'Failed to acquire and inspect remote media URL');
     } finally {
@@ -453,7 +601,10 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
 
     setAnalyzing(true);
     setError(null);
+    setVaultSealedSuccess(false);
+    setLinkedSuccess(false);
     setActiveCaseTitle(selectedFile.name);
+    setCollectionMode('ON_DEMAND');
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -479,6 +630,7 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
         });
         setAudioResult(res);
       }
+      fetchHistory();
     } catch (err: any) {
       setError(err?.message || 'Forensic analysis encountered an unhandled error.');
     } finally {
@@ -617,35 +769,54 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                 </button>
               </div>
 
-              {/* Intake Mode Switcher: Local File vs Remote URL */}
+              {/* Intake Mode Switcher: Local File, Batch, Remote URL, Vault Asset */}
               <div className="flex items-center justify-between text-xs font-mono pt-1">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">SOURCE:</span>
-                <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIntakeMode('upload')}
                     className={cn(
-                      'px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors',
+                      'px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors text-center',
                       intakeMode === 'upload' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                     )}
                   >
-                    File Upload
+                    Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIntakeMode('batch')}
+                    className={cn(
+                      'px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors text-center',
+                      intakeMode === 'batch' ? 'bg-indigo-900/60 text-indigo-200 border border-indigo-700/60' : 'text-slate-400 hover:text-white'
+                    )}
+                  >
+                    Batch
                   </button>
                   <button
                     type="button"
                     onClick={() => setIntakeMode('url')}
                     className={cn(
-                      'px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1',
+                      'px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors text-center',
                       intakeMode === 'url' ? 'bg-cyan-900/60 text-cyan-200 border border-cyan-700/60' : 'text-slate-400 hover:text-white'
                     )}
                   >
-                    <LinkIcon className="w-3 h-3" />
-                    <span>Remote URL</span>
+                    URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIntakeMode('vault')}
+                    className={cn(
+                      'px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors text-center',
+                      intakeMode === 'vault' ? 'bg-purple-900/60 text-purple-200 border border-purple-700/60' : 'text-slate-400 hover:text-white'
+                    )}
+                  >
+                    Vault
                   </button>
                 </div>
               </div>
 
-              {intakeMode === 'upload' ? (
+              {intakeMode === 'upload' && (
                 <>
                   {/* Upload Dropzone */}
                   <label className="border-2 border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors block text-center">
@@ -693,10 +864,65 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                     </Button>
                   </div>
                 </>
-              ) : (
+              )}
+
+              {intakeMode === 'batch' && (
+                <div className="space-y-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60 font-mono text-xs">
+                  <span className="font-bold text-slate-300 block flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    Multi-Image Batch Ingestion (Max 10):
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setBatchFiles(Array.from(e.target.files).slice(0, 10));
+                      }
+                    }}
+                    className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-mono file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
+                  />
+                  {batchFiles.length > 0 && (
+                    <div className="text-[11px] text-slate-400">
+                      Selected: {batchFiles.length} images ({batchFiles.map((f) => f.name).join(', ')})
+                    </div>
+                  )}
+                  <Button
+                    onClick={runBatchImageAnalysis}
+                    disabled={batchFiles.length === 0 || analyzingBatch}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold"
+                  >
+                    {analyzingBatch ? 'PROCESSING BATCH...' : `PROCESS ${batchFiles.length || ''} BATCH IMAGES`}
+                  </Button>
+                  {batchResults.length > 0 && (
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold">Batch Outcomes ({batchResults.length}):</span>
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {batchResults.map((b, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setImageResult(b);
+                              setActiveCaseTitle(`Batch Asset #${idx + 1}`);
+                              setCollectionMode('ON_DEMAND');
+                            }}
+                            className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 cursor-pointer flex justify-between items-center text-[11px] border border-slate-800/60"
+                          >
+                            <span className="truncate max-w-[150px] text-slate-200">Asset #{idx + 1}</span>
+                            <span className="font-mono text-emerald-400 text-[10px]">{b.sha256?.substring(0, 12)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {intakeMode === 'url' && (
                 <div className="space-y-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <span className="text-xs font-mono font-bold text-slate-300 block">
-                    Remote Media Acquisition:
+                    Remote Media Acquisition (SSRF Protected):
                   </span>
                   <input
                     type="url"
@@ -721,6 +947,32 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                         FETCH & RUN FORENSIC ANALYSIS
                       </>
                     )}
+                  </Button>
+                </div>
+              )}
+
+              {intakeMode === 'vault' && (
+                <div className="space-y-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60 font-mono text-xs">
+                  <span className="font-bold text-slate-300 block flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                    Ingest from Evidence Vault:
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Enter an Evidence ID (e.g. <code>ev_media_...</code>) from the Vault to run forensic extraction on the preserved artifact.
+                  </p>
+                  <input
+                    type="text"
+                    value={evidenceAssetId}
+                    onChange={(e) => setEvidenceAssetId(e.target.value)}
+                    placeholder="ev_media_123456"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-hidden focus:border-purple-500"
+                  />
+                  <Button
+                    onClick={runVaultAssetAnalysis}
+                    disabled={!evidenceAssetId.trim() || analyzingVaultAsset}
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold"
+                  >
+                    {analyzingVaultAsset ? 'ANALYZING VAULT ASSET...' : 'PULL & ANALYZE EVIDENCE ASSET'}
                   </Button>
                 </div>
               )}
@@ -819,6 +1071,26 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                   </Button>
                   <Button
                     size="sm"
+                    onClick={sealToEvidenceVault}
+                    disabled={sealingToVault || vaultSealedSuccess}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold h-8 cursor-pointer"
+                  >
+                    {vaultSealedSuccess ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-purple-200" />
+                        VAULT SEALED
+                      </>
+                    ) : sealingToVault ? (
+                      'SEALING...'
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+                        SEAL TO VAULT
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={linkToInvestigation}
                     disabled={linking || linkedSuccess}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold h-8 cursor-pointer"
@@ -826,20 +1098,47 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                     {linkedSuccess ? (
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-200" />
-                        SEALED TO VAULT
+                        SEALED TO CASE
                       </>
                     ) : linking ? (
                       'SEALING...'
                     ) : (
                       <>
                         <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-                        SEAL TO INVESTIGATION VAULT
+                        SEAL TO INVESTIGATION
                       </>
                     )}
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
+                {/* Collection Mode & Freshness Telemetry */}
+                <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800 font-mono text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-bold uppercase text-[10px]">COLLECTION MODE:</span>
+                    <Badge
+                      variant={
+                        collectionMode === 'ON_DEMAND'
+                          ? 'success'
+                          : collectionMode === 'HISTORICAL'
+                          ? 'outline'
+                          : 'warning'
+                      }
+                      className="text-[10px] font-mono"
+                    >
+                      {collectionMode === 'ON_DEMAND'
+                        ? 'ON_DEMAND (Live Forensic Telemetry)'
+                        : collectionMode === 'HISTORICAL'
+                        ? 'HISTORICAL (Persisted Case Record)'
+                        : 'SHOWCASE (Preloaded Verification Case)'}
+                    </Badge>
+                  </div>
+                  <div className="text-slate-400 text-[10px] flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    <span>{imageResult.analyzed_at ? new Date(imageResult.analyzed_at).toLocaleTimeString() : 'Recent'}</span>
+                  </div>
+                </div>
+
                 {/* Cryptographic Hash Bar */}
                 <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1271,6 +1570,51 @@ export const MediaForensicsPanel: React.FC<MediaForensicsPanelProps> = ({
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Persisted Forensic Dossiers & Asset Library */}
+          {history.length > 0 && (
+            <div className="p-4 rounded-xl border border-slate-800 bg-[#0f1422] space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Persisted Forensic Dossiers ({history.length} Ingested Assets)</span>
+                </h4>
+                <button
+                  type="button"
+                  onClick={fetchHistory}
+                  disabled={loadingHistory}
+                  className="text-[11px] font-mono text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={cn('w-3 h-3', loadingHistory && 'animate-spin')} />
+                  <span>Refresh Library</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+                {history.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => loadHistoricalAnalysis(item)}
+                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 hover:border-cyan-500/60 hover:bg-slate-900/60 cursor-pointer transition-all flex items-center justify-between gap-3 group"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[9px] font-mono uppercase">
+                          {item.media_type || 'IMAGE'}
+                        </Badge>
+                        <span className="text-xs font-mono font-bold text-slate-200 group-hover:text-cyan-300 truncate">
+                          {item.filename || 'Dossier Asset'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] font-mono text-slate-500 truncate mt-0.5">
+                        {item.primary_hash ? `${item.primary_hash.substring(0, 16)}...` : item.created_at || 'Recent'}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </div>
+                ))}
               </div>
             </div>
           )}
