@@ -172,7 +172,7 @@ export const AgentsPage: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
           <Link2 className="w-3.5 h-3.5" />
-          <span>See contract documentation at <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">docs/migration/ML_TEAM_INTEGRATION_CONTRACT.md</code></span>
+          <span>See contract specifications in <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">AGENTS.md</code></span>
         </div>
       </div>
     </div>
