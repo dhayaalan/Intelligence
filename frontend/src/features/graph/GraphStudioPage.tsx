@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../../core/api/client';
 import { GraphStudioComponent } from './GraphStudioComponent';
-import { Share2, FolderGit2, AlertCircle } from 'lucide-react';
+import { Share2, FolderGit2, AlertCircle, Download } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Entity, Relationship, Investigation } from '../../types';
 
@@ -16,6 +16,7 @@ interface InvestigationGraphResponse {
 
 export const GraphStudioPage: React.FC = () => {
   const [selectedInvId, setSelectedInvId] = useState<string>('');
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // 1. Fetch investigations list to allow scoping to a specific case
   const { data: investigations = [] } = useQuery({
@@ -34,6 +35,32 @@ export const GraphStudioPage: React.FC = () => {
 
   const entities = graphData?.entities || [];
   const relationships = graphData?.relationships || [];
+
+  const handleExportMaltego = async () => {
+    if (!activeId) return;
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem('sential_token');
+      const response = await fetch(`/api/v1/graph/export/maltego?investigation_id=${activeId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Failed to export Maltego CSV');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `maltego_investigation_${activeId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Maltego export failed:', err);
+      alert('Could not export Maltego CSV. Ensure the investigation has graph nodes.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 w-full">
@@ -70,6 +97,16 @@ export const GraphStudioPage: React.FC = () => {
               </select>
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleExportMaltego}
+            disabled={isExporting || entities.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors shadow-2xs cursor-pointer"
+            title="Export investigation entities and relationships formatted for Maltego Table Import Wizard"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isExporting ? 'Exporting...' : 'Export Maltego CSV'}</span>
+          </button>
           <Badge variant="default">
             {relationships.length} EDGES • {entities.length} NODES
           </Badge>

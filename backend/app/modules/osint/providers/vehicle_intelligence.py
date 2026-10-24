@@ -47,9 +47,19 @@ INDIA_STATE_CODES: Dict[str, str] = {
     "TN": "Tamil Nadu",
     "TR": "Tripura",
     "TS": "Telangana",
+    "TG": "Telangana",
     "UK": "Uttarakhand",
     "UP": "Uttar Pradesh",
     "WB": "West Bengal",
+}
+
+TELANGANA_RTOS: Dict[str, str] = {
+    "01": "Mancherial / Adilabad RTO", "02": "Karimnagar RTO", "03": "Warangal / Hanamkonda RTO",
+    "04": "Khammam RTO", "05": "Nalgonda RTO", "06": "Mahabubnagar RTO",
+    "07": "Ranga Reddy / Attapur RTO", "08": "Medchal / Uppal / Kukatpally RTO",
+    "09": "Khairatabad, Hyderabad Central RTO", "10": "Secunderabad RTO",
+    "11": "Malakpet, Hyderabad East RTO", "12": "Kishanbagh, Hyderabad South RTO",
+    "13": "Tolichowki, Hyderabad West RTO", "14": "Hyderabad North RTO", "15": "Sangareddy / Medak RTO"
 }
 
 TAMIL_NADU_RTOS: Dict[str, str] = {
@@ -341,6 +351,8 @@ class VehicleRegistrationProvider(ProviderAdapter):
             rto_office = f"RTO {state_code}-{rto_padded}"
             if state_code == "TN" and rto_padded in TAMIL_NADU_RTOS:
                 rto_office = f"RTO TN-{rto_padded} ({TAMIL_NADU_RTOS[rto_padded]})"
+            elif state_code in ["TS", "TG"] and rto_padded in TELANGANA_RTOS:
+                rto_office = f"RTO {state_code}-{rto_padded} ({TELANGANA_RTOS[rto_padded]})"
             
             lat, lon = None, None
             if state_code == "TN" and rto_padded in TAMIL_NADU_RTO_COORDS:
@@ -388,12 +400,109 @@ class VehicleRegistrationProvider(ProviderAdapter):
             "matched": False
         }
 
+    @staticmethod
+    def is_vin(query: str) -> bool:
+        cleaned = re.sub(r"[\s\-_:]", "", query.strip().upper())
+        return bool(re.match(r"^[A-HJ-NPR-Z0-9]{17}$", cleaned))
+
+    @staticmethod
+    def lookup_nhtsa_vin(vin: str) -> Dict[str, Any]:
+        """Queries the official, free and keyless NHTSA VIN decoding API."""
+        cleaned = re.sub(r"[\s\-_:]", "", vin.strip().upper())
+        try:
+            with httpx.Client(timeout=6.0) as client:
+                res = client.get(f"https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/{cleaned}?format=json")
+                if res.status_code == 200:
+                    data = res.json()
+                    results = data.get("Results", [])
+                    lookup_dict = {
+                        item.get("Variable", "").lower(): item.get("Value")
+                        for item in results if item.get("Variable") and item.get("Value") and item.get("Value") not in ["0", "Not Applicable"]
+                    }
+                    return {
+                        "vin": cleaned,
+                        "valid": True,
+                        "make": lookup_dict.get("make"),
+                        "model": lookup_dict.get("model"),
+                        "model_year": lookup_dict.get("model year"),
+                        "vehicle_type": lookup_dict.get("vehicle type") or lookup_dict.get("body class"),
+                        "manufacturer": lookup_dict.get("manufacturer name"),
+                        "plant_country": lookup_dict.get("plant country"),
+                        "fuel_type": lookup_dict.get("fuel type - primary"),
+                        "displacement_l": lookup_dict.get("displacement (l)"),
+                        "source": "NHTSA Global VIN Registry",
+                    }
+        except Exception as e:
+            logger.debug(f"NHTSA VIN decode failed: {e}")
+        return {
+            "vin": cleaned,
+            "valid": False,
+            "source": "NHTSA Global VIN Registry (Unreachable)",
+        }
+
     def execute_lookup(
         self,
         plate_number: str,
         jurisdiction_hint: Optional[str] = None,
         authorized_credential: Optional[str] = None
     ) -> Dict[str, Any]:
+        # 1. Check if 17-character VIN
+        if self.is_vin(plate_number):
+            vin_data = self.lookup_nhtsa_vin(plate_number)
+            entities: List[EntityPayload] = []
+            evidence: List[EvidencePayload] = []
+            relationships: List[RelationshipPayload] = []
+
+            vin_clean = vin_data.get("vin", plate_number.strip().upper())
+            make_model = f"{vin_data.get('make') or ''} {vin_data.get('model') or ''}".strip()
+            display_val = f"{vin_clean} ({make_model})" if make_model else vin_clean
+
+            entities.append(EntityPayload(
+                type=EntityType.VEHICLE,
+                value=vin_clean,
+                confidence=0.95 if vin_data.get("valid") else 0.7,
+                sources=["NHTSA Global VIN Registry"],
+                metadata={
+                    "identifier_type": "VIN",
+                    "vin": vin_clean,
+                    "make": vin_data.get("make"),
+                    "model": vin_data.get("model"),
+                    "model_year": vin_data.get("model_year"),
+                    "vehicle_type": vin_data.get("vehicle_type"),
+                    "manufacturer": vin_data.get("manufacturer"),
+                    "plant_country": vin_data.get("plant_country"),
+                    "fuel_type": vin_data.get("fuel_type"),
+                    "displacement_l": vin_data.get("displacement_l"),
+                    "valid": vin_data.get("valid"),
+                }
+            ))
+
+            evidence.append(EvidencePayload(
+                title=f"NHTSA Global VIN Record: {vin_clean}",
+                source="NHTSA VPIC Registry",
+                category="Vehicle OSINT",
+                content=f"Decoded VIN {vin_clean}: Make={vin_data.get('make')}, Model={vin_data.get('model')}, Year={vin_data.get('model_year')}, Plant={vin_data.get('plant_country')}",
+                provenance={
+                    "service": "NHTSA VPIC API",
+                    "query": vin_clean,
+                    "valid": vin_data.get("valid")
+                }
+            ))
+
+            return {
+                "status": "SUCCESS",
+                "message": f"NHTSA VIN record decoded successfully for '{vin_clean}'",
+                "plate_number": vin_clean,
+                "type": "vin",
+                "jurisdiction": vin_data.get("plant_country", "GLOBAL"),
+                "live_registry_status": "OFFICIAL_GLOBAL_LOOKUP",
+                "official_registry_executed": True,
+                "entities": entities,
+                "relationships": relationships,
+                "evidence": evidence
+            }
+
+        # 2. Vehicle Registration Plate Processing
         parsed = self.parse_plate(plate_number)
         if not parsed.get("matched"):
             return {
@@ -639,4 +748,6 @@ class VehicleRegistrationProvider(ProviderAdapter):
         )
 
 vehicle_registration_provider = VehicleRegistrationProvider()
+is_vin = VehicleRegistrationProvider.is_vin
+lookup_nhtsa_vin = VehicleRegistrationProvider.lookup_nhtsa_vin
 

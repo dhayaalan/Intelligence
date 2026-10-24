@@ -309,3 +309,29 @@ async def get_graph_status(
         "engine": "Neo4j Community 5.20.0" if ping_res.get("status") == "healthy" else "MongoDB In-Memory (Fallback)",
         "is_healthy": ping_res.get("status") == "healthy"
     }
+
+@router.get("/export/maltego")
+async def export_graph_to_maltego(
+    investigation_id: Optional[str] = Query(None, description="Scope export to specific investigation"),
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Exports investigation entity and relationship graph to RFC-4180 CSV
+    formatted for Maltego Desktop's 'Import Graph from Table' wizard.
+    """
+    from fastapi.responses import Response
+    from app.modules.osint.providers.maltego import generate_maltego_csv
+
+    tenant_id = current_user.tenant_id
+    entities = await entity_repo.list_by_tenant(tenant_id, investigation_id=investigation_id)
+    relationships = await relationship_repo.list_by_tenant(tenant_id, investigation_id=investigation_id)
+
+    csv_data = generate_maltego_csv(entities, relationships)
+    filename = f"maltego_export_{investigation_id or 'global'}.csv"
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+

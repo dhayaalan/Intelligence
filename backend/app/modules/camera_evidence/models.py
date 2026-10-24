@@ -79,8 +79,17 @@ class ANPRDetectionRecord(BaseModel):
     normalized_candidate_plate: str
     alternative_candidates: List[str] = Field(default_factory=list)
     target_plate: str
-    confidence: float  # Calibrated score between 0.0 and 1.0
+    confidence: float  # Calibrated combined score between 0.0 and 1.0
+    detection_confidence: float = 0.90  # Object/candidate plate detection score
+    ocr_confidence: float = 0.85        # Optical character recognition score
     match_status: ANPRMatchStatus = ANPRMatchStatus.CANDIDATE_MATCH
+
+    # Temporal tracking across frames
+    temporal_track_id: Optional[str] = None
+    frame_count_tracked: int = 1
+    temporal_timestamps: List[float] = Field(default_factory=list)
+    media_hash: Optional[str] = None
+    original_filename: Optional[str] = None
     
     # Reviewer tracking
     human_reviewer_id: Optional[str] = None
@@ -97,6 +106,7 @@ class ANPRDetectionRecord(BaseModel):
     detector_version: str = "OpenCV 5.0.0 Morphological Contour Filter + Tesseract 5.5.0"
     processed_at: datetime = Field(default_factory=datetime.utcnow)
     limitations: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ANPRReviewRequest(BaseModel):

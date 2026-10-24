@@ -76,6 +76,7 @@ import { OsintMapComponent, GeoLocationItem } from '../map/OsintMapComponent';
 import { formatDate, cn } from '../../lib/utils';
 import { useAuth } from '../../core/auth/AuthContext';
 import { NewsArticleReaderView } from '../news_intelligence/NewsArticleReaderView';
+import { SocialResultsView, SocialResultItem } from '../social_intelligence/components/SocialResultsView';
 
 /**
  * Universal highlight component that highlights search query tokens
@@ -177,6 +178,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     | 'overview'
     | 'all'
     | 'profiles'
+    | 'social'
     | 'media'
     | 'news_intel'
     | 'locations_timeline'
@@ -195,6 +197,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     | 'locations'
     | 'evidence'
   >('overview');
+  const [extraCrawledPosts, setExtraCrawledPosts] = useState<SocialResultItem[]>([]);
   const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
   const [newsIntelSubTab, setNewsIntelSubTab] = useState<'findings' | 'articles'>('findings');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
@@ -902,6 +905,94 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     return newsArticles.slice(start, start + newsPageSize);
   }, [newsArticles, newsPage, newsPageSize]);
 
+  // Social media dispatches, reels, and comment trees
+  const socialPosts = useMemo<SocialResultItem[]>(() => {
+    const posts: SocialResultItem[] = [...extraCrawledPosts];
+    const seenUrls = new Set<string>(extraCrawledPosts.map((p) => p.url));
+
+    if (!searchResult) return posts;
+
+    // 1. Extract from Evidence records
+    searchResult.evidence.forEach((ev) => {
+      const prov = (ev.provider || '').toLowerCase();
+      const mod = (ev.module || '').toLowerCase();
+      const raw = ev.raw_data || {};
+
+      // Exclude bare profile existence checks from the catalog (these belong in the Profiles tab)
+      const isCatalogProfileCheck =
+        raw.found === false ||
+        raw.status === 'NOT_FOUND' ||
+        (raw.profile_url && !raw.post_id && (!raw.text || raw.text === ev.reference) && !raw.video_url);
+      if (isCatalogProfileCheck) return;
+
+      const hasAuthenticContent =
+        Boolean(raw.post_id) ||
+        Boolean(raw.video_url) ||
+        Boolean(raw.post_type) ||
+        (Array.isArray(raw.comments) && raw.comments.length > 0) ||
+        (Boolean(raw.text) && raw.text !== ev.reference && String(raw.text).length > 3);
+
+      const isSoc =
+        mod === 'social_media_intelligence' ||
+        (['bluesky', 'telegram', 'reddit', 'youtube', 'mastodon', 'instagram', 'facebook'].includes(prov) && hasAuthenticContent) ||
+        (Boolean(raw.post_id) && hasAuthenticContent);
+
+      if (isSoc) {
+        const u = raw.url || ev.reference || raw.post_id || `soc-${posts.length}`;
+        if (!seenUrls.has(u)) {
+          seenUrls.add(u);
+          posts.push({
+            id: raw.post_id || ev.id || u,
+            platform: (raw.platform || prov || 'social').toLowerCase(),
+            author: raw.author || 'Anonymous User',
+            text: raw.text || ev.reference || '',
+            url: raw.url || ev.reference || '',
+            created_at: raw.created_at || ev.timestamp,
+            likes_count: raw.likes ?? raw.likes_count ?? 0,
+            views_count: raw.views ?? raw.views_count ?? 0,
+            shares_count: raw.shares ?? raw.shares_count ?? 0,
+            comments_count: raw.comments_count ?? (Array.isArray(raw.comments) ? raw.comments.length : 0),
+            post_type: raw.post_type || (raw.video_url ? 'reel' : 'post'),
+            video_url: raw.video_url,
+            comments: Array.isArray(raw.comments) ? raw.comments : [],
+            cib_clusters: raw.cib_clusters || [],
+            evidence_id: ev.id,
+            confidence: ev.confidence,
+            entities: raw.entities || [],
+          });
+        }
+      }
+    });
+
+    // 2. Extract from Media records (reels and social videos)
+    searchResult.media?.forEach((m) => {
+      const plat = (m.source_platform || m.source_provider || '').toLowerCase();
+      if (
+        ['instagram', 'facebook', 'youtube', 'reddit', 'bluesky', 'telegram', 'mastodon'].includes(plat) ||
+        m.metadata?.post_type === 'reel'
+      ) {
+        const u = m.canonical_source_url || m.url;
+        if (u && !seenUrls.has(u)) {
+          seenUrls.add(u);
+          posts.push({
+            id: m.id,
+            platform: plat || 'social',
+            author: m.metadata?.author || m.parent_title || 'Target',
+            text: m.description || m.title || '',
+            url: u,
+            created_at: m.publication_date || m.collection_date,
+            post_type: m.metadata?.post_type || (m.media_type === 'video' ? 'reel' : 'post'),
+            video_url: m.media_type === 'video' ? m.url : undefined,
+            comments_count: m.metadata?.comments_count || 0,
+            confidence: 0.95,
+          });
+        }
+      }
+    });
+
+    return posts;
+  }, [searchResult, extraCrawledPosts]);
+
   const entityTypes = useMemo(() => {
     if (!searchResult) return [];
     const types = new Set(searchResult.entities.map((e) => e.type.toUpperCase()));
@@ -1501,6 +1592,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
                   { id: 'all', label: 'All Results', count: filteredEntities.length, icon: Database },
                   { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
+                  { id: 'social', label: 'Social & Reels', count: socialPosts.length, icon: Share2 },
                   { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
                   { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Video },
                   { id: 'news_intel', label: 'News & Intelligence', count: newsArticles.length + keyFindings.length, icon: Newspaper },
@@ -1561,6 +1653,68 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                   }
                   return null;
                 })()}
+
+                {/* SOCIAL MEDIA & REELS DISPATCHES (SHOWN FIRST FOR PERSON / SOCIAL TARGETS) */}
+                {socialPosts.length > 0 && (
+                  <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 border border-pink-500/30 shadow-md">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                          <Share2 className="w-4 h-4 text-pink-500" />
+                          <span>Captured Social Media Dispatches & Video Reels ({socialPosts.length})</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-300 font-mono font-bold">
+                            PRIORITY FEED
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Authentic public social media dispatches, video reels, and comment threads captured across network collectors.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('social')}
+                        className="text-xs font-mono font-bold text-pink-600 dark:text-pink-400 hover:underline flex items-center gap-1 cursor-pointer bg-white/80 dark:bg-slate-900/80 px-3 py-1.5 rounded-xl border border-pink-500/20 shadow-xs"
+                      >
+                        <span>View all {socialPosts.length} dispatches & reels</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {socialPosts.slice(0, 3).map((post) => (
+                        <div
+                          key={post.id}
+                          className="p-3.5 rounded-xl bg-white dark:bg-[#0c101d] border border-slate-200/90 dark:border-slate-800 space-y-2 text-xs flex flex-col justify-between hover:border-pink-500/40 shadow-xs transition-all"
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900 dark:text-white font-mono text-[11px]">
+                                @{post.author}
+                              </span>
+                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                                {post.platform}
+                              </span>
+                            </div>
+                            <p className="text-slate-700 dark:text-slate-300 text-xs line-clamp-3">
+                              {post.text}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] font-mono text-slate-400">
+                            <span>{post.comments_count || post.comments?.length || 0} comments</span>
+                            <span
+                              className="text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer hover:underline flex items-center gap-1"
+                              onClick={() => setActiveTab('social')}
+                            >
+                              <span>Inspect & Play</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* INVESTIGATION SNAPSHOT: 9 Primary Metrics (Section 8) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -2789,6 +2943,25 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: SOCIAL MEDIA & REELS */}
+            {activeTab === 'social' && (
+              <div className="p-4 sm:p-5">
+                <SocialResultsView
+                  posts={socialPosts}
+                  targetQuery={query}
+                  investigationId={searchResult.investigation_id}
+                  cibClusters={socialPosts[0]?.cib_clusters || []}
+                  onPivot={(term) => {
+                    setQuery(term);
+                    handleSearch(new Event('submit') as any, term);
+                  }}
+                  onPostCrawledAndSealed={(newP) => {
+                    setExtraCrawledPosts((prev) => [newP, ...prev]);
+                  }}
+                />
               </div>
             )}
 

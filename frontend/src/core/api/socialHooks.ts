@@ -226,3 +226,79 @@ export function useRegionalNarrativeComparison() {
   });
 }
 
+export interface SocialCommentItem {
+  id?: string;
+  author: string;
+  author_id?: string;
+  text: string;
+  published_at?: string;
+  likes_count?: number;
+  avatar_url?: string;
+}
+
+export interface SocialCrawlRequest {
+  url: string;
+  extract_media?: boolean;
+  bypass_blocking?: boolean;
+  extract_entities?: boolean;
+  extract_comments?: boolean;
+}
+
+export interface SocialCrawlResult {
+  url: string;
+  final_url: string;
+  platform: string;
+  post_type: string; // 'post' | 'reel' | 'video' | 'short' | 'story'
+  title: string;
+  text: string;
+  author: string;
+  author_id?: string;
+  published_at?: string;
+  media_urls: string[];
+  video_url?: string;
+  likes_count: number;
+  comments_count: number;
+  shares_count: number;
+  views_count?: number;
+  comments: SocialCommentItem[];
+  bypass_technique: string;
+  http_status: number;
+  is_blocked_url: boolean;
+  raw_metadata: Record<string, any>;
+  extracted_entities: string[];
+  crawled_at: string;
+}
+
+export function useSocialCrawlUrl() {
+  return useMutation<SocialCrawlResult, Error, SocialCrawlRequest>({
+    mutationFn: (req) => apiRequest<SocialCrawlResult>('/social/crawl-url', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  });
+}
+
+export interface SocialAutoCrawlRequest {
+  target: string;
+  investigation_id?: string;
+  limit?: number;
+  extract_comments?: boolean;
+}
+
+export interface SocialAutoCrawlResponse {
+  target: string;
+  total: number;
+  results: any[];
+  message: string;
+}
+
+export function useSocialAutoCrawl() {
+  return useMutation<SocialAutoCrawlResponse, Error, SocialAutoCrawlRequest>({
+    mutationFn: (req) => apiRequest<SocialAutoCrawlResponse>('/social/auto-crawl', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  });
+}
+
+

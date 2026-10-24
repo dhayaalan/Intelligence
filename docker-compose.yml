@@ -110,6 +110,9 @@ services:
       - ML_SERVICE_API_KEY=${ML_SERVICE_API_KEY:-}
       - ZAP_API_URL=${ZAP_API_URL:-http://172.17.0.1:8090}
       - ZAP_API_KEY=${ZAP_API_KEY:-changeme}
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+      - SPIDERFOOT_URL=${SPIDERFOOT_URL:-http://spiderfoot:5001}
+      - THEHARVESTER_WORKER_URL=${THEHARVESTER_WORKER_URL:-http://theharvester-worker:5002}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -200,3 +203,35 @@ services:
     ports:
       - "127.0.0.1:${ZAP_PORT:-8091}:8090"
     command: zap.sh -daemon -host 0.0.0.0 -port 8090 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+
+  # ----------------------------------------------------------------------------
+  # 6. Optional OSINT Workers (Profile: scanners)
+  # ----------------------------------------------------------------------------
+  theharvester-worker:
+    profiles: ["scanners"]
+    build:
+      context: ./osint-workers/theharvester
+      dockerfile: Dockerfile
+    container_name: intelligence-theharvester
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${THEHARVESTER_PORT:-5002}:5002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  spiderfoot:
+    profiles: ["scanners"]
+    image: spiderfoot/spiderfoot:latest
+    container_name: intelligence-spiderfoot
+    restart: unless-stopped
+    networks:
+      - intelligence-network
+    ports:
+      - "127.0.0.1:${SPIDERFOOT_PORT:-5001}:5001"
+    command: ["python3", "sf.py", "-l", "0.0.0.0:5001"]
+

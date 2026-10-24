@@ -21,6 +21,16 @@ class CredibilityBand(str, Enum):
     INAUTHENTIC = "INAUTHENTIC"
 
 
+class SocialCommentItem(BaseModel):
+    id: Optional[str] = None
+    author: str
+    author_id: Optional[str] = None
+    text: str
+    published_at: Optional[str] = None
+    likes_count: int = 0
+    avatar_url: Optional[str] = None
+
+
 class SocialPost(BaseModel):
     id: str
     platform: SocialPlatformType
@@ -41,6 +51,10 @@ class SocialPost(BaseModel):
     sentiment: Optional[str] = None
     entities: List[str] = Field(default_factory=list)
     credibility_score: Optional[float] = None
+    post_type: str = "post"  # 'post' | 'reel' | 'video' | 'short' | 'thread'
+    video_url: Optional[str] = None
+    comments_count: int = 0
+    comments: List[SocialCommentItem] = Field(default_factory=list)
 
 
 class CibCluster(BaseModel):
@@ -144,4 +158,40 @@ class SocialSearchResponse(BaseModel):
     provider_statuses: Dict[str, str] = Field(default_factory=dict)
     collector_telemetry: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     execution_time_ms: float
+
+
+
+
+
+class SocialCrawlRequest(BaseModel):
+    url: str
+    extract_media: bool = True
+    bypass_blocking: bool = True
+    extract_entities: bool = True
+    extract_comments: bool = True
+
+
+class SocialCrawlResult(BaseModel):
+    url: str
+    final_url: str
+    platform: str
+    post_type: str = "post"  # post, reel, video, story, short, thread
+    title: str
+    text: str
+    author: str
+    author_id: Optional[str] = None
+    published_at: Optional[str] = None
+    media_urls: List[str] = Field(default_factory=list)
+    video_url: Optional[str] = None
+    likes_count: int = 0
+    comments_count: int = 0
+    shares_count: int = 0
+    comments: List[SocialCommentItem] = Field(default_factory=list)
+    bypass_technique: str = "DIRECT_STEALTH"
+    http_status: int = 200
+    is_blocked_url: bool = False
+    raw_metadata: Dict[str, Any] = Field(default_factory=dict)
+    extracted_entities: List[str] = Field(default_factory=list)
+    crawled_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
 

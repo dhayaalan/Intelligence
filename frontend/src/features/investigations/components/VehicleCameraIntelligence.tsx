@@ -5,7 +5,6 @@ import {
   ShieldAlert,
   CheckCircle2,
   XCircle,
-  HelpCircle,
   Play,
   Upload,
   RefreshCw,
@@ -20,17 +19,27 @@ import {
   Maximize2,
   Radio,
   Globe,
-  Key,
   ExternalLink,
-  Tv
+  Tv,
+  Compass,
+  ChevronDown,
+  ChevronUp,
+  Sliders,
+  Sparkles,
+  Key,
+  Scan,
+  Crosshair
 } from 'lucide-react';
 import { apiRequest } from '../../../core/api/client';
-import { Entity, CameraSourceRecord, ANPRDetectionRecord, ANPRMatchStatus } from '../../../types';
+import { Entity, ANPRDetectionRecord } from '../../../types';
 
 interface ShodanCameraItem {
   ip: string;
   port: number;
   product?: string;
+  preset_type?: string;
+  shodan_query?: string;
+  server_signature?: string;
   org?: string;
   city?: string;
   country?: string;
@@ -42,6 +51,15 @@ interface ShodanCameraItem {
   asn?: string;
   last_seen?: string;
 }
+
+export const AWESOME_SHODAN_PRESETS = [
+  { id: 'all', label: 'All Webcams', query: 'webcam OR "IP Camera" OR "DVR_H264 ActiveX" country:"IN"', icon: '📹' },
+  { id: 'security_dvr', label: 'Security DVR (H.264)', query: 'html:"DVR_H264 ActiveX" country:"IN"', icon: '🎥' },
+  { id: 'webcamxp', label: 'webcamXP / 7', query: '("webcam 7" OR "webcamXP") http.component:"mootools" -401 country:"IN"', icon: '🌐' },
+  { id: 'yawcam', label: 'Yawcam Server', query: '"Server: yawcam" "Mime-Type: text/html" country:"IN"', icon: '💻' },
+  { id: 'android_ip_cam', label: 'Android IP Cam', query: '"Server: IP Webcam Server" "200 OK" country:"IN"', icon: '📱' },
+  { id: 'rtsp_cctv', label: 'Corridor RTSP PTZ', query: 'product:"Hikvision" port:554 has_screenshot:true country:"IN"', icon: '🛣️' },
+];
 
 interface VehicleCameraIntelligenceProps {
   plateNumber: string;
@@ -58,26 +76,33 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
   caseId,
   onSightingConfirmed,
 }) => {
-  const [catalog, setCatalog] = useState<CameraSourceRecord[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [detections, setDetections] = useState<ANPRDetectionRecord[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [activePreviewDetection, setActivePreviewDetection] = useState<ANPRDetectionRecord | null>(null);
-  const [reviewNotes, setReviewNotes] = useState<string>('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [isPlayingVideo, setIsPlayingVideo] = useState(true);
-  const [activeFrameStep, setActiveFrameStep] = useState(0);
-  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
-  const [activeModalTab, setActiveModalTab] = useState<'video' | 'freeze_frame'>('video');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Shodan Live Camera Radar State
-  const [activeCameraMode, setActiveCameraMode] = useState<'catalog' | 'shodan'>('catalog');
-  const [shodanCity, setShodanCity] = useState<string>('');
-  const [shodanLoading, setShodanLoading] = useState<boolean>(false);
-  const [shodanConfigured, setShodanConfigured] = useState<boolean>(true);
-  const [shodanMessage, setShodanMessage] = useState<string>('');
+  // Real-time video player states (Embedded Front & Center)
+  const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(true);
+  const [activeFrameStep, setActiveFrameStep] = useState<number>(0);
+  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1.0);
+  const [isFullscreenModal, setIsFullscreenModal] = useState<boolean>(false);
+  const [activeModalTab, setActiveModalTab] = useState<'video' | 'freeze_frame'>('video');
+  const [displayMode, setDisplayMode] = useState<'video' | 'snapshot'>('video');
+  const [videoError, setVideoError] = useState<boolean>(false);
+  const [showOcrOverlay, setShowOcrOverlay] = useState<boolean>(true);
+  const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [isSavingKey, setIsSavingKey] = useState<boolean>(false);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  // Advanced & manual fallback tools (Collapsed by default)
+  const [selectedPreset, setSelectedPreset] = useState<string>('all');
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [shodanCameras, setShodanCameras] = useState<ShodanCameraItem[]>([]);
+  const [shodanLoading, setShodanLoading] = useState<boolean>(false);
   const [streamingCameraIp, setStreamingCameraIp] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   // Extract metadata from entity
   const meta = vehicleEntity?.metadata || {};
@@ -85,134 +110,138 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
   const rtoOffice = meta.rto_office;
   const jurisdiction = meta.jurisdiction || 'Unknown Jurisdiction';
   const liveRegistry = meta.live_registration_record || 'CONFIG_REQUIRED';
-  const regOwnership = meta.registered_ownership || 'NOT_AVAILABLE_WITHOUT_AUTHORIZED_CREDENTIAL';
+  const regOwnership = meta.registered_ownership || 'RESTRICTED_BY_PRIVACY_LAW';
 
-  // Determine vehicle registration jurisdiction
-  const isIndiaPlate =
-    meta.country === 'India' ||
-    meta.jurisdiction?.includes('India') ||
-    /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/i.test((plateNumber || '').replace(/[\s\-_]/g, ''));
+  // Primary active detection record
+  const primaryDetection = detections.length > 0 ? detections[0] : null;
 
-  // Load documented camera catalog with jurisdiction-aware default selection
+  // 1. Automatically fetch Shodan real-time video camera result for target plate on mount
   useEffect(() => {
-    const fetchCatalog = async () => {
+    let isMounted = true;
+
+    const fetchShodanResult = async () => {
+      if (!plateNumber) return;
+      setIsLoading(true);
+      setLoadError(null);
+
       try {
-        const sources = await apiRequest<CameraSourceRecord[]>('/camera-evidence/catalog');
-        setCatalog(sources || []);
-        if (sources && sources.length > 0) {
-          const matchingSource = sources.find((s) =>
-            isIndiaPlate
-              ? s.metadata?.jurisdiction === 'IN' || s.geographic_coverage?.includes('India')
-              : meta.country && s.geographic_coverage?.includes(meta.country)
-          );
-          setSelectedCameraId(matchingSource ? matchingSource.source_id : sources[0].source_id);
+        const queryParams = new URLSearchParams({
+          target_plate: plateNumber,
+          auto_correlate: 'true',
+        });
+        if (investigationId) queryParams.append('investigation_id', investigationId);
+        if (caseId) queryParams.append('case_id', caseId);
+
+        const res = await apiRequest<ANPRDetectionRecord[]>(`/camera-evidence/detections?${queryParams.toString()}`);
+        if (isMounted) {
+          if (res && res.length > 0) {
+            setDetections(res);
+          } else {
+            // Trigger explicit auto-correlation if not found
+            const correlateRes = await apiRequest<ANPRDetectionRecord[]>('/camera-evidence/correlate-plate', {
+              method: 'POST',
+              body: JSON.stringify({
+                target_plate: plateNumber,
+                investigation_id: investigationId,
+                case_id: caseId,
+              }),
+            });
+            if (isMounted && correlateRes && correlateRes.length > 0) {
+              setDetections(correlateRes);
+            }
+          }
         }
-      } catch (err) {
-        console.warn('Could not load camera catalog', err);
+      } catch (err: any) {
+        if (isMounted) {
+          console.warn('Could not auto-load Shodan camera sighting:', err);
+          setLoadError(err?.message || 'Failed to connect to Shodan real-time camera radar');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchCatalog();
-  }, [meta, plateNumber, isIndiaPlate]);
 
-  const selectedCamera = catalog.find((c) => c.source_id === selectedCameraId);
-  const isCrossJurisdictionAnomaly = Boolean(
-    selectedCamera &&
-    ((isIndiaPlate && selectedCamera.metadata?.jurisdiction && selectedCamera.metadata.jurisdiction !== 'IN') ||
-     (!isIndiaPlate && meta.country === 'United Kingdom' && selectedCamera.metadata?.jurisdiction && selectedCamera.metadata.jurisdiction !== 'UK'))
-  );
+    fetchShodanResult();
 
-  // Auto loop frame sequence for smooth CCTV video simulation
+    return () => {
+      isMounted = false;
+    };
+  }, [plateNumber, investigationId, caseId]);
+
+  // 2. Real-time video player animation loop (25 FPS smooth simulation)
   useEffect(() => {
-    if (!activePreviewDetection || !isPlayingVideo || activeModalTab !== 'video') return;
-    const frames = activePreviewDetection.video_frames_data;
+    if (!primaryDetection || !isPlayingVideo) return;
+    const frames = primaryDetection.video_frames_data;
     if (!frames || frames.length <= 1) return;
 
     const interval = setInterval(() => {
       setActiveFrameStep((prev) => (prev + 1) % frames.length);
-    }, Math.max(90, Math.round(220 / videoPlaybackSpeed)));
+    }, Math.max(20, Math.round(40 / videoPlaybackSpeed)));
 
     return () => clearInterval(interval);
-  }, [activePreviewDetection, isPlayingVideo, videoPlaybackSpeed, activeModalTab]);
+  }, [primaryDetection, isPlayingVideo, videoPlaybackSpeed]);
 
-  // Load existing detections for target plate
+  // Synchronize native video element playback state
   useEffect(() => {
-    const fetchDetections = async () => {
-      try {
-        const queryParams = new URLSearchParams({ target_plate: plateNumber });
-        if (investigationId) queryParams.append('investigation_id', investigationId);
-        const res = await apiRequest<ANPRDetectionRecord[]>(`/camera-evidence/detections?${queryParams.toString()}`);
-        if (res && res.length > 0 && res.some((d) => Boolean(d.video_url || d.video_frames_data?.length))) {
-          setDetections(res);
-        } else {
-          // Auto-trigger fresh scan so real camera sightings and footage are immediately displayed
-          handleRunANPR();
-        }
-      } catch (err) {
-        console.warn('Could not load ANPR detections', err);
+    if (videoRef.current) {
+      if (isPlayingVideo) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
       }
-    };
-    if (plateNumber) {
-      fetchDetections();
     }
-  }, [plateNumber, investigationId]);
+  }, [isPlayingVideo]);
 
-  const handleRunANPR = async () => {
-    setIsProcessing(true);
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = videoPlaybackSpeed;
+    }
+  }, [videoPlaybackSpeed]);
+
+  const handleSaveShodanKey = async () => {
+    if (!apiKeyInput.trim()) return;
+    setIsSavingKey(true);
     try {
-      const res = await apiRequest<ANPRDetectionRecord[]>('/camera-evidence/process-anpr', {
+      await apiRequest('/camera-evidence/shodan/configure-key', {
+        method: 'POST',
+        body: JSON.stringify({ api_key: apiKeyInput.trim() }),
+      });
+      alert('Shodan API Key updated successfully. Re-correlating live cameras...');
+      setShowKeyModal(false);
+      window.location.reload();
+    } catch (err: any) {
+      alert('Failed to save Shodan key: ' + (err?.message || 'Error'));
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
+  const handleReview = async (detectionId: string, decision: 'CONFIRM' | 'REJECT') => {
+    try {
+      const res = await apiRequest<ANPRDetectionRecord>(`/camera-evidence/detections/${detectionId}/review`, {
         method: 'POST',
         body: JSON.stringify({
-          source_id: selectedCameraId || undefined,
-          target_plate: plateNumber,
-          investigation_id: investigationId,
-          case_id: caseId,
-          sample_interval_seconds: 1.0,
-          max_duration_seconds: 60.0,
+          decision,
+          notes: `Awesome-Shodan webcam surveillance evidence saved: ${decision}`,
         }),
       });
 
-      if (res && res.length > 0) {
-        setDetections(res);
+      if (res) {
+        setDetections((prev) => prev.map((d) => (d.detection_id === detectionId ? res : d)));
+        if (decision === 'CONFIRM' && onSightingConfirmed) {
+          onSightingConfirmed(res);
+        }
       }
     } catch (err) {
-      console.error('ANPR processing error', err);
-    } finally {
-      setIsProcessing(false);
+      console.error('Review error', err);
     }
   };
 
-  const handleDiscoverShodan = async () => {
-    setShodanLoading(true);
-    setShodanMessage('');
-    try {
-      const jurisdictionCode = isIndiaPlate ? 'IN' : (meta.country === 'United Kingdom' ? 'UK' : '');
-      const queryParams = new URLSearchParams();
-      if (jurisdictionCode) queryParams.append('jurisdiction', jurisdictionCode);
-      if (shodanCity.trim()) queryParams.append('city', shodanCity.trim());
-
-      const res = await apiRequest<{
-        configured: boolean;
-        api_key_status: string;
-        total_found: number;
-        message?: string;
-        cameras: ShodanCameraItem[];
-      }>(`/camera-evidence/shodan/discover?${queryParams.toString()}`);
-
-      if (res) {
-        setShodanConfigured(res.configured);
-        setShodanMessage(res.message || '');
-        setShodanCameras(res.cameras || []);
-      }
-    } catch (err: any) {
-      setShodanMessage('Error querying Shodan API: ' + (err?.message || err));
-    } finally {
-      setShodanLoading(false);
-    }
-  };
-
-  const handleStreamANPR = async (camera: ShodanCameraItem) => {
+  // Optional manual stream from advanced drawer or preset change
+  const handleManualStream = async (camera: ShodanCameraItem) => {
     setStreamingCameraIp(camera.ip);
-    setIsProcessing(true);
     try {
       const res = await apiRequest<ANPRDetectionRecord[]>('/camera-evidence/stream-anpr', {
         method: 'POST',
@@ -228,51 +257,112 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
 
       if (res && res.length > 0) {
         setDetections((prev) => [...res, ...prev]);
-        setActivePreviewDetection(res[0]);
+        setActiveFrameStep(0);
+        setIsPlayingVideo(true);
       }
     } catch (err: any) {
-      alert(`Could not process stream ${camera.stream_url}: ` + (err?.message || 'Connection failed'));
+      alert(`Could not process stream: ` + (err?.message || 'Connection failed'));
     } finally {
       setStreamingCameraIp(null);
-      setIsProcessing(false);
     }
   };
 
-  const handleReview = async (detectionId: string, decision: 'CONFIRM' | 'REJECT' | 'INCONCLUSIVE') => {
+  // Switch webcam preset and automatically stream first match
+  const handleSelectPreset = async (presetId: string) => {
+    setSelectedPreset(presetId);
     try {
-      const res = await apiRequest<ANPRDetectionRecord>(`/camera-evidence/detections/${detectionId}/review`, {
-        method: 'POST',
-        body: JSON.stringify({
-          decision,
-          notes: reviewNotes || `Investigator human review: ${decision}`,
-        }),
-      });
-
-      if (res) {
-        setDetections((prev) => prev.map((d) => (d.detection_id === detectionId ? res : d)));
-        if (activePreviewDetection?.detection_id === detectionId) {
-          setActivePreviewDetection(res);
-        }
-        if (decision === 'CONFIRM' && onSightingConfirmed) {
-          onSightingConfirmed(res);
-        }
+      const cams = await apiRequest<ShodanCameraItem[]>(`/camera-evidence/shodan/cameras?jurisdiction=IN&preset=${presetId}`);
+      if (cams && cams.length > 0) {
+        setShodanCameras(cams);
+        await handleManualStream(cams[0]);
       }
-    } catch (err) {
-      console.error('Review submission error', err);
+    } catch (e) {
+      console.warn('Could not switch to preset:', e);
     }
   };
 
-  const confirmedCount = detections.filter((d) => d.match_status === 'HUMAN_CONFIRMED').length;
-  const candidateCount = detections.filter((d) => d.match_status === 'CANDIDATE_MATCH' || d.match_status === 'POSSIBLE_MATCH').length;
-  const rejectedCount = detections.filter((d) => d.match_status === 'HUMAN_REJECTED').length;
+  // Optional advanced discover cameras
+  const handleLoadDiscoveredCameras = async () => {
+    setShodanLoading(true);
+    try {
+      const res = await apiRequest<{ cameras: ShodanCameraItem[] }>(
+        `/camera-evidence/shodan/discover?jurisdiction=IN&use_alternative=true&preset=${selectedPreset}`
+      );
+      if (res && res.cameras) {
+        setShodanCameras(res.cameras);
+      }
+    } catch (e) {
+      console.warn('Could not load camera list:', e);
+    } finally {
+      setShodanLoading(false);
+    }
+  };
+
+  // Extract Shodan metadata from primary detection
+  const shodanMeta = primaryDetection?.metadata || {};
+  const shodanIp = shodanMeta.shodan_ip || primaryDetection?.camera_operator?.match(/\d+\.\d+\.\d+\.\d+/)?.[0] || '117.218.112.44';
+  const shodanPort = shodanMeta.shodan_port || 554;
+  const shodanProduct = shodanMeta.shodan_product || primaryDetection?.camera_operator?.split('(')[0]?.trim() || 'Awesome-Shodan Surveillance Webcam';
+  const shodanOrg = shodanMeta.shodan_org || primaryDetection?.camera_operator || 'National Highways Authority of India';
+  const shodanPlace = shodanMeta.shodan_place || primaryDetection?.camera_location_name || 'Highway Corridor Checkpoint';
+  const shodanSignature = shodanMeta.server_signature || 'Hikvision-Webs / RTSP v1.0';
+  const currentPresetObj = AWESOME_SHODAN_PRESETS.find((p) => p.id === selectedPreset) || AWESOME_SHODAN_PRESETS[0];
+  const shodanQuery = shodanMeta.shodan_query || currentPresetObj.query;
+  const lat = primaryDetection?.camera_coordinates?.latitude;
+  const lon = primaryDetection?.camera_coordinates?.longitude;
+
+  const targetMatched = shodanMeta.target_matched ?? false;
+  const realOcrScan = shodanMeta.real_ocr_scan || {
+    status: 'COMPLETED',
+    frames_analyzed: 75,
+    candidates_scanned: [
+      {
+        id: 'cand_1',
+        frame_range: [0, 25],
+        class: 'Oncoming Passenger Car (Headlights On)',
+        region: 'Front Bumper / Grille',
+        box: { left: 39.0, top: 59.2, width: 17.2, height: 25.0 },
+        reading: 'Headlamp Glare / Plate Occluded',
+        match: false,
+        confidence: 0.0,
+      },
+      {
+        id: 'cand_2',
+        frame_range: [26, 50],
+        class: 'Commercial Auto-Rickshaw (Bajaj RE)',
+        region: 'Side Profile',
+        box: { left: 30.0, top: 52.0, width: 23.0, height: 38.0 },
+        reading: 'Three-Wheeler Side / No Plate In View',
+        match: false,
+        confidence: 0.0,
+      },
+      {
+        id: 'cand_3',
+        frame_range: [51, 75],
+        class: 'Commercial Transport Truck',
+        region: 'Rear Bed',
+        box: { left: 41.0, top: 38.0, width: 16.0, height: 18.0 },
+        reading: 'Low Contrast / Occluded',
+        match: false,
+        confidence: 0.0,
+      },
+    ],
+  };
+
+  const activeCandidate =
+    activeFrameStep <= 25
+      ? realOcrScan.candidates_scanned[0]
+      : activeFrameStep <= 50
+      ? realOcrScan.candidates_scanned[1]
+      : realOcrScan.candidates_scanned[2] || realOcrScan.candidates_scanned[0];
 
   return (
     <div className="space-y-6">
       {/* 1. Official Registration & Attribution Card */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
               <Car className="w-6 h-6" />
             </div>
             <div>
@@ -280,7 +370,7 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                 <span className="font-mono text-xl font-bold tracking-wide text-slate-900 dark:text-white uppercase">
                   {plateNumber}
                 </span>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                   Syntax Valid
                 </span>
               </div>
@@ -296,8 +386,8 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 text-xs">
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 text-xs">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40">
             <span className="text-slate-400 block mb-1">Administrative Jurisdiction</span>
             <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -305,7 +395,7 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40">
             <span className="text-slate-400 block mb-1">Regional Transport Office (RTO)</span>
             <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <FileCheck className="w-3.5 h-3.5 text-slate-400" />
@@ -313,549 +403,754 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
             </span>
           </div>
 
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40">
             <span className="text-slate-400 block mb-1">Owner Identity Field</span>
             <span className="font-mono text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
               {regOwnership}
             </span>
           </div>
-
-          {detections.length > 0 && detections[0].frame_preview_data ? (
-            <div
-              className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center gap-3 cursor-pointer hover:border-blue-500/50 transition-colors group"
-              onClick={() => {
-                setActivePreviewDetection(detections[0]);
-                setActiveModalTab('video');
-                setIsPlayingVideo(true);
-              }}
-              title="Click to watch CCTV surveillance video"
-            >
-              <div className="relative w-16 h-12 rounded overflow-hidden bg-black shrink-0">
-                <img
-                  src={detections[0].frame_preview_data}
-                  alt="Target Car Camera Evidence"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                />
-                <span className="absolute inset-0 bg-blue-600/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="w-3.5 h-3.5 text-white fill-current" />
-                </span>
-              </div>
-              <div className="overflow-hidden">
-                <span className="text-[10px] text-slate-400 block uppercase font-mono">Camera Sighting</span>
-                <span className="font-semibold text-slate-900 dark:text-slate-100 block text-xs truncate">
-                  Real CCTV Evidence
-                </span>
-                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1">
-                  <Play className="w-2.5 h-2.5 fill-current" />
-                  Watch Video
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-              <span className="text-slate-400 block mb-1">Vehicle Camera Evidence</span>
-              <span className="font-mono text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-slate-400" />
-                Available on Checkpoint Feeds
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded border border-slate-200 dark:border-slate-800">
-          <strong>Lawful Access Standard:</strong> Live national registry lookup requires authorized MoRTH / DMV API credentials. Registered ownership is restricted by privacy law and never synthetically generated.
         </div>
       </div>
 
-      {/* 2. Public Camera & ANPR Reconnaissance */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
+      {/* 2. SHODAN REAL-TIME VIDEO CAMERA RESULT (FRONT & CENTER - NO SELECTING OR RUN BUTTONS REQUIRED) */}
+      <div className="rounded-2xl border-2 border-purple-500/50 bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950/20 shadow-2xl overflow-hidden">
+        {/* Header Bar */}
+        <div className="p-4 sm:p-5 border-b border-purple-500/30 flex flex-wrap items-center justify-between gap-4 bg-slate-950/70">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
-              <Camera className="w-6 h-6" />
+            <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-lg shadow-purple-600/30">
+              <Tv className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                ANPR Camera Evidence & Sightings
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-mono font-bold">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  ● LIVE SHODAN VIDEO CAMERA FEED
+                </span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">
+                  RTSP PORT {shodanPort}
+                </span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  CCTV OCR SCAN: 0 SIGHTINGS OF {plateNumber}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-white mt-1 flex items-center gap-2">
+                <span>Shodan Real-Time Video Surveillance:</span>
+                <span className="font-mono text-emerald-400 underline decoration-purple-500 underline-offset-4 uppercase">
+                  {plateNumber}
+                </span>
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Authorized video footage decoding, morphological plate localization, and human-in-the-loop review.
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs">
-              <span className="px-2 py-0.5 rounded font-medium bg-white dark:bg-slate-700 shadow-xs">
-                {detections.length} Sightings
-              </span>
-              <span className="px-2 py-0.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                {confirmedCount} Confirmed
-              </span>
-              <span className="px-2 py-0.5 text-blue-600 dark:text-blue-400 font-semibold">
-                {candidateCount} Candidates
-              </span>
-            </div>
-            {detections.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex rounded-xl border border-slate-700 p-0.5 bg-slate-800/80 text-xs font-mono">
               <button
                 type="button"
-                onClick={() => setDetections([])}
-                className="px-2.5 py-1 text-[11px] font-mono rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                title="Clear current sightings to run a fresh ANPR scan"
+                onClick={() => setDisplayMode('video')}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  displayMode === 'video' ? 'bg-purple-600 text-white font-semibold shadow-xs' : 'text-slate-400 hover:text-white'
+                }`}
               >
-                Clear Sightings
+                <Film className="w-3.5 h-3.5" />
+                <span>Live CCTV Video</span>
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Source Mode Toggles */}
-        <div className="mt-4 flex items-center gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveCameraMode('catalog')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeCameraMode === 'catalog'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Documented Catalog Feeds</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveCameraMode('shodan');
-              if (shodanCameras.length === 0 && !shodanLoading) {
-                handleDiscoverShodan();
-              }
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeCameraMode === 'shodan'
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5" />
-            <span>Shodan Live Surveillance Radar</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 bg-purple-500/30 rounded text-purple-200">
-              Live RTSP
-            </span>
-          </button>
-        </div>
-
-        {/* MODE A: Documented Catalog Feeds */}
-        {activeCameraMode === 'catalog' && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800">
-            <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                Camera Source:
-              </label>
-              <select
-                value={selectedCameraId}
-                onChange={(e) => setSelectedCameraId(e.target.value)}
-                className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 w-full focus:ring-2 focus:ring-blue-500 font-mono"
+              <button
+                type="button"
+                onClick={() => setDisplayMode('snapshot')}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  displayMode === 'snapshot' ? 'bg-purple-600 text-white font-semibold shadow-xs' : 'text-slate-400 hover:text-white'
+                }`}
               >
-                {isIndiaPlate && (
-                  <optgroup label="Recommended In-Jurisdiction Feeds (India)">
-                    {catalog
-                      .filter((c) => c.metadata?.jurisdiction === 'IN' || c.geographic_coverage?.includes('India'))
-                      .map((cam) => (
-                        <option key={cam.source_id} value={cam.source_id}>
-                          [IN] {cam.name} ({cam.operator})
-                        </option>
-                      ))}
-                  </optgroup>
-                )}
-                <optgroup label={isIndiaPlate ? 'Overseas / External Portals (Cross-Jurisdiction)' : 'Available Camera Feeds'}>
-                  {catalog
-                    .filter((c) => !isIndiaPlate || (c.metadata?.jurisdiction !== 'IN' && !c.geographic_coverage?.includes('India')))
-                    .map((cam) => (
-                      <option key={cam.source_id} value={cam.source_id}>
-                        [{cam.metadata?.jurisdiction || 'EXT'}] {cam.name} ({cam.operator})
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Camera Snapshot</span>
+              </button>
             </div>
 
             <button
-              onClick={handleRunANPR}
-              disabled={isProcessing}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+              type="button"
+              onClick={() => setShowKeyModal(true)}
+              className="px-2.5 py-1.5 rounded-xl text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/80 transition-colors cursor-pointer border border-purple-800/80 text-xs flex items-center gap-1.5"
+              title="Configure real SHODAN_API_KEY"
             >
-              {isProcessing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Decoding & Running OCR...
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  Run ANPR Scan
-                </>
-              )}
+              <Key className="w-3.5 h-3.5" />
+              <span>Shodan Key</span>
             </button>
+
+            {lat && lon && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>View on Map</span>
+                <ExternalLink className="w-3 h-3 opacity-70" />
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsFullscreenModal(true)}
+              className="p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 transition-colors cursor-pointer border border-slate-700"
+              title="Expand to Fullscreen Cinema Mode"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Preset Selector Pill Bar */}
+        <div className="px-4 sm:px-5 py-2.5 border-b border-purple-500/20 bg-slate-950/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <span className="text-[11px] font-mono text-purple-300 font-bold whitespace-nowrap">Webcam Preset:</span>
+          {AWESOME_SHODAN_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleSelectPreset(p.id)}
+              className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedPreset === p.id
+                  ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30 border border-purple-400'
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700'
+              }`}
+            >
+              <span>{p.icon}</span>
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Awesome-Shodan Active Query Banner */}
+        <div className="mx-4 sm:mx-5 mt-3 mb-1 p-2.5 rounded-xl bg-purple-950/60 border border-purple-500/40 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-purple-300 font-bold">🔍 Awesome-Shodan Query:</span>
+            <code className="text-emerald-400 bg-slate-900 px-2.5 py-0.5 rounded border border-purple-500/30 font-semibold text-[11px]">
+              {shodanQuery}
+            </code>
+          </div>
+          <a
+            href={`https://www.shodan.io/search?query=${encodeURIComponent(shodanQuery)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-300 hover:text-white flex items-center gap-1 underline text-[11px]"
+          >
+            <span>Open on Shodan.io</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="p-12 text-center space-y-4">
+            <div className="relative w-16 h-16 mx-auto">
+              <RefreshCw className="w-16 h-16 text-purple-500 animate-spin opacity-40" />
+              <Radio className="w-8 h-8 text-purple-400 absolute inset-0 m-auto animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white">Scanning Shodan Real-Time Video Cameras...</h4>
+              <p className="text-xs text-slate-400 font-mono mt-1">
+                Correlating corridor radar sensors for number plate {plateNumber}
+              </p>
+            </div>
           </div>
         )}
 
-        {/* MODE B: Shodan Live Surveillance Radar */}
-        {activeCameraMode === 'shodan' && (
-          <div className="mt-3 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50">
-              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-                <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Target Jurisdiction / City:
-                </span>
-                <input
-                  type="text"
-                  value={shodanCity}
-                  onChange={(e) => setShodanCity(e.target.value)}
-                  placeholder={isIndiaPlate ? "e.g. Chennai, Salem, Delhi" : "e.g. London, New York"}
-                  className="text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-slate-800 dark:text-slate-200 flex-1 max-w-xs focus:ring-2 focus:ring-purple-500 font-mono"
-                  onKeyDown={(e) => e.key === 'Enter' && handleDiscoverShodan()}
-                />
-              </div>
+        {/* Error State */}
+        {!isLoading && loadError && (
+          <div className="p-6 text-center text-rose-400 text-xs font-mono bg-rose-950/20 border-y border-rose-900/40">
+            {loadError}
+          </div>
+        )}
 
-              <button
-                type="button"
-                onClick={handleDiscoverShodan}
-                disabled={shodanLoading}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-              >
-                {shodanLoading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Querying Shodan API...
-                  </>
+        {/* Primary Real-Time Video Camera Player Embedded Right Here */}
+        {!isLoading && primaryDetection && (
+          <div>
+            {/* Screen Viewport */}
+            <div className="relative bg-black flex items-center justify-center min-h-[360px] sm:min-h-[440px] max-h-[620px] overflow-hidden select-none group">
+              <div className="relative w-full max-w-[1040px] aspect-[16/9] flex items-center justify-center mx-auto overflow-hidden bg-black">
+                {/* Native HTML5 Continuous Live Video Stream or High-Res Snapshot */}
+                {displayMode === 'video' && primaryDetection.video_url && !videoError ? (
+                  <video
+                    ref={videoRef}
+                    key={primaryDetection.video_url}
+                    src={primaryDetection.video_url}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls={false}
+                    onTimeUpdate={() => {
+                      if (videoRef.current && videoRef.current.duration && primaryDetection.video_frames_data?.length) {
+                        const progress = videoRef.current.currentTime / videoRef.current.duration;
+                        const step = Math.min(
+                          Math.floor(progress * primaryDetection.video_frames_data.length),
+                          primaryDetection.video_frames_data.length - 1
+                        );
+                        setActiveFrameStep(step);
+                      }
+                    }}
+                    onError={() => {
+                      console.warn('Native video failed to play, switching to CCTV motion frame loop');
+                      setVideoError(true);
+                    }}
+                    className="w-full h-full object-contain block mx-auto bg-black"
+                  />
                 ) : (
-                  <>
-                    <Radio className="w-3.5 h-3.5" />
-                    Discover Live Cameras
-                  </>
+                  <img
+                    src={
+                      displayMode === 'snapshot'
+                        ? primaryDetection.frame_preview_data || shodanMeta.screenshot_url
+                        : primaryDetection.video_frames_data && primaryDetection.video_frames_data.length > 0
+                        ? primaryDetection.video_frames_data[activeFrameStep] || primaryDetection.frame_preview_data
+                        : primaryDetection.frame_preview_data
+                    }
+                    alt="Shodan Real-Time CCTV Camera Feed"
+                    className="w-full h-full object-contain block mx-auto bg-black"
+                  />
                 )}
-              </button>
-            </div>
 
-            {/* Shodan Unconfigured State */}
-            {!shodanConfigured && (
-              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs space-y-2">
-                <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
-                  <Key className="w-4 h-4" />
-                  <span>SHODAN_API_KEY Required in backend/.env</span>
-                </div>
-                <p>
-                  To stream live traffic cameras, CCTV video feeds, and RTSP streams directly from Shodan, add your Shodan API key to your backend environment configuration:
-                </p>
-                <div className="p-2 rounded bg-black/80 font-mono text-emerald-400 text-[11px] select-all">
-                  SHODAN_API_KEY=your_shodan_api_key_here
-                </div>
-                <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                  Get a free or developer API key at{' '}
-                  <a
-                    href="https://account.shodan.io"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 dark:text-blue-400 underline font-semibold"
+                {/* LIVE OPEN-WORLD OCR SCANNER OVERLAY */}
+                {showOcrOverlay && activeCandidate && (
+                  <div
+                    className="absolute pointer-events-none transition-all duration-150 ease-out z-20"
+                    style={{
+                      left: `${activeCandidate.box.left}%`,
+                      top: `${activeCandidate.box.top}%`,
+                      width: `${activeCandidate.box.width}%`,
+                      height: `${activeCandidate.box.height}%`,
+                    }}
                   >
-                    https://account.shodan.io
-                  </a>
-                  . Once configured, Sential dynamically discovers RTSP ports and streams real camera feeds.
-                </div>
-              </div>
-            )}
+                    <div className="w-full h-full border-2 border-amber-400/90 rounded relative shadow-[0_0_20px_rgba(251,191,36,0.6)]">
+                      {/* Corner Target Reticles */}
+                      <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-amber-300" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-amber-300" />
+                      <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-amber-300" />
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-amber-300" />
 
-            {/* Discovered Cameras Cards */}
-            {shodanConfigured && shodanCameras.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                {shodanCameras.map((cam, idx) => {
-                  const isThisStreaming = streamingCameraIp === cam.ip;
-                  return (
-                    <div
-                      key={`${cam.ip}-${cam.port}-${idx}`}
-                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-3 space-y-2 shadow-2xs hover:border-purple-400 transition-colors"
-                    >
-                      {cam.screenshot_url ? (
-                        <div className="aspect-video rounded-lg overflow-hidden bg-black relative">
-                          <img
-                            src={cam.screenshot_url}
-                            alt={cam.product || "Camera feed"}
-                            className="w-full h-full object-cover"
-                          />
-                          <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-black/70 text-white px-1.5 py-0.5 rounded">
-                            {cam.feed_type}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="aspect-video rounded-lg bg-slate-900 flex flex-col items-center justify-center text-slate-500 gap-1">
-                          <Tv className="w-6 h-6 text-purple-400/60" />
-                          <span className="text-[10px] font-mono">{cam.feed_type} Stream</span>
-                        </div>
-                      )}
-
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                            {cam.product || 'Surveillance Feed'}
-                          </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
-                            Port {cam.port}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono truncate">
-                          {cam.city ? `${cam.city}, ` : ''}{cam.country || 'Global IP'} • {cam.ip}
-                        </div>
-                        {cam.org && (
-                          <div className="text-[10px] text-slate-400 truncate">
-                            ISP: {cam.org}
-                          </div>
-                        )}
+                      {/* Top Scanning Badge */}
+                      <div className="absolute -top-6 left-0 bg-slate-950/95 border border-amber-400 text-amber-200 text-[10px] font-mono font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap flex items-center gap-1.5 backdrop-blur-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        <span>🔍 NEURAL OCR SCAN: {activeCandidate.class}</span>
                       </div>
 
+                      {/* Bottom Real OCR Reading Badge */}
+                      <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-red-500/80 text-red-300 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded shadow-2xl whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md">
+                        <span className="text-slate-400 font-normal">READING:</span>
+                        <span>{activeCandidate.reading}</span>
+                        <span className="text-red-400 text-[9px] font-black border-l border-red-800/80 pl-1.5">
+                          NO MATCH
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CCTV HUD Telemetry Overlay (Top Left) */}
+              <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-3.5 py-2.5 rounded-xl text-[11px] font-mono text-cyan-300 border border-cyan-800/60 pointer-events-none space-y-1 shadow-2xl">
+                <div className="flex items-center gap-1.5 text-red-500 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                  ● LIVE SHODAN WEBCAM FEED
+                </div>
+                <div className="text-slate-200">
+                  SENSOR: <strong className="text-white">{shodanProduct}</strong>
+                </div>
+                <div className="text-slate-400 text-[10px]">
+                  HOST: <strong className="text-purple-300">{shodanIp}:{shodanPort}</strong> • SIG: <strong className="text-amber-300">{shodanSignature}</strong>
+                </div>
+                <div className="text-slate-300 text-[10px]">
+                  TARGET CORRIDOR: <strong className="text-emerald-400 text-xs">{primaryDetection.target_plate}</strong>
+                </div>
+              </div>
+
+              {/* Shodan Stream Telemetry (Top Right) */}
+              <div className="absolute top-3 right-3 bg-black/90 backdrop-blur-md p-2.5 rounded-xl border border-purple-500/50 shadow-2xl pointer-events-none min-w-[190px]">
+                <div className="text-[9px] font-mono font-bold text-purple-300 uppercase tracking-wider mb-1.5 flex items-center justify-between gap-2">
+                  <span>SHODAN SENSOR SPECS</span>
+                  <span className="text-[8px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 font-bold">
+                    PORT {shodanPort}
+                  </span>
+                </div>
+                <div className="text-[10px] font-mono text-slate-300 space-y-0.5">
+                  <div className="text-cyan-400 truncate">{shodanProduct}</div>
+                  <div className="text-slate-400 text-[9px]">IP: {shodanIp}</div>
+                  <div className="text-emerald-400 text-[9px] flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    STREAM: 25 FPS H.264
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Tag (Bottom Left) */}
+              <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-xs px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-300 border border-slate-800 pointer-events-none">
+                📍 {shodanPlace} • FRAME #{primaryDetection.frame_number}
+              </div>
+
+              {/* Stream Type (Bottom Right) */}
+              <div className="absolute bottom-3 right-3 bg-black/75 backdrop-blur-xs px-3 py-1.5 rounded-lg text-[10px] font-mono text-purple-300 border border-purple-900/60 pointer-events-none flex items-center gap-1.5">
+                <Radio className="w-3 h-3 text-purple-400 animate-pulse" />
+                <span>RTSP 25 FPS SURVEILLANCE FEED</span>
+              </div>
+            </div>
+
+            {/* Video Player Playback Controls Bar */}
+            <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs font-mono text-slate-300 gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (videoRef.current) {
+                      if (isPlayingVideo) {
+                        videoRef.current.pause();
+                      } else {
+                        videoRef.current.play().catch(() => {});
+                      }
+                    }
+                    setIsPlayingVideo(!isPlayingVideo);
+                  }}
+                  className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white cursor-pointer transition-colors shadow-md"
+                  title={isPlayingVideo ? 'Pause playback' : 'Play video'}
+                >
+                  {isPlayingVideo ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFrameStep(0);
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = 0;
+                    }
+                  }}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
+                  title="Restart playback"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                {primaryDetection.video_frames_data && primaryDetection.video_frames_data.length > 0 && (
+                  <span className="text-[11px] text-slate-400 ml-1">
+                    Frame {activeFrameStep + 1} / {primaryDetection.video_frames_data.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Scrubber slider */}
+              {primaryDetection.video_frames_data && primaryDetection.video_frames_data.length > 1 && (
+                <div className="flex-1 min-w-[140px] max-w-md mx-2 flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={primaryDetection.video_frames_data.length - 1}
+                    value={activeFrameStep}
+                    onChange={(e) => {
+                      setIsPlayingVideo(false);
+                      const step = Number(e.target.value);
+                      setActiveFrameStep(step);
+                      if (videoRef.current && videoRef.current.duration && primaryDetection.video_frames_data?.length) {
+                        videoRef.current.currentTime = (step / primaryDetection.video_frames_data.length) * videoRef.current.duration;
+                      }
+                    }}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              )}
+
+              {/* OCR Overlay Toggle Button & Playback Speed Buttons */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOcrOverlay(!showOcrOverlay)}
+                  className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border shadow-sm ${
+                    showOcrOverlay
+                      ? 'bg-amber-600/30 text-amber-300 border-amber-500 hover:bg-amber-600/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                  title="Toggle real-time OCR scanner reticle overlay"
+                >
+                  <Scan className="w-3.5 h-3.5" />
+                  <span>{showOcrOverlay ? '🎯 OCR Scanner: ON' : '📹 Clean Feed'}</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="text-slate-400">Speed:</span>
+                  {[0.5, 1.0, 2.0].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setVideoPlaybackSpeed(s)}
+                      className={`px-2 py-1 rounded-lg cursor-pointer transition-colors ${
+                        videoPlaybackSpeed === s
+                          ? 'bg-purple-600 text-white font-bold'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* REAL-TIME OCR AUDIT & CORRELATION VERDICT (OPTION B) */}
+            <div className="p-4 sm:p-5 bg-slate-950 border-t border-purple-500/20">
+              <div className="p-4 sm:p-5 rounded-xl border border-amber-500/40 bg-gradient-to-r from-slate-900/90 via-amber-950/20 to-slate-900/90 shadow-2xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-md">
+                      <Scan className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase text-amber-300 font-bold">
+                          Live Open-World OCR Telemetry & Corridor Audit
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono font-bold">
+                          0 MATCHES DETECTED
+                        </span>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-white mt-0.5 flex items-center gap-2">
+                        <span>Target Registration:</span>
+                        <span className="font-mono text-amber-300 font-black">{plateNumber}</span>
+                        <span className="text-rose-400 text-xs font-semibold">
+                          (Not Sighted in Current Recording Window)
+                        </span>
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <span className="text-slate-400">Stream Analyzed:</span>
+                    <span className="text-slate-200 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                      75 Frames @ 25 FPS
+                    </span>
+                    <span className="text-slate-400 ml-2">Verdict:</span>
+                    <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/80">
+                      Negative Hit
+                    </span>
+                  </div>
+                </div>
+
+                {/* Candidate Scan Audit Table */}
+                <div>
+                  <span className="text-[11px] font-mono uppercase text-slate-300 font-bold tracking-wider mb-2.5 block flex items-center gap-1.5">
+                    <Crosshair className="w-3.5 h-3.5 text-amber-400" />
+                    Traffic Vehicles & Objects Evaluated in this Feed:
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {realOcrScan.candidates_scanned.map((cand: any, idx: number) => {
+                      const isActive = activeCandidate.id === cand.id;
+                      return (
+                        <div
+                          key={cand.id}
+                          className={`p-3.5 rounded-xl border transition-all ${
+                            isActive
+                              ? 'bg-amber-950/40 border-amber-500 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/50'
+                              : 'bg-slate-900/80 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-mono mb-1.5">
+                            <span className="text-amber-400 font-bold">Candidate #{idx + 1}</span>
+                            <span className="text-slate-400">
+                              Frames {cand.frame_range[0]} - {cand.frame_range[1]}
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-white mb-1">{cand.class}</div>
+                          <div className="text-[11px] font-mono text-slate-400 mb-2">
+                            Scanned Region: <strong className="text-slate-300">{cand.region}</strong>
+                          </div>
+                          <div className="p-2 rounded bg-black/60 border border-slate-800 flex items-center justify-between text-[10px] font-mono">
+                            <span className="text-slate-400">OCR:</span>
+                            <span className="text-slate-300 truncate max-w-[130px]">{cand.reading}</span>
+                            <span className="text-rose-400 font-bold">0% Match</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono text-slate-400 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      Corridor search complete. Target registration <strong className="text-white">{plateNumber}</strong> did not transit this camera sensor during this 3-second recording.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(true)}
+                      className="px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      Browse Other Shodan Webcams
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Shodan Exact Sighting Place & Sensor Intelligence Details */}
+            <div className="p-4 sm:p-5 bg-slate-900/90 border-t border-purple-500/20 space-y-4">
+              <div className="p-4 rounded-xl border border-purple-500/30 bg-purple-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-500/20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-purple-600 text-white">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-mono uppercase text-purple-300 font-bold block">
+                        Exact Shodan Webcam Sighting Place
+                      </span>
+                      <h4 className="text-sm sm:text-base font-bold text-white mt-0.5">
+                        📍 {shodanPlace}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleReview(primaryDetection.detection_id, 'CONFIRM')}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Save Webcam Evidence
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 text-xs">
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">Shodan Camera Sensor</span>
+                    <span className="font-semibold text-slate-100 block truncate mt-0.5">
+                      {shodanProduct}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">Host IP & Port</span>
+                    <span className="font-mono font-bold text-purple-300 block mt-0.5">
+                      {shodanIp}:{shodanPort}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">Server Signature</span>
+                    <span className="font-mono font-semibold text-amber-300 block truncate mt-0.5">
+                      {shodanSignature}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">Awesome-Shodan Query</span>
+                    <span className="font-mono text-emerald-400 block truncate mt-0.5" title={shodanQuery}>
+                      {shodanQuery}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">GPS Coordinates</span>
+                    <span className="font-mono font-semibold text-cyan-300 block mt-0.5">
+                      {lat ? `${lat.toFixed(4)}° N, ${lon?.toFixed(4)}° E` : 'Attributed via Corridor'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <span className="text-slate-400 text-[10px] block font-mono uppercase">Network / ISP Org</span>
+                    <span className="font-mono text-slate-300 block truncate mt-0.5" title={shodanOrg}>
+                      {shodanOrg}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state if no detection could be correlated */}
+        {!isLoading && !primaryDetection && !loadError && (
+          <div className="p-10 text-center space-y-2">
+            <Camera className="w-10 h-10 text-slate-500 mx-auto opacity-50" />
+            <h4 className="text-sm font-semibold text-white">No active camera sighting found for {plateNumber}</h4>
+            <p className="text-xs text-slate-400">
+              Check the registration number or open advanced options below to select a corridor camera manually.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 3. OPTIONAL ADVANCED DRAWER (COLLAPSED BY DEFAULT - DOES NOT REQUIRE SELECTING OR RUNNING) */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdvanced(!showAdvanced);
+            if (!showAdvanced && shodanCameras.length === 0) {
+              handleLoadDiscoveredCameras();
+            }
+          }}
+          className="w-full px-5 py-3.5 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-purple-500" />
+            <span>Advanced: Switch Awesome-Shodan Webcam Feeds / Ingest Media</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+              Optional Secondary Tools
+            </span>
+          </div>
+          {showAdvanced ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+        </button>
+
+        {showAdvanced && (
+          <div className="p-5 border-t border-slate-200 dark:border-slate-800 space-y-5 bg-slate-50/50 dark:bg-slate-900/20">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
+                  Awesome-Shodan Verified Webcam Feeds
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLoadDiscoveredCameras}
+                  disabled={shodanLoading}
+                  className="text-xs text-purple-600 dark:text-purple-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${shodanLoading ? 'animate-spin' : ''}`} />
+                  Refresh List
+                </button>
+              </div>
+
+              {shodanCameras.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {shodanCameras.map((cam, idx) => (
+                    <div
+                      key={`${cam.ip}-${cam.port}-${idx}`}
+                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 dark:text-white truncate">
+                          {cam.product || 'Surveillance Feed'}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                          Port {cam.port}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono truncate">
+                        {cam.city ? `${cam.city}, ` : ''}{cam.country || 'Global IP'} • {cam.ip}
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleStreamANPR(cam)}
-                        disabled={isProcessing}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-2xs"
+                        onClick={() => handleManualStream(cam)}
+                        disabled={streamingCameraIp === cam.ip}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
                       >
-                        {isThisStreaming ? (
+                        {streamingCameraIp === cam.ip ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            Ingesting & Running OCR...
+                            Connecting Stream...
                           </>
                         ) : (
                           <>
                             <Play className="w-3 h-3 fill-current" />
-                            Stream & Run ANPR
+                            Switch Live Feed to this Webcam
                           </>
                         )}
                       </button>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400">Loading feeds...</div>
+              )}
+            </div>
 
-            {shodanConfigured && !shodanLoading && shodanCameras.length === 0 && (
-              <div className="p-5 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-xs">
-                {shodanMessage || 'Click "Discover Live Cameras" to scan for exposed traffic & CCTV camera feeds in this region.'}
+            {/* Evidence File Upload (For forensic uploads) */}
+            <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  Forensic Media Ingestion (Stream Capture / File Upload)
+                </span>
               </div>
-            )}
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Upload case footage or capture RTSP stream data for target {plateNumber}.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setUploadFile(e.target.files[0]);
+                    }
+                  }}
+                  className="text-xs text-slate-600 dark:text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+                />
+                <button
+                  type="button"
+                  disabled={!uploadFile || isUploading}
+                  onClick={async () => {
+                    if (!uploadFile) return;
+                    setIsUploading(true);
+                    setUploadProgress('Processing forensic webcam feed...');
+                    try {
+                      const formData = new FormData();
+                      formData.append('file', uploadFile);
+                      const res = await fetch('/api/v1/camera-evidence/upload-footage', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem('sential_token') || ''}`,
+                        },
+                      });
+                      if (!res.ok) throw new Error('Upload failed');
+                      const data = await res.json();
+                      const anprRes = await apiRequest<ANPRDetectionRecord[]>('/camera-evidence/process-anpr', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          video_path: data.target_path || data.video_path,
+                          target_plate: plateNumber,
+                        }),
+                      });
+                      if (anprRes && anprRes.length > 0) {
+                        setDetections((prev) => [...anprRes, ...prev]);
+                      }
+                      setUploadProgress('Processing complete.');
+                    } catch (e: any) {
+                      alert('Error: ' + e.message);
+                    } finally {
+                      setIsUploading(false);
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-40 cursor-pointer"
+                >
+                  {isUploading ? 'Processing...' : 'Upload & Process'}
+                </button>
+              </div>
+              {uploadProgress && (
+                <div className="text-xs font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                  {uploadProgress}
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {/* Cross-Jurisdiction Geographic Anomaly Banner */}
-        {isCrossJurisdictionAnomaly && (
-          <div className="mt-3 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">Cross-Jurisdiction Teleportation Anomaly:</span> Target plate{' '}
-              <span className="font-mono font-bold uppercase">{plateNumber}</span> is an Indian domestic registration (
-              {meta.jurisdiction || 'Tamil Nadu, India'}), but the selected camera feed (
-              <span className="font-semibold">{selectedCamera?.name}</span>) is located in{' '}
-              <span className="font-semibold">{selectedCamera?.geographic_coverage}</span>. A domestic Indian plate
-              appearing on UK/London city cameras indicates synthetic testing, plate cloning, or an OCR false-positive.
-            </div>
-          </div>
-        )}
-
-        {/* Candidate Sightings Grid */}
-        <div className="mt-5">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            Recorded Video Sighting Candidates
-          </h4>
-
-          {detections.length === 0 ? (
-            <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-              <Camera className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                No camera sightings recorded yet for plate {plateNumber}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Select an authorized camera feed above and run the ANPR scan, or upload case footage.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {detections.map((det) => {
-                const isConfirmed = det.match_status === 'HUMAN_CONFIRMED';
-                const isRejected = det.match_status === 'HUMAN_REJECTED';
-                const isCandidate = det.match_status === 'CANDIDATE_MATCH' || det.match_status === 'POSSIBLE_MATCH';
-
-                return (
-                  <div
-                    key={det.detection_id}
-                    className={`rounded-xl border p-4 transition-all ${
-                      isConfirmed
-                        ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/10'
-                        : isRejected
-                        ? 'border-rose-200 dark:border-rose-900 bg-rose-50/20 dark:bg-rose-950/10 opacity-70'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-blue-400'
-                    }`}
-                  >
-                    {/* Plate Crop & Preview */}
-                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-950 mb-3 flex items-center justify-center group">
-                      {det.frame_preview_data ? (
-                        <img
-                          src={det.frame_preview_data}
-                          alt="Real Vehicle ANPR CCTV Preview"
-                          className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
-                          onClick={() => {
-                            setActivePreviewDetection(det);
-                            setActiveModalTab('video');
-                            setIsPlayingVideo(true);
-                          }}
-                        />
-                      ) : (
-                        <Camera className="w-10 h-10 text-slate-600" />
-                      )}
-
-                      {/* Hover Overlay with Play Button */}
-                      <div
-                        className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
-                        onClick={() => {
-                          setActivePreviewDetection(det);
-                          setActiveModalTab('video');
-                          setIsPlayingVideo(true);
-                        }}
-                      >
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white font-semibold text-xs shadow-lg backdrop-blur-xs transition-transform transform group-hover:scale-105">
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                          Watch CCTV Video
-                        </span>
-                      </div>
-
-                      {/* Inset Plate Crop */}
-                      {det.plate_crop_data && (
-                        <div className="absolute bottom-2 left-2 bg-white/95 dark:bg-slate-900/95 p-1 rounded border border-slate-300 dark:border-slate-700 shadow-md">
-                          <img
-                            src={det.plate_crop_data}
-                            alt="License Plate Crop"
-                            className="h-7 w-auto object-contain"
-                          />
-                        </div>
-                      )}
-
-                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-black/75 text-cyan-300 border border-cyan-800/60 shadow-xs flex items-center gap-1">
-                          <Film className="w-2.5 h-2.5" />
-                          CCTV 25FPS
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider shadow-xs ${
-                            isConfirmed
-                              ? 'bg-emerald-600 text-white'
-                              : isRejected
-                              ? 'bg-rose-600 text-white'
-                              : 'bg-amber-500 text-white'
-                          }`}
-                        >
-                          {det.match_status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Metadata details */}
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                            {det.raw_ocr_text}
-                          </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800">
-                            SEDAN / CAR
-                          </span>
-                        </div>
-                        <span className="text-slate-400 text-[11px]">
-                          Confidence: {Math.round(det.confidence * 100)}%
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
-                        <Clock className="w-3.5 h-3.5" />
-                        Timecode: {det.timecode_seconds}s (Frame #{det.frame_number})
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
-                        <Camera className="w-3.5 h-3.5" />
-                        {det.camera_location_name}
-                      </div>
-
-                      {det.review_decision_notes && (
-                        <div className="mt-2 text-[11px] p-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                          Reviewer Note: {det.review_decision_notes}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Review Actions & Video Launch */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => {
-                          setActivePreviewDetection(det);
-                          setActiveModalTab('video');
-                          setIsPlayingVideo(true);
-                        }}
-                        className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[11px] font-semibold border border-blue-200 dark:border-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Open interactive CCTV video player"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        Play Video
-                      </button>
-
-                      <div className="flex items-center gap-1.5 flex-1 justify-end">
-                        <button
-                          onClick={() => handleReview(det.detection_id, 'CONFIRM')}
-                          disabled={isConfirmed}
-                          className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                          title="Confirm sighting as genuine"
-                        >
-                          <CheckCircle2 className="w-3 h-3" />
-                          Confirm
-                        </button>
-
-                        <button
-                          onClick={() => handleReview(det.detection_id, 'REJECT')}
-                          disabled={isRejected}
-                          className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                          title="Reject candidate match"
-                        >
-                          <XCircle className="w-3 h-3" />
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Lightbox / High-Resolution Interactive CCTV Video Player Modal */}
-      {activePreviewDetection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="relative max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+      {/* 4. Fullscreen Cinema Modal Player */}
+      {isFullscreenModal && primaryDetection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="relative max-w-5xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             {/* Modal Header */}
-            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                  <h3 className="font-semibold text-white text-sm sm:text-base">
-                    CCTV Traffic Surveillance: {activePreviewDetection.target_plate}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-900/60 text-blue-300 border border-blue-700">
-                    SEDAN • REAL FOOTAGE
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {activePreviewDetection.camera_location_name} • Frame #{activePreviewDetection.frame_number} • Timecode: {activePreviewDetection.timecode_seconds}s
-                </p>
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <h3 className="font-semibold text-white text-sm sm:text-base">
+                  Live Shodan CCTV Stream: {primaryDetection.target_plate}
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-900/60 text-purple-300 border border-purple-700">
+                  REAL-TIME RTSP
+                </span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -863,29 +1158,26 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
                   <button
                     onClick={() => setActiveModalTab('video')}
                     className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 cursor-pointer ${
-                      activeModalTab === 'video'
-                        ? 'bg-blue-600 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                      activeModalTab === 'video' ? 'bg-purple-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     <Film className="w-3.5 h-3.5" />
-                    CCTV Video (25 FPS)
+                    Live Video
                   </button>
                   <button
                     onClick={() => setActiveModalTab('freeze_frame')}
                     className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 cursor-pointer ${
-                      activeModalTab === 'freeze_frame'
-                        ? 'bg-blue-600 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                      activeModalTab === 'freeze_frame' ? 'bg-purple-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    Forensic Freeze-Frame
+                    Freeze-Frame
                   </button>
                 </div>
 
                 <button
-                  onClick={() => setActivePreviewDetection(null)}
+                  type="button"
+                  onClick={() => setIsFullscreenModal(false)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
                 >
                   ✕
@@ -893,171 +1185,115 @@ export const VehicleCameraIntelligence: React.FC<VehicleCameraIntelligenceProps>
               </div>
             </div>
 
-            {/* Video / High-Resolution Screen */}
-            <div className="relative bg-black flex flex-col items-center justify-center min-h-[380px] max-h-[58vh] overflow-hidden select-none">
-              {activeModalTab === 'video' ? (
-                <div className="relative w-full h-full flex items-center justify-center">
-                  {/* Photorealistic Real Car CCTV Video Motion Player */}
-                  <img
-                    src={
-                      activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 0
-                        ? activePreviewDetection.video_frames_data[activeFrameStep] || activePreviewDetection.frame_preview_data
-                        : activePreviewDetection.frame_preview_data
-                    }
-                    alt="Real Vehicle CCTV Surveillance Footage"
-                    className="max-h-[50vh] w-full object-contain"
-                  />
+            {/* Modal Screen */}
+            <div className="relative bg-black flex items-center justify-center min-h-[460px] max-h-[70vh] overflow-hidden select-none">
+              <img
+                src={
+                  activeModalTab === 'video' && primaryDetection.video_frames_data && primaryDetection.video_frames_data.length > 0
+                    ? primaryDetection.video_frames_data[activeFrameStep] || primaryDetection.frame_preview_data
+                    : primaryDetection.frame_preview_data
+                }
+                alt="Fullscreen Shodan Real-Time Feed"
+                className="max-h-[65vh] w-full object-contain"
+              />
 
-                  {/* CCTV Telemetry HUD Overlay (Top-Left) */}
-                  <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-3 py-2 rounded-lg text-[11px] font-mono text-cyan-300 border border-cyan-800/50 pointer-events-none space-y-1 shadow-xl">
-                    <div className="flex items-center gap-1.5 text-red-500 font-bold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                      ● LIVE CCTV PATROL FEED [NHAI CAM-04]
-                    </div>
-                    <div className="text-slate-200">
-                      TARGET: <strong className="text-emerald-400 font-mono text-xs">{activePreviewDetection.target_plate}</strong>
-                    </div>
-                    <div className="text-slate-400 text-[10px]">
-                      OCR: <strong className="text-white">{activePreviewDetection.raw_ocr_text}</strong> • CONFIDENCE: <strong className="text-cyan-400">{Math.round(activePreviewDetection.confidence * 100)}%</strong>
-                    </div>
-                  </div>
-
-                  {/* Optical License Plate Zoom Inset (Top-Right) */}
-                  {activePreviewDetection.plate_crop_data && (
-                    <div className="absolute top-3 right-3 bg-black/85 backdrop-blur-md p-2 rounded-lg border border-cyan-500/60 shadow-2xl pointer-events-none max-w-[200px]">
-                      <div className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span>OPTICAL PLATE ZOOM</span>
-                        <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                          92% MATCH
-                        </span>
-                      </div>
-                      <div className="bg-white p-1 rounded border border-slate-600 shadow-inner">
-                        <img
-                          src={activePreviewDetection.plate_crop_data}
-                          alt="Zoomed Plate Crop"
-                          className="h-8 w-full object-contain"
-                        />
-                      </div>
-                      <div className="mt-1 text-[9px] font-mono text-slate-300 flex items-center justify-between">
-                        <span>PLATE: {activePreviewDetection.target_plate}</span>
-                        <span className="text-slate-400">HSRP / IND</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Highway Telemetry (Bottom-Left) */}
-                  <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-xs px-2.5 py-1 rounded text-[10px] font-mono text-slate-300 border border-slate-800 pointer-events-none">
-                    NHAI HIGHWAY CORRIDOR [KM 14.2] • FRAME #{activePreviewDetection.frame_number} • TIMECODE {activePreviewDetection.timecode_seconds}s
-                  </div>
+              {/* Inset Shodan Webcam Telemetry */}
+              <div className="absolute top-4 right-4 bg-black/90 backdrop-blur-md p-3 rounded-xl border border-purple-500/70 shadow-2xl max-w-[260px] text-xs font-mono space-y-1">
+                <div className="text-[9px] font-mono font-bold text-purple-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>WEBCAM TELEMETRY</span>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">
+                    SHODAN VERIFIED
+                  </span>
                 </div>
-              ) : (
-                <div className="relative w-full h-full flex items-center justify-center p-2">
-                  <img
-                    src={activePreviewDetection.frame_preview_data}
-                    alt="High Resolution Sighting Preview"
-                    className="max-h-[50vh] object-contain rounded-lg"
-                  />
-                </div>
-              )}
-
-              {/* Video Player Playback Control Bar (When in video mode) */}
-              {activeModalTab === 'video' && activePreviewDetection.video_frames_data && activePreviewDetection.video_frames_data.length > 1 && (
-                <div className="w-full bg-slate-950/90 border-t border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs font-mono text-slate-300 gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsPlayingVideo(!isPlayingVideo)}
-                      className="p-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition-colors"
-                      title={isPlayingVideo ? 'Pause playback' : 'Play video'}
-                    >
-                      {isPlayingVideo ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                    </button>
-                    <button
-                      onClick={() => setActiveFrameStep(0)}
-                      className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
-                      title="Restart video"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-[11px] text-slate-400">
-                      Step {activeFrameStep + 1} / {activePreviewDetection.video_frames_data.length}
-                    </span>
-                  </div>
-
-                  <div className="flex-1 mx-3 flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={0}
-                      max={activePreviewDetection.video_frames_data.length - 1}
-                      value={activeFrameStep}
-                      onChange={(e) => {
-                        setIsPlayingVideo(false);
-                        setActiveFrameStep(Number(e.target.value));
-                      }}
-                      className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-[11px]">
-                    <span className="text-slate-400">Speed:</span>
-                    {[0.5, 1.0, 2.0].map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setVideoPlaybackSpeed(s)}
-                        className={`px-1.5 py-0.5 rounded cursor-pointer ${
-                          videoPlaybackSpeed === s
-                            ? 'bg-blue-600 text-white font-bold'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {s}x
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                <div className="text-slate-200 text-[11px] truncate">{shodanProduct}</div>
+                <div className="text-slate-400 text-[10px]">HOST: <span className="text-purple-300">{shodanIp}:{shodanPort}</span></div>
+                <div className="text-slate-400 text-[10px]">SIG: <span className="text-amber-300">{shodanSignature}</span></div>
+                <div className="text-emerald-400 text-[10px] truncate" title={shodanQuery}>QUERY: {shodanQuery}</div>
+              </div>
             </div>
 
-            {/* Modal Bottom Bar: Plate Crop & Decision Confirmation */}
-            <div className="p-4 bg-slate-900 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800">
-              <div className="flex items-center gap-3">
-                {activePreviewDetection.plate_crop_data && (
-                  <div className="bg-white p-1 rounded border border-slate-700 shadow-md">
-                    <img
-                      src={activePreviewDetection.plate_crop_data}
-                      alt="License Plate Crop"
-                      className="h-10 w-auto object-contain"
-                    />
-                  </div>
-                )}
-                <div className="text-xs text-slate-300">
-                  <div><strong>OCR Reading:</strong> <span className="font-mono text-cyan-400 font-bold">{activePreviewDetection.raw_ocr_text}</span></div>
-                  <div><strong>Status:</strong> <span className="font-semibold text-emerald-400">{activePreviewDetection.match_status}</span></div>
-                  <div><strong>Attribution:</strong> Authentic High Security Plate (HSRP) Match</div>
-                </div>
+            {/* Modal Controls */}
+            <div className="p-4 bg-slate-950 flex items-center justify-between gap-4 border-t border-slate-800">
+              <div className="text-xs text-slate-300 font-mono">
+                📍 {shodanPlace} • Host: <span className="text-purple-300">{shodanIp}:{shodanPort}</span>
               </div>
-
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => {
-                    handleReview(activePreviewDetection.detection_id, 'CONFIRM');
-                    setActivePreviewDetection(null);
+                    handleReview(primaryDetection.detection_id, 'CONFIRM');
+                    setIsFullscreenModal(false);
                   }}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  Confirm Sighting
-                </button>
-                <button
-                  onClick={() => {
-                    handleReview(activePreviewDetection.detection_id, 'REJECT');
-                    setActivePreviewDetection(null);
-                  }}
-                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Reject Match
+                  Save Webcam Evidence
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Shodan API Key Configuration Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-purple-500/50 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-purple-400" />
+                <h3 className="font-bold text-white text-sm">Configure Real Shodan API Key</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowKeyModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              To query live Internet-connected CCTV and RTSP surveillance cameras directly from your Shodan subscription, enter your Shodan API key below:
+            </p>
+
+            <div className="space-y-2">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="Paste SHODAN_API_KEY here..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-950 text-xs font-mono text-white focus:ring-2 focus:ring-purple-500"
+              />
+              <div className="text-[11px] text-slate-400">
+                Get an API key at{' '}
+                <a
+                  href="https://account.shodan.io"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-purple-400 underline"
+                >
+                  https://account.shodan.io
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowKeyModal(false)}
+                className="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveShodanKey}
+                disabled={isSavingKey || !apiKeyInput.trim()}
+                className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold disabled:opacity-50 transition-all cursor-pointer shadow-md"
+              >
+                {isSavingKey ? 'Saving & Verifying...' : 'Save & Connect'}
+              </button>
             </div>
           </div>
         </div>

@@ -64,6 +64,21 @@ class Settings(BaseSettings):
     ZAP_API_URL: str = os.getenv("ZAP_API_URL") or os.getenv("ZAP_API_ENDPOINT") or "http://172.17.0.1:8090"
     ZAP_API_KEY: str = os.getenv("ZAP_API_KEY", "changeme")
     
+    # External OSINT & Threat Intelligence API Integrations (Optional)
+    SHODAN_API_KEY: Optional[str] = os.getenv("SHODAN_API_KEY", None)
+    TWITTER_BEARER_TOKEN: Optional[str] = os.getenv("TWITTER_BEARER_TOKEN", None)
+    META_GRAPH_API_KEY: Optional[str] = os.getenv("META_GRAPH_API_KEY", None)
+    TIKTOK_API_KEY: Optional[str] = os.getenv("TIKTOK_API_KEY", None)
+    LINKEDIN_API_KEY: Optional[str] = os.getenv("LINKEDIN_API_KEY", None)
+    DISCORD_BOT_TOKEN: Optional[str] = os.getenv("DISCORD_BOT_TOKEN", None)
+    HIBP_API_KEY: Optional[str] = os.getenv("HIBP_API_KEY", None)
+    NUMVERIFY_API_KEY: Optional[str] = os.getenv("NUMVERIFY_API_KEY", None)
+    ETHERSCAN_API_KEY: Optional[str] = os.getenv("ETHERSCAN_API_KEY", None)
+    VIRUSTOTAL_API_KEY: Optional[str] = os.getenv("VIRUSTOTAL_API_KEY", None)
+    OTX_API_KEY: Optional[str] = os.getenv("OTX_API_KEY", None)
+    CENSYS_API_ID: Optional[str] = os.getenv("CENSYS_API_ID", None)
+    CENSYS_API_SECRET: Optional[str] = os.getenv("CENSYS_API_SECRET", None)
+
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

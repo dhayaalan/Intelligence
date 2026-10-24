@@ -1,5 +1,7 @@
 import asyncio
 import time
+import re
+import urllib.parse
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 import httpx
@@ -46,9 +48,25 @@ class UsernameReconProvider(ProviderAdapter):
         entities: List[Dict[str, Any]] = []
         evidence: List[Dict[str, Any]] = []
 
+        target_stripped = target.strip()
+        # Multi-word text (e.g. "malware threat campaign") is a general topical/event query, NOT a social username handle
+        if " " in target_stripped and not target_stripped.startswith("@") and "@" not in target_stripped:
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="skipped",
+                duration_ms=(time.time() - start_time) * 1000,
+                raw_data={"reason": "Multi-word text query is not a social username handle"}
+            )
+
         if t_type in ["username", "email", "person", "identity", "handle"] or " " not in target:
-            raw_user = target.split("@")[0].strip().replace(" ", "")
+            raw_user = target_stripped.split("@")[0].strip().replace(" ", "")
             username = "".join(c for c in raw_user if c.isalnum() or c in "._-") or raw_user
+            if not username or len(username) < 2:
+                return ProviderResponse(
+                    provider_id=self.provider_id,
+                    status="skipped",
+                    duration_ms=(time.time() - start_time) * 1000
+                )
             
             # Platforms configurations with explicit check methods
             platforms_config = [
@@ -253,39 +271,117 @@ class UsernameReconProvider(ProviderAdapter):
                         if method == "JSON_API":
                             try:
                                 json_body = resp.json()
+                                if not json_body:
+                                    return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
+
                                 if p["platform_id"] == "github":
+                                    if json_body.get("message") == "Not Found" or not json_body.get("login"):
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     display_name = json_body.get("name")
                                     bio = json_body.get("bio")
                                     avatar_url = json_body.get("avatar_url")
                                     followers = json_body.get("followers")
-                                elif p["platform_id"] == "gitlab" and isinstance(json_body, list) and len(json_body) > 0:
+                                elif p["platform_id"] == "gitlab":
+                                    if not isinstance(json_body, list) or len(json_body) == 0:
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     u0 = json_body[0]
                                     display_name = u0.get("name")
                                     avatar_url = u0.get("avatar_url")
                                     bio = u0.get("bio")
                                 elif p["platform_id"] == "bluesky":
+                                    if json_body.get("error") or not json_body.get("did"):
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     display_name = json_body.get("displayName")
                                     bio = json_body.get("description")
                                     avatar_url = json_body.get("avatar")
                                     followers = json_body.get("followersCount")
                                 elif p["platform_id"] == "devto":
+                                    if "error" in json_body or not json_body.get("id"):
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     display_name = json_body.get("name")
                                     bio = json_body.get("summary")
                                     avatar_url = json_body.get("profile_image")
                                 elif p["platform_id"] == "hackernews":
+                                    if json_body is None or not isinstance(json_body, dict) or not json_body.get("id"):
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     bio = json_body.get("about")
                                 elif p["platform_id"] == "reddit":
+                                    if json_body.get("error") or json_body.get("message") == "Not Found" or not json_body.get("data", {}).get("name"):
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
                                     r_data = json_body.get("data", {})
                                     display_name = r_data.get("name")
                                     avatar_url = r_data.get("icon_img")
                                 elif p["platform_id"] == "keybase":
                                     them = json_body.get("them", [])
-                                    if them and len(them) > 0:
-                                        profile = them[0].get("profile", {})
-                                        display_name = profile.get("full_name")
-                                        bio = profile.get("bio")
+                                    if not them or len(them) == 0:
+                                        return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
+                                    profile = them[0].get("profile", {})
+                                    display_name = profile.get("full_name")
+                                    bio = profile.get("bio")
                             except Exception:
-                                pass
+                                return {**p, "exists": False, "status": ExtractionStatus.NOT_FOUND.value, "status_code": 404}
+
+                        elif method == "HTTP_PAGE":
+                            # Check URL redirects to login/auth pages
+                            parsed_final = urllib.parse.urlparse(str(resp.url))
+                            login_paths = ["/login", "/signin", "/sign-in", "/session/new", "/accounts/login", "/auth/login"]
+                            if any(ind in parsed_final.path.lower() for ind in login_paths):
+                                return {
+                                    **p,
+                                    "exists": False,
+                                    "status": ExtractionStatus.NOT_FOUND.value,
+                                    "status_code": 404,
+                                    "note": f"Redirected to authentication page: {resp.url}"
+                                }
+
+                            body_text = resp.text or ""
+                            body_lower = body_text.lower()
+                            title_match = re.search(r'<title>([^<]+)</title>', body_text, re.I)
+                            page_title = title_match.group(1).strip().lower() if title_match else ""
+
+                            # High-assurance soft-404 keywords
+                            soft_404_keywords = [
+                                "profile isn't available",
+                                "the link may be broken or the profile may have been removed",
+                                "the link you followed may be broken",
+                                "sorry, this page isn't available",
+                                "this page isn't available",
+                                "this account doesn't exist",
+                                "this account doesn’t exist",
+                                "couldn't find this account",
+                                "user does not exist",
+                                "user not found",
+                                "account not found",
+                                "profile not found",
+                                "page not found",
+                                "404 not found",
+                                "the specified profile could not be found",
+                                "channel does not exist",
+                                "content unavailable",
+                                "channel is unavailable",
+                                "if you have telegram, you can contact",
+                                "this user has not yet set up a public profile",
+                                "account suspended",
+                                "this content isn't available right now"
+                            ]
+
+                            if any(kw in page_title for kw in soft_404_keywords) or any(kw in body_lower for kw in soft_404_keywords):
+                                return {
+                                    **p,
+                                    "exists": False,
+                                    "status": ExtractionStatus.NOT_FOUND.value,
+                                    "status_code": 404,
+                                    "note": f"Platform soft-404: {page_title or 'Profile not found'}"
+                                }
+
+                            if p["platform_id"] == "telegram":
+                                if "tgme_page_extra" not in body_text or "if you have telegram, you can contact" in body_lower:
+                                    return {
+                                        **p,
+                                        "exists": False,
+                                        "status": ExtractionStatus.NOT_FOUND.value,
+                                        "status_code": 404
+                                    }
 
                         if display_name:
                             extracted_fields.append("display_name")

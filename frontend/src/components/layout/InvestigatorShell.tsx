@@ -37,11 +37,38 @@ interface InvestigatorShellProps {
 
 export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarOpen, onCloseSidebar }) => {
   const { user, logout } = useAuth();
-  const [activeNav, setActiveNav] = useState<NavView>('search');
+  const getInitialNav = (): { nav: NavView; invId: string | null } => {
+    if (typeof window !== 'undefined') {
+      const parts = window.location.pathname.replace(/^\/+/, '').split('/');
+      const path = (parts[0] || '').toLowerCase();
+      const validNavs: NavView[] = [
+        'search', 'social', 'agents', 'news', 'tools', 'investigations',
+        'entities', 'graph', 'map', 'findings', 'evidence', 'reports'
+      ];
+      if (validNavs.includes(path as NavView)) {
+        return { nav: path as NavView, invId: parts[1] || null };
+      }
+    }
+    return { nav: 'search', invId: null };
+  };
+
+  const initialRoute = getInitialNav();
+  const [activeNav, setActiveNav] = useState<NavView>(initialRoute.nav);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchTarget, setSearchTarget] = useState<{ query: string; targetType?: string } | null>(null);
-  const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
+  const [selectedInvId, setSelectedInvId] = useState<string | null>(initialRoute.invId);
   const [investigationsKey, setInvestigationsKey] = useState<number>(0);
+
+  // Sync state on back/forward browser navigation
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const route = getInitialNav();
+      setActiveNav(route.nav);
+      setSelectedInvId(route.invId);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const { data: tools = [] } = useTools();
   const [runningTool, setRunningTool] = useState<ToolItem | null>(null);
@@ -49,6 +76,16 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
   const navItems: NavItem[] = [
     { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
     { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
+    { id: 'tools', label: 'Tools Workbench', icon: <Wrench className="w-4 h-4" /> },
+    { id: 'graph', label: 'Graph Studio', icon: <Share2 className="w-4 h-4" /> },
+    { id: 'map', label: 'OSINT Map', icon: <Globe className="w-4 h-4" /> },
+    { id: 'news', label: 'News Intelligence', icon: <Newspaper className="w-4 h-4" />, dividerBefore: true },
+    { id: 'social', label: 'Social Intelligence', icon: <MessageSquare className="w-4 h-4" /> },
+    { id: 'agents', label: 'Agents', icon: <Bot className="w-4 h-4" /> },
+    { id: 'findings', label: 'Findings', icon: <ShieldAlert className="w-4 h-4" />, dividerBefore: true },
+    { id: 'evidence', label: 'Evidence', icon: <Layers className="w-4 h-4" /> },
+    { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" /> },
+    { id: 'reports', label: 'Reports', icon: <FileText className="w-4 h-4" /> },
   ];
 
   const handleOpenInvestigationFromSearch = async (target: string, targetType: string, searchId?: string) => {
@@ -64,6 +101,9 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
       });
       if (res?.id) {
         setSelectedInvId(res.id);
+        if (typeof window !== 'undefined') {
+          window.history.pushState(null, '', `/investigations/${res.id}`);
+        }
       }
       setActiveNav('investigations');
     } catch (err) {
@@ -78,6 +118,9 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
       setInvestigationsKey((k) => k + 1);
     }
     setActiveNav(id);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/${id}`);
+    }
     onCloseSidebar(); // Close mobile sidebar on navigation
   };
 
@@ -256,11 +299,24 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
           <InvestigationsPage
             key={investigationsKey}
             selectedInvestigationId={selectedInvId}
-            onSelectInvestigation={(id) => setSelectedInvId(id)}
-            onClearSelectedInvestigation={() => setSelectedInvId(null)}
+            onSelectInvestigation={(id) => {
+              setSelectedInvId(id);
+              if (typeof window !== 'undefined') {
+                window.history.pushState(null, '', id ? `/investigations/${id}` : '/investigations');
+              }
+            }}
+            onClearSelectedInvestigation={() => {
+              setSelectedInvId(null);
+              if (typeof window !== 'undefined') {
+                window.history.pushState(null, '', '/investigations');
+              }
+            }}
             onNavigateToSearch={(target, targetType) => {
               setSearchTarget({ query: target, targetType });
               setActiveNav('search');
+              if (typeof window !== 'undefined') {
+                window.history.pushState(null, '', '/search');
+              }
             }}
           />
         )}

@@ -71,6 +71,16 @@ class TargetClassifier:
         "chancellor", "governor", "judge", "director", "officer", "secretary"
     }
 
+    TOPICAL_KEYWORDS = {
+        "malware", "threat", "campaign", "attack", "cyber", "security", "exploit", "vulnerability",
+        "ransomware", "phishing", "botnet", "trojan", "virus", "spyware", "breach", "zero-day",
+        "cve", "ddos", "backdoor", "payload", "c2", "command", "control", "infrastructure",
+        "traffic", "network", "system", "report", "analysis", "intelligence", "operation",
+        "leak", "dump", "database", "server", "domain", "proxy", "vpn", "tor", "protocol",
+        "case", "incident", "policy", "fraud", "scam", "crypto", "blockchain", "surveillance",
+        "camera", "sensor", "satellite", "reconnaissance", "osint", "investigation", "overview"
+    }
+
     @classmethod
     def classify(cls, query: str) -> str:
         """
@@ -524,7 +534,8 @@ class TargetClassifier:
         # 15. Check Person Names (e.g. "Narendra Modi", "Joe Biden", "Dr. Jane Smith")
         # =========================================================================
         has_honorific = any(h in tokens for h in cls.PERSON_HONORIFICS)
-        if has_honorific or (len(tokens) in (2, 3) and all(t.isalpha() for t in tokens) and not has_event_keyword and not has_org_indicator):
+        has_topical_kw = any(t in cls.TOPICAL_KEYWORDS for t in tokens)
+        if (has_honorific or (len(tokens) in (2, 3) and all(t.isalpha() for t in tokens) and not has_event_keyword and not has_org_indicator)) and not has_topical_kw:
             return {
                 "intent": "PERSON",
                 "category": "IDENTITY",

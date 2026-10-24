@@ -1,121 +1,170 @@
+"""
+Shodan OSINT Intelligence Provider.
+Integrates both:
+1. Shodan InternetDB (100% Keyless, free API providing ports, vulns/CVEs, CPEs, hostnames, and tags).
+2. Authoritative Shodan Host API (when SHODAN_API_KEY is configured) for detailed service banners,
+   SSL certificates, ASN, and vulnerability enrichment.
+
+Note: Shodan is an internet exposure index for exposed hosts and services.
+It is NOT a search engine for private video surveillance or arbitrary CCTV streams.
+"""
+
 import os
 import time
-from typing import Any, Dict
+import socket
+import ipaddress
+import logging
+from typing import Any, Dict, List, Optional
 import httpx
+from pydantic import BaseModel, Field
+
 from app.core.config import settings
 from app.module_sdk.provider_adapter import ProviderAdapter, ProviderRequest, ProviderResponse
 from app.module_sdk.models import HealthCheckResult, ModuleHealthStatus
 
+logger = logging.getLogger(__name__)
+
+
+class ShodanHostFinding(BaseModel):
+    ip: str
+    ports: List[int] = Field(default_factory=list)
+    hostnames: List[str] = Field(default_factory=list)
+    cpes: List[str] = Field(default_factory=list)
+    vulns: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+    asn: Optional[str] = None
+    org: Optional[str] = None
+    isp: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    source: str = "Shodan InternetDB"
+
+
 class ShodanProvider(ProviderAdapter):
+    """
+    Adapter for Shodan Internet Exposure and Vulnerability Census.
+    Supports keyless InternetDB queries and keyed Shodan Host API calls.
+    """
+
     @property
     def provider_id(self) -> str:
         return "shodan"
 
     @property
     def name(self) -> str:
-        return "Shodan Intelligence"
+        return "Shodan Exposure & Vulnerability Census"
+
+    def get_api_key(self) -> Optional[str]:
+        return os.getenv("SHODAN_API_KEY") or getattr(settings, "SHODAN_API_KEY", None)
 
     async def health_check(self) -> HealthCheckResult:
-        api_key = getattr(settings, "SHODAN_API_KEY", None) or os.environ.get("SHODAN_API_KEY")
-        if not api_key:
+        # Check InternetDB keyless endpoint
+        start = time.time()
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                res = await client.get("https://internetdb.shodan.io/1.1.1.1")
+                latency = round((time.time() - start) * 1000, 2)
+                api_key = self.get_api_key()
+                key_status = "Configured (Full API + InternetDB)" if api_key else "Keyless InternetDB Active (Free Tier)"
+                return HealthCheckResult(
+                    status=ModuleHealthStatus.HEALTHY,
+                    message=f"Shodan operational: {key_status}",
+                    latency_ms=latency
+                )
+        except Exception as e:
+            latency = round((time.time() - start) * 1000, 2)
             return HealthCheckResult(
                 status=ModuleHealthStatus.DEGRADED,
-                message="Shodan API key is not configured (SHODAN_API_KEY missing in backend/.env)",
-                latency_ms=0.5
+                message=f"Shodan InternetDB connection degraded: {str(e)}",
+                latency_ms=latency
             )
-        return HealthCheckResult(
-            status=ModuleHealthStatus.HEALTHY,
-            message="Shodan API endpoint configured and reachable",
-            latency_ms=2.1
-        )
 
     async def execute(self, request: ProviderRequest) -> ProviderResponse:
         start_time = time.time()
-        
-        # Check if simulated failure or provider disabled via options/config
-        if (request.options.get("fail_shodan") or request.config.get("fail_shodan")
-                or request.options.get("shodan_disabled") or request.config.get("shodan_disabled")):
-            raise ConnectionError("Shodan API connection timeout / rate limit exceeded")
-
         target = request.query.strip()
         t_type = request.target_type.lower()
-        
-        api_key = request.config.get("api_key") or getattr(settings, "SHODAN_API_KEY", None) or os.environ.get("SHODAN_API_KEY")
+        api_key = request.config.get("api_key") or self.get_api_key()
 
-        # Zero synthetic fallback: never inject dummy CVEs or ports if unconfigured
-        if not api_key:
+        # Resolve IP address safely
+        resolved_ip: Optional[str] = None
+        try:
+            ipaddress.ip_address(target)
+            resolved_ip = target
+        except ValueError:
+            try:
+                resolved_ip = socket.gethostbyname(target)
+            except Exception:
+                resolved_ip = None
+
+        if not resolved_ip:
             duration = round((time.time() - start_time) * 1000, 2)
             return ProviderResponse(
                 provider_id=self.provider_id,
                 status="skipped",
-                error="SHODAN_API_KEY is not configured in backend/.env. Query skipped to prevent synthetic fallback.",
-                raw_data={
-                    "target": target,
-                    "configured": False,
-                    "status": "CONFIG_REQUIRED",
-                    "ports": [],
-                    "vulnerabilities": []
-                },
+                error=f"Target '{target}' could not be resolved to a routable IP address for Shodan.",
+                raw_data={"target": target, "ports": [], "vulns": []},
                 duration_ms=duration
             )
 
-        # Real Shodan API Execution
-        ports = []
-        vulns = []
-        ip_info = {}
-        resolved_ip = target
+        finding = ShodanHostFinding(ip=resolved_ip)
 
-        if t_type in ["ip", "domain"]:
+        # 1. Query Keyless Shodan InternetDB
+        internetdb_queried = False
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(f"https://internetdb.shodan.io/{resolved_ip}")
+                if res.status_code == 200:
+                    data = res.json()
+                    finding.ports = data.get("ports", [])
+                    finding.hostnames = data.get("hostnames", [])
+                    finding.cpes = data.get("cpes", [])
+                    finding.vulns = data.get("vulns", [])
+                    finding.tags = data.get("tags", [])
+                    internetdb_queried = True
+        except Exception as e:
+            logger.debug(f"Shodan InternetDB query for {resolved_ip} failed: {e}")
+
+        # 2. If SHODAN_API_KEY is available, enrich with Host API
+        if api_key:
             try:
-                import socket
-                import ipaddress
-                try:
-                    ipaddress.ip_address(target)
-                except ValueError:
-                    resolved_ip = socket.gethostbyname(target)
-                
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with httpx.AsyncClient(timeout=6.0) as client:
                     resp = await client.get(f"https://api.shodan.io/shodan/host/{resolved_ip}?key={api_key}")
                     if resp.status_code == 200:
                         s_data = resp.json()
-                        ports = s_data.get("ports", [])
-                        vulns = s_data.get("vulns", [])
-                        ip_info = {
-                            "as": s_data.get("asn"),
-                            "org": s_data.get("org"),
-                            "isp": s_data.get("isp"),
-                            "city": s_data.get("city"),
-                            "country": s_data.get("country_name"),
-                            "countryCode": s_data.get("country_code"),
-                            "lat": s_data.get("latitude"),
-                            "lon": s_data.get("longitude")
-                        }
-                    elif resp.status_code == 404:
-                        # Genuine 404: Host not indexed in Shodan census
-                        pass
-            except Exception:
-                pass
+                        finding.ports = sorted(list(set(finding.ports + s_data.get("ports", []))))
+                        finding.vulns = sorted(list(set(finding.vulns + s_data.get("vulns", []))))
+                        finding.hostnames = sorted(list(set(finding.hostnames + s_data.get("hostnames", []))))
+                        finding.asn = s_data.get("asn")
+                        finding.org = s_data.get("org")
+                        finding.isp = s_data.get("isp")
+                        finding.city = s_data.get("city")
+                        finding.country = s_data.get("country_name")
+                        finding.source = "Shodan Full API & InternetDB"
+            except Exception as e:
+                logger.debug(f"Shodan Keyed API enrichment failed: {e}")
 
-        banner_info = {
-            "target": target,
-            "ip": resolved_ip,
-            "ports": ports,
-            "asn": ip_info.get("as"),
-            "org": ip_info.get("org"),
-            "isp": ip_info.get("isp"),
-            "city": ip_info.get("city"),
-            "country": ip_info.get("country"),
-            "country_code": ip_info.get("countryCode"),
-            "lat": ip_info.get("lat"),
-            "lng": ip_info.get("lon"),
-            "vulnerabilities": vulns,
-            "hostnames": [f"edge-{target}"] if t_type == "domain" else [f"host-{target.replace('.', '-')}.net"]
-        }
-        
         duration = round((time.time() - start_time) * 1000, 2)
         return ProviderResponse(
             provider_id=self.provider_id,
             status="success",
-            raw_data=banner_info,
+            raw_data={
+                "target": target,
+                "ip": resolved_ip,
+                "source": finding.source,
+                "ports": finding.ports,
+                "vulns": finding.vulns,
+                "hostnames": finding.hostnames,
+                "cpes": finding.cpes,
+                "tags": finding.tags,
+                "asn": finding.asn,
+                "org": finding.org,
+                "isp": finding.isp,
+                "city": finding.city,
+                "country": finding.country,
+                "api_key_configured": bool(api_key),
+            },
             duration_ms=duration
         )
+
+
+shodan_provider = ShodanProvider()

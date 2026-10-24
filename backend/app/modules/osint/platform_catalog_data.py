@@ -52,7 +52,15 @@ MAJOR_SOCIAL_MEDIA_PLATFORMS = [
         "detection_method": "STATUS_CODE",
         "expected_status": [200],
         "not_found_status": [404],
-        "not_found_keywords": ["Sorry, this page isn't available"],
+        "not_found_keywords": [
+            "Sorry, this page isn't available",
+            "Profile isn't available",
+            "Profile isnt available",
+            "The link may be broken or the profile may have been removed",
+            "The link may be broken",
+            "profile may have been removed",
+            "Page Not Found"
+        ],
         "reliability_score": 0.98,
         "license_type": "Public Profile",
         "notes": "Visual social media profile, reels, and avatar",
@@ -86,7 +94,12 @@ MAJOR_SOCIAL_MEDIA_PLATFORMS = [
         "detection_method": "STATUS_CODE",
         "expected_status": [200],
         "not_found_status": [404],
-        "not_found_keywords": ["This content isn't available right now"],
+        "not_found_keywords": [
+            "This content isn't available right now",
+            "This page isn't available",
+            "The link you followed may be broken",
+            "Page Not Found"
+        ],
         "reliability_score": 0.95,
         "license_type": "Public Profile",
         "notes": "Public page and profile footprint",

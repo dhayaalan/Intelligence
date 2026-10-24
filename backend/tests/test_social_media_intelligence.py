@@ -191,3 +191,198 @@ def test_api_youtube_investigation(client: TestClient, super_admin_headers):
     assert data["subtitles"]["status"] == "TRANSCRIPT_UNAVAILABLE"
     assert len(data["subtitles"]["segments"]) == 0
     assert data["metadata"]["transcript_status"] == "TRANSCRIPT_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_resilient_crawler_local_extraction():
+    from app.modules.social_media_intelligence.crawler_engine import resilient_social_crawler
+
+    html = '''<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Leaked Intel Report 2026</title>
+        <meta property="og:title" content="Leaked Network Asset Vulnerabilities">
+        <meta property="og:description" content="Detailed analysis of exposed perimeter infrastructure and CCTV telemetry for @target_analyst. Contact lead@sec.org">
+        <meta property="og:image" content="https://example.com/evidence.jpg">
+        <meta name="author" content="ThreatScout">
+    </head>
+    <body>
+        <h1>Perimeter Breach Notice</h1>
+        <p>Investigation notes for #cyberthreat intelligence.</p>
+        <div class="comment-body">Excellent report on vulnerability remediation.</div>
+    </body>
+    </html>'''
+
+    result = await resilient_social_crawler._extract_intelligence_from_page(
+        html=html,
+        original_url="https://x.com/target_analyst/status/1234567890",
+        final_url="https://x.com/target_analyst/status/1234567890",
+        platform="twitter",
+        post_type="post",
+        status_code=200,
+        bypass_strategy="DIRECT_STEALTH",
+        is_blocked=False,
+        extract_media=True,
+        extract_comments=True,
+        extract_entities=True,
+        extra_meta={}
+    )
+    assert result.platform == "twitter"
+    assert result.title == "Leaked Network Asset Vulnerabilities"
+    assert "Detailed analysis" in result.text
+    assert result.author == "ThreatScout"
+    assert "https://example.com/evidence.jpg" in result.media_urls
+    assert any("@target_analyst" in e for e in result.extracted_entities)
+    assert len(result.comments) >= 1
+    assert "remediation" in result.comments[0].text
+
+
+@pytest.mark.asyncio
+async def test_instagram_reel_and_comment_extraction():
+    from app.modules.social_media_intelligence.crawler_engine import resilient_social_crawler
+
+    reel_html = '''<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Instagram Reel</title>
+        <meta property="og:title" content="Drone Patrol Reel">
+        <meta property="og:video" content="https://cdninstagram.com/reel/drone_feed.mp4">
+        <meta property="og:image" content="https://cdninstagram.com/reel/poster.jpg">
+    </head>
+    <body>
+        <div class="Caption">Aerial patrol footage recording movement along sector 4. #surveillance</div>
+        <span class="UsernameText">@aerial_patrol_unit</span>
+        <div class="Feedback">14.5k likes 340 comments</div>
+        <script type="application/ld+json">
+        {
+            "@type": "SocialMediaPosting",
+            "headline": "Aerial surveillance footage",
+            "comment": [
+                {"@type": "Comment", "text": "Confirmed visual on vehicle tag", "author": {"name": "dispatcher_01"}}
+            ]
+        }
+        </script>
+    </body>
+    </html>'''
+
+    reel_url = "https://www.instagram.com/reel/C8xyz9876/"
+    post_type = resilient_social_crawler.detect_post_type(reel_url)
+    assert post_type == "reel"
+
+    result = await resilient_social_crawler._extract_intelligence_from_page(
+        html=reel_html,
+        original_url=reel_url,
+        final_url=reel_url,
+        platform="instagram",
+        post_type=post_type,
+        status_code=200,
+        bypass_strategy="INSTAGRAM_EMBED_BYPASS",
+        is_blocked=False,
+        extract_media=True,
+        extract_comments=True,
+        extract_entities=True,
+        extra_meta={}
+    )
+
+    assert result.platform == "instagram"
+    assert result.post_type == "reel"
+    assert result.video_url == "https://cdninstagram.com/reel/drone_feed.mp4"
+    assert "Aerial patrol footage" in result.text
+    assert result.author == "@aerial_patrol_unit"
+    assert result.likes_count == 14500
+    assert len(result.comments) >= 1
+    assert result.comments[0].author == "dispatcher_01"
+    assert "Confirmed visual" in result.comments[0].text
+
+
+@pytest.mark.asyncio
+async def test_facebook_post_and_comment_extraction():
+    from app.modules.social_media_intelligence.crawler_engine import resilient_social_crawler
+
+    fb_html = '''<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Facebook Video</title>
+        <meta property="og:title" content="Checkpoint Video Incident">
+        <meta property="og:description" content="Dashcam footage of suspicious crossing attempt.">
+        <meta property="og:video" content="https://video.xx.fbcdn.net/dashcam.mp4">
+        <meta name="author" content="Border Watch Network">
+    </head>
+    <body>
+        <p>Full incident report filed with municipal command.</p>
+        <div data-sigil="comment-body">Verified with ANPR logs from station 2.</div>
+    </body>
+    </html>'''
+
+    fb_url = "https://www.facebook.com/watch/?v=9876543210"
+    post_type = resilient_social_crawler.detect_post_type(fb_url)
+    assert post_type == "video"
+
+    result = await resilient_social_crawler._extract_intelligence_from_page(
+        html=fb_html,
+        original_url=fb_url,
+        final_url=fb_url,
+        platform="facebook",
+        post_type=post_type,
+        status_code=200,
+        bypass_strategy="FACEBOOK_OEMBED_BYPASS",
+        is_blocked=False,
+        extract_media=True,
+        extract_comments=True,
+        extract_entities=True,
+        extra_meta={}
+    )
+
+    assert result.platform == "facebook"
+    assert result.post_type == "video"
+    assert result.video_url == "https://video.xx.fbcdn.net/dashcam.mp4"
+    assert "Incident" in result.title
+    assert len(result.comments) >= 1
+    assert "Verified with ANPR logs" in result.comments[0].text
+
+
+def test_api_crawl_url_endpoint(client: TestClient, super_admin_headers):
+    from unittest.mock import patch
+    from app.modules.social_media_intelligence.models import SocialCrawlResult, SocialCommentItem
+
+    fake_result = SocialCrawlResult(
+        url="https://instagram.com/reel/test1234",
+        final_url="https://instagram.com/reel/test1234",
+        platform="instagram",
+        post_type="reel",
+        title="Verified Case Footage",
+        text="Surveillance recording of target license plate at highway checkpoint.",
+        author="@traffic_unit",
+        published_at="2026-10-22T12:00:00Z",
+        media_urls=["https://instagram.com/media/test.jpg", "https://cdninstagram.com/video.mp4"],
+        video_url="https://cdninstagram.com/video.mp4",
+        likes_count=1200,
+        comments_count=15,
+        comments=[
+            SocialCommentItem(author="inspector_dave", text="Identified matching plate in Sector B")
+        ],
+        bypass_technique="INSTAGRAM_EMBED_BYPASS",
+        http_status=200,
+        is_blocked_url=False,
+        extracted_entities=["@traffic_unit"]
+    )
+
+    with patch("app.modules.social_media_intelligence.crawler_engine.resilient_social_crawler.crawl_url") as mock_crawl:
+        async def fake_crawl(*args, **kwargs):
+            return fake_result
+        mock_crawl.side_effect = fake_crawl
+
+        res = client.post(
+            "/api/v1/social/crawl-url",
+            json={"url": "https://instagram.com/reel/test1234", "bypass_blocking": True, "extract_comments": True},
+            headers=super_admin_headers
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["platform"] == "instagram"
+        assert data["post_type"] == "reel"
+        assert data["video_url"] == "https://cdninstagram.com/video.mp4"
+        assert data["author"] == "@traffic_unit"
+        assert len(data["comments"]) == 1
+        assert data["comments"][0]["author"] == "inspector_dave"
+

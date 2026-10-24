@@ -60,6 +60,7 @@ import { ImagesTab } from '../search/components/ImagesTab';
 import { VideosTab } from '../search/components/VideosTab';
 import { MediaViewerModal } from '../search/components/MediaViewerModal';
 import { VehicleCameraIntelligence } from './components/VehicleCameraIntelligence';
+import { SocialResultsView, SocialResultItem } from '../social_intelligence/components/SocialResultsView';
 
 export type TargetType = 'DOMAIN' | 'IP' | 'EMAIL' | 'USERNAME' | 'PHONE' | 'HASH' | 'CRYPTO' | 'URL' | 'PERSON' | 'ORGANIZATION';
 
@@ -105,6 +106,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     | 'overview'
     | 'all'
     | 'profiles'
+    | 'social'
     | 'media'
     | 'images'
     | 'videos'
@@ -206,6 +208,92 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
     const start = (profilePage - 1) * profilePageSize;
     return profileEntities.slice(start, start + profilePageSize);
   }, [profileEntities, profilePage, profilePageSize]);
+
+  // Social media dispatches, reels, and comment trees
+  const socialPosts = useMemo<SocialResultItem[]>(() => {
+    const posts: SocialResultItem[] = [];
+    const seenUrls = new Set<string>();
+
+    // 1. From evidenceList
+    evidenceList.forEach((ev) => {
+      const prov = (ev.provider || '').toLowerCase();
+      const mod = (ev.module || '').toLowerCase();
+      const raw = ev.raw_data || {};
+
+      // Exclude bare profile existence checks from the catalog (these belong in the Profiles tab)
+      const isCatalogProfileCheck =
+        raw.found === false ||
+        raw.status === 'NOT_FOUND' ||
+        (raw.profile_url && !raw.post_id && (!raw.text || raw.text === ev.reference) && !raw.video_url);
+      if (isCatalogProfileCheck) return;
+
+      const hasAuthenticContent =
+        Boolean(raw.post_id) ||
+        Boolean(raw.video_url) ||
+        Boolean(raw.post_type) ||
+        (Array.isArray(raw.comments) && raw.comments.length > 0) ||
+        (Boolean(raw.text) && raw.text !== ev.reference && String(raw.text).length > 3);
+
+      const isSoc =
+        mod === 'social_media_intelligence' ||
+        (['bluesky', 'telegram', 'reddit', 'youtube', 'mastodon', 'instagram', 'facebook'].includes(prov) && hasAuthenticContent) ||
+        (Boolean(raw.post_id) && hasAuthenticContent);
+
+      if (isSoc) {
+        const u = raw.url || ev.reference || raw.post_id || `soc-${posts.length}`;
+        if (!seenUrls.has(u)) {
+          seenUrls.add(u);
+          posts.push({
+            id: raw.post_id || ev.id || u,
+            platform: (raw.platform || prov || 'social').toLowerCase(),
+            author: raw.author || 'Anonymous User',
+            text: raw.text || ev.reference || '',
+            url: raw.url || ev.reference || '',
+            created_at: raw.created_at || ev.timestamp,
+            likes_count: raw.likes ?? raw.likes_count ?? 0,
+            views_count: raw.views ?? raw.views_count ?? 0,
+            shares_count: raw.shares ?? raw.shares_count ?? 0,
+            comments_count: raw.comments_count ?? (Array.isArray(raw.comments) ? raw.comments.length : 0),
+            post_type: raw.post_type || (raw.video_url ? 'reel' : 'post'),
+            video_url: raw.video_url,
+            comments: Array.isArray(raw.comments) ? raw.comments : [],
+            cib_clusters: raw.cib_clusters || [],
+            evidence_id: ev.id,
+            confidence: ev.confidence,
+            entities: raw.entities || [],
+          });
+        }
+      }
+    });
+
+    // 2. From mediaList (reels and social videos)
+    mediaList.forEach((m) => {
+      const plat = (m.source_platform || m.source_provider || '').toLowerCase();
+      if (
+        ['instagram', 'facebook', 'youtube', 'reddit', 'bluesky', 'telegram', 'mastodon'].includes(plat) ||
+        m.metadata?.post_type === 'reel'
+      ) {
+        const u = m.canonical_source_url || m.url;
+        if (u && !seenUrls.has(u)) {
+          seenUrls.add(u);
+          posts.push({
+            id: m.id,
+            platform: plat || 'social',
+            author: m.metadata?.author || m.parent_title || 'Target',
+            text: m.description || m.title || '',
+            url: u,
+            created_at: m.publication_date || m.collection_date,
+            post_type: m.metadata?.post_type || (m.media_type === 'video' ? 'reel' : 'post'),
+            video_url: m.media_type === 'video' ? m.url : undefined,
+            comments_count: m.metadata?.comments_count || 0,
+            confidence: 0.95,
+          });
+        }
+      }
+    });
+
+    return posts;
+  }, [evidenceList, mediaList]);
 
   // Geolocation entities
   const geoLocations: GeoLocationItem[] = useMemo(() => {
@@ -1017,6 +1105,7 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
           { id: 'overview', label: 'Overview', count: null, icon: Sparkles },
           { id: 'all', label: 'All Results', count: entities.length, icon: Database },
           { id: 'profiles', label: 'Profiles', count: profileEntities.length, icon: Users },
+          { id: 'social', label: 'Social & Reels', count: socialPosts.length, icon: Share2 },
           { id: 'images', label: 'Images', count: imageRecords.length, icon: Camera },
           { id: 'videos', label: 'Videos', count: videoRecords.length, icon: Film },
           { id: 'news_intel', label: 'News & Intelligence', count: (newsRecord ? 1 : 0) + keyFindingsList.length, icon: Newspaper },
@@ -1417,6 +1506,60 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
               </CardContent>
             </Card>
           </div>
+
+          {/* SOCIAL MEDIA & REELS SNAPSHOT WIDGET */}
+          {socialPosts.length > 0 && (
+            <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-r from-pink-500/5 via-purple-500/5 to-indigo-500/5 border border-pink-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-pink-500" />
+                    <span>Sealed Social Media & Viral Reels ({socialPosts.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Authentic public social media dispatches, video reels, and comment threads preserved with cryptographic integrity.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('social')}
+                  className="text-xs font-mono font-bold text-pink-600 dark:text-pink-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View all {socialPosts.length} dispatches & reels</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {socialPosts.slice(0, 3).map((post) => (
+                  <div
+                    key={post.id}
+                    className="p-3.5 rounded-xl bg-white dark:bg-[#0c101d] border border-slate-200/90 dark:border-slate-800 space-y-2 text-xs flex flex-col justify-between"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 dark:text-white font-mono text-[11px]">
+                          @{post.author}
+                        </span>
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
+                          {post.platform}
+                        </span>
+                      </div>
+                      <p className="text-slate-700 dark:text-slate-300 text-xs line-clamp-3">
+                        {post.text}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] font-mono text-slate-400">
+                      <span>{post.comments_count || post.comments?.length || 0} comments</span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer" onClick={() => setActiveTab('social')}>
+                        Inspect Reel →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1736,6 +1879,36 @@ export const InvestigationDetailPage: React.FC<InvestigationDetailPageProps> = (
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB: SOCIAL MEDIA & REELS */}
+      {activeTab === 'social' && (
+        <Card className="border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-xs">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <Share2 className="w-4 h-4 text-pink-600 dark:text-pink-400" />
+                <span>Social Media Intelligence & Viral Reels</span>
+              </CardTitle>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Authentic social dispatches, video reels, and comment trees attached to this investigation case.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs">
+                {socialPosts.length} Sealed Dispatches
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            <SocialResultsView
+              posts={socialPosts}
+              investigationId={investigationId}
+              targetQuery={investigation?.target}
+              onPostCrawledAndSealed={() => loadAll()}
+            />
           </CardContent>
         </Card>
       )}

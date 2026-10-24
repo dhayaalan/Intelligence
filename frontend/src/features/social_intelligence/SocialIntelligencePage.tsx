@@ -23,7 +23,12 @@ import {
   FileText,
   Activity,
   Flame,
-  Globe
+  Globe,
+  Link as LinkIcon,
+  Copy,
+  Check,
+  Zap,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -33,6 +38,7 @@ import {
   useYouTubeInvestigation,
   useCredibilityAnalysis,
   useRegionalNarrativeComparison,
+  useSocialCrawlUrl,
   SocialPost,
   SocialPlatformType,
   CibCluster,
@@ -40,6 +46,7 @@ import {
   YouTubeInvestigationResult,
   RegionalGeography,
   RegionalPerspective,
+  SocialCrawlResult,
 } from '../../core/api/socialHooks';
 import { formatDate, cn } from '../../lib/utils';
 
@@ -53,7 +60,7 @@ export const SocialIntelligencePage: React.FC = () => {
     'youtube'
   ]);
   const [detectCib, setDetectCib] = useState(true);
-  const [activeTab, setActiveTab] = useState<'feed' | 'cib' | 'youtube' | 'regional'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'cib' | 'youtube' | 'regional' | 'crawler'>('feed');
 
   // Regional Narrative Comparison State
   const [regionalTopic, setRegionalTopic] = useState('defense aerospace readiness');
@@ -65,6 +72,14 @@ export const SocialIntelligencePage: React.FC = () => {
   const [egressRoute, setEgressRoute] = useState<'DIRECT' | 'REGIONAL_GATEWAY_APPROVED'>('REGIONAL_GATEWAY_APPROVED');
   const [failClosed, setFailClosed] = useState(true);
 
+  // Anti-Block Crawler State
+  const [crawlUrl, setCrawlUrl] = useState('https://x.com/shodanhq/status/1788226065609314488');
+  const [crawlBypass, setCrawlBypass] = useState(true);
+  const [crawlExtractMedia, setCrawlExtractMedia] = useState(true);
+  const [crawlExtractEntities, setCrawlExtractEntities] = useState(true);
+  const [crawlExtractComments, setCrawlExtractComments] = useState(true);
+  const [copiedText, setCopiedText] = useState(false);
+
   // YouTube modal / inspection
   const [inspectingVideoId, setInspectingVideoId] = useState<string | null>(null);
   const [selectedPostCredibility, setSelectedPostCredibility] = useState<CredibilityScore | null>(null);
@@ -74,6 +89,25 @@ export const SocialIntelligencePage: React.FC = () => {
   const ytMutation = useYouTubeInvestigation();
   const credMutation = useCredibilityAnalysis();
   const regionalMutation = useRegionalNarrativeComparison();
+  const crawlMutation = useSocialCrawlUrl();
+
+  const handleCrawl = (targetUrl?: string) => {
+    const toCrawl = (targetUrl || crawlUrl).trim();
+    if (!toCrawl) return;
+    crawlMutation.mutate({
+      url: toCrawl,
+      bypass_blocking: crawlBypass,
+      extract_media: crawlExtractMedia,
+      extract_entities: crawlExtractEntities,
+      extract_comments: crawlExtractComments,
+    });
+  };
+
+  const handleCopyText = (content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
+  };
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -303,6 +337,22 @@ export const SocialIntelligencePage: React.FC = () => {
         >
           <Globe className="w-3.5 h-3.5" />
           Regional Narrative Comparison
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crawler')}
+          className={cn(
+            'px-3.5 py-1.5 rounded-lg text-xs font-semibold font-mono transition-colors flex items-center gap-1.5 cursor-pointer',
+            activeTab === 'crawler'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+          )}
+        >
+          <Zap className="w-3.5 h-3.5 text-amber-300" />
+          Blocked URL Crawler
+          <span className="text-[10px] bg-amber-500/20 text-amber-200 border border-amber-500/30 px-1 py-0.2 rounded font-mono uppercase">
+            Anti-Block
+          </span>
         </button>
       </div>
 
@@ -929,6 +979,458 @@ export const SocialIntelligencePage: React.FC = () => {
                       </ul>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 5. BLOCKED URL CRAWLER TAB */}
+      {activeTab === 'crawler' && (
+        <div className="space-y-6">
+          {/* Header & Strategic Context Card */}
+          <Card className="border border-amber-500/20 bg-linear-to-r from-amber-500/5 via-slate-900/40 to-slate-900/60 backdrop-blur-md">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white font-mono flex items-center gap-2">
+                      Multi-Tier Resilient Social Web Crawler
+                      <Badge variant="outline" className="text-amber-400 border-amber-500/30 text-[10px]">
+                        Anti-Bot Evasion Active
+                      </Badge>
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-sans mt-0.5">
+                      Extracts verified intelligence from social posts, forums, and articles even when target endpoints return HTTP 403, Cloudflare challenges, or login paywalls.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                    Tier 1: Stealth Client
+                  </span>
+                  <span>→</span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                    Tier 2: Bot Spoofing
+                  </span>
+                  <span>→</span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                    Tier 3: Syndication Index
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Crawler Input Box */}
+          <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422]">
+            <CardContent className="p-5 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>TARGET SOCIAL MEDIA / POST URL</span>
+                  <span className="text-[11px] font-normal text-slate-500">
+                    Supports Twitter/X, Reddit, Instagram, Bluesky, Telegram, Mastodon, YouTube & News
+                  </span>
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                    <input
+                      type="url"
+                      value={crawlUrl}
+                      onChange={(e) => setCrawlUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCrawl();
+                        }
+                      }}
+                      placeholder="https://x.com/username/status/... or https://www.reddit.com/r/..."
+                      className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg focus:outline-hidden focus:border-amber-500 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleCrawl()}
+                    disabled={crawlMutation.isPending || !crawlUrl.trim()}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs px-4 flex items-center gap-2 cursor-pointer"
+                  >
+                    {crawlMutation.isPending ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Crawling...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5" />
+                        Crawl & Extract
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono text-slate-400">
+                <span className="text-[11px] text-slate-500">Quick Test Targets:</span>
+                {[
+                  {
+                    label: 'IG Reel: Surveillance',
+                    url: 'https://www.instagram.com/reel/C8XYZ123/',
+                  },
+                  {
+                    label: 'FB Video: Dashcam Incident',
+                    url: 'https://www.facebook.com/watch/?v=987654321',
+                  },
+                  {
+                    label: 'Reddit: NetSec (Comments)',
+                    url: 'https://www.reddit.com/r/netsec/comments/1h7a7n8/cve_advisory_roundup/',
+                  },
+                  {
+                    label: 'X/Twitter: Shodan',
+                    url: 'https://x.com/shodanhq/status/1788226065609314488',
+                  },
+                  {
+                    label: 'Bluesky: Threat Intel',
+                    url: 'https://bsky.app/profile/vxunderground.bsky.social',
+                  },
+                  {
+                    label: 'BleepingComputer: Breach News',
+                    url: 'https://www.bleepingcomputer.com/news/security/',
+                  },
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setCrawlUrl(preset.url);
+                      handleCrawl(preset.url);
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] transition-colors cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Configuration Toggles */}
+              <div className="flex flex-wrap items-center gap-5 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs font-mono">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={crawlBypass}
+                    onChange={(e) => setCrawlBypass(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span>Multi-Tier Anti-Bot Bypass (Googlebot Emulation)</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={crawlExtractMedia}
+                    onChange={(e) => setCrawlExtractMedia(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span>Extract Media, Videos & Posters</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={crawlExtractComments}
+                    onChange={(e) => setCrawlExtractComments(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span className="font-semibold text-amber-500 dark:text-amber-400">Extract Public Comments & Threads</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={crawlExtractEntities}
+                    onChange={(e) => setCrawlExtractEntities(e.target.checked)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span>Extract Entities (@mentions, #hashtags, emails)</span>
+                </label>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Error Banner */}
+          {crawlMutation.isError && (
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Crawler Error: {crawlMutation.error?.message || 'Failed to extract content from target URL.'}</span>
+            </div>
+          )}
+
+          {/* Crawl Results Display */}
+          {crawlMutation.data && (
+            <div className="space-y-4">
+              <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1422] shadow-sm">
+                <CardContent className="p-6 space-y-5">
+                  {/* Result Header & Badges */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-xs uppercase px-2.5 py-1 bg-slate-100 dark:bg-slate-800">
+                        {crawlMutation.data.platform}
+                      </Badge>
+                      <Badge
+                        variant={
+                          crawlMutation.data.post_type === 'reel'
+                            ? 'destructive'
+                            : crawlMutation.data.post_type === 'video' || crawlMutation.data.post_type === 'short'
+                            ? 'warning'
+                            : 'default'
+                        }
+                        className={cn(
+                          'font-mono text-xs uppercase px-2.5 py-1 font-bold',
+                          crawlMutation.data.post_type === 'reel'
+                            ? 'bg-linear-to-r from-purple-600 to-pink-600 text-white border-0'
+                            : ''
+                        )}
+                      >
+                        {crawlMutation.data.post_type || 'POST'}
+                      </Badge>
+                      <Badge
+                        variant={
+                          crawlMutation.data.bypass_technique.includes('GOOGLEBOT')
+                            ? 'warning'
+                            : crawlMutation.data.bypass_technique.includes('SYNDICATION')
+                            ? 'default'
+                            : 'success'
+                        }
+                        className="font-mono text-xs px-2.5 py-1 flex items-center gap-1.5"
+                      >
+                        <Zap className="w-3 h-3" />
+                        Technique: {crawlMutation.data.bypass_technique}
+                      </Badge>
+                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        HTTP {crawlMutation.data.http_status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                      <span>Crawled: {formatDate(crawlMutation.data.crawled_at)}</span>
+                      <a
+                        href={crawlMutation.data.final_url || crawlMutation.data.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-500 hover:text-cyan-400 flex items-center gap-1"
+                      >
+                        Source <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Title & Author Info */}
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                      {crawlMutation.data.title || 'Untitled Post / Extracted Entity'}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-500">
+                      {crawlMutation.data.author && (
+                        <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
+                          <UserCheck className="w-3.5 h-3.5 text-cyan-500" />
+                          Author: {crawlMutation.data.author}
+                        </span>
+                      )}
+                      {crawlMutation.data.published_at && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Published: {formatDate(crawlMutation.data.published_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Post Content with Copy Button */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                      <span>EXTRACTED CONTENT & BODY</span>
+                      <button
+                        onClick={() => handleCopyText(crawlMutation.data.text || crawlMutation.data.title)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                      >
+                        {copiedText ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Text</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed font-sans max-h-96 overflow-y-auto">
+                      {crawlMutation.data.text || (
+                        <span className="text-slate-500 italic">No direct text body found in page. Review raw metadata below.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Extracted Media Gallery */}
+                  {crawlMutation.data.media_urls && crawlMutation.data.media_urls.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>EXTRACTED MEDIA & ASSETS ({crawlMutation.data.media_urls.length})</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {crawlMutation.data.media_urls.map((mediaUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 aspect-video flex items-center justify-center"
+                          >
+                            <img
+                              src={mediaUrl}
+                              alt={`Extracted asset ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            <a
+                              href={mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-mono gap-1"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              View
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extracted Video Media */}
+                  {crawlMutation.data.video_url && (
+                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                        <Video className="w-3.5 h-3.5 text-pink-500" />
+                        <span className="font-bold text-slate-900 dark:text-white uppercase">
+                          Captured Reel / Video Stream Source
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+                        <div className="flex items-center gap-2 text-slate-300 truncate max-w-xl">
+                          <Play className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="truncate">{crawlMutation.data.video_url}</span>
+                        </div>
+                        <a
+                          href={crawlMutation.data.video_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-mono text-xs flex items-center gap-1.5 transition-colors"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          Watch / Stream
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extracted Comments Section */}
+                  {crawlMutation.data.comments && crawlMutation.data.comments.length > 0 && (
+                    <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                          <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            EXTRACTED COMMENTS & THREAD RESPONSES ({crawlMutation.data.comments.length})
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-500">
+                          {crawlMutation.data.comments_count || crawlMutation.data.comments.length} total discussion items observed
+                        </span>
+                      </div>
+
+                      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                        {crawlMutation.data.comments.map((comment, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 space-y-1.5 text-xs font-mono"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5">
+                                <UserCheck className="w-3 h-3" />
+                                {comment.author}
+                              </span>
+                              <div className="flex items-center gap-3 text-slate-400 text-[11px]">
+                                {comment.likes_count !== undefined && comment.likes_count > 0 && (
+                                  <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                                    <Heart className="w-3 h-3 fill-rose-500" />
+                                    {comment.likes_count}
+                                  </span>
+                                )}
+                                {comment.published_at && (
+                                  <span>{formatDate(comment.published_at)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-sans text-xs">
+                              {comment.text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extracted Entities */}
+                  {crawlMutation.data.extracted_entities && crawlMutation.data.extracted_entities.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-xs font-mono text-slate-400 block font-bold">
+                        EXTRACTED ENTITIES ({crawlMutation.data.extracted_entities.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {crawlMutation.data.extracted_entities.map((entity, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className={cn(
+                              'font-mono text-xs',
+                              entity.startsWith('@')
+                                ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/5'
+                                : entity.startsWith('#')
+                                ? 'border-amber-500/40 text-amber-400 bg-amber-500/5'
+                                : 'border-slate-700 text-slate-300 bg-slate-800'
+                            )}
+                          >
+                            {entity}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw Metadata Technical Inspector */}
+                  <details className="group pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-mono">
+                    <summary className="cursor-pointer text-slate-400 hover:text-slate-200 flex items-center justify-between py-1 select-none">
+                      <span className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-slate-500" />
+                        Raw OpenGraph / Twitter Card / JSON-LD Metadata Inspector
+                      </span>
+                      <span className="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="mt-3 p-3 rounded-lg bg-slate-900 border border-slate-800 overflow-x-auto text-slate-300">
+                      <pre className="text-[11px] leading-relaxed">
+                        {JSON.stringify(crawlMutation.data.raw_metadata || {}, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
                 </CardContent>
               </Card>
             </div>

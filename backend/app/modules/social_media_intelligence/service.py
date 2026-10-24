@@ -191,6 +191,87 @@ class SocialMediaIntelligenceService:
             posts=posts
         )
 
+    async def auto_crawl_target(
+        self,
+        target: str,
+        limit: int = 15,
+        extract_comments: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Automatically crawls and extracts social posts, video streams, reels,
+        and comment threads for the target across all platforms without requiring
+        manual URL input from the user.
+        """
+        clean_target = (target or "").strip()
+        if not clean_target:
+            return []
+
+        from app.modules.social_media_intelligence.crawler_engine import resilient_social_crawler
+
+        # 1. Search authentic posts across all operational social collectors
+        search_req = SocialSearchRequest(query=clean_target, limit=limit, detect_cib=True)
+        search_resp = await self.execute_search(search_req)
+        posts = search_resp.results
+
+        # 2. Automatically deep-crawl the top posts with valid URLs to extract nested comment trees & video streams
+        enriched_posts: List[Dict[str, Any]] = []
+
+        async def _deep_crawl_single(p: SocialPost) -> Dict[str, Any]:
+            post_dict = {
+                "id": p.id,
+                "platform": p.platform.value if hasattr(p.platform, "value") else str(p.platform),
+                "author": p.author,
+                "author_id": p.author_id,
+                "text": p.text,
+                "created_at": p.created_at,
+                "url": p.url,
+                "likes_count": p.likes_count,
+                "views_count": p.views_count or 0,
+                "shares_count": p.reposts_count,
+                "comments_count": getattr(p, "comments_count", 0),
+                "post_type": getattr(p, "post_type", "post"),
+                "video_url": getattr(p, "video_url", None),
+                "media_urls": p.media_urls,
+                "comments": [c.dict() if hasattr(c, "dict") else dict(c) for c in getattr(p, "comments", [])],
+                "entities": p.entities,
+                "credibility_score": p.credibility_score
+            }
+
+            if p.url and p.url.startswith(("http://", "https://")):
+                try:
+                    crawl_res = await resilient_social_crawler.crawl_url(
+                        url=p.url,
+                        extract_comments=extract_comments,
+                        extract_media=True,
+                        bypass_blocking=True
+                    )
+                    if crawl_res:
+                        post_dict["post_type"] = crawl_res.post_type or post_dict["post_type"]
+                        if crawl_res.video_url:
+                            post_dict["video_url"] = crawl_res.video_url
+                        if crawl_res.media_urls:
+                            post_dict["media_urls"] = list(set(post_dict["media_urls"] + crawl_res.media_urls))
+                        if crawl_res.comments:
+                            post_dict["comments"] = [c.dict() if hasattr(c, "dict") else dict(c) for c in crawl_res.comments]
+                            post_dict["comments_count"] = len(post_dict["comments"])
+                        if crawl_res.likes_count:
+                            post_dict["likes_count"] = max(post_dict["likes_count"], crawl_res.likes_count)
+                        if crawl_res.extracted_entities:
+                            post_dict["entities"] = list(set(post_dict["entities"] + crawl_res.extracted_entities))
+                except Exception as crawl_err:
+                    app_logger.debug(f"Auto-crawl deep resolution skipped for {p.url}: {crawl_err}")
+
+            return post_dict
+
+        if posts:
+            tasks = [_deep_crawl_single(p) for p in posts[:min(len(posts), 10)]]
+            crawl_results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in crawl_results:
+                if isinstance(res, dict):
+                    enriched_posts.append(res)
+
+        return enriched_posts
+
     async def investigate_youtube_video(self, url_or_id: str) -> Optional[YouTubeInvestigationResult]:
         return await youtube_collector.investigate_video(url_or_id)
 

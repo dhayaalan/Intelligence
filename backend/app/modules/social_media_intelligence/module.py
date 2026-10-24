@@ -71,6 +71,23 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
         )
         resp = await social_media_service.execute_search(req)
 
+        from app.modules.social_media_intelligence.crawler_engine import resilient_crawler_engine
+        from urllib.parse import urlparse
+
+        # If query is a direct social link, crawl full post, reel, and comments
+        crawled_post = None
+        if context.query.startswith(("http://", "https://")):
+            parsed_u = urlparse(context.query)
+            clean_host = parsed_u.netloc.lower().replace("www.", "")
+            if any(dom in clean_host for dom in ["instagram.com", "facebook.com", "reddit.com", "youtube.com", "youtu.be", "bsky.app", "mastodon", "t.me", "tiktok.com"]):
+                try:
+                    crawled_post = await resilient_crawler_engine.crawl_url(context.query, extract_comments=True)
+                    if crawled_post and not any(p.url == crawled_post.url for p in resp.results):
+                        resp.results.insert(0, crawled_post)
+                        resp.total_results += 1
+                except Exception as crawl_err:
+                    logger.warning(f"Error crawling direct social query '{context.query}': {crawl_err}")
+
         entities: List[EntityPayload] = []
         evidence: List[EvidencePayload] = []
         relationships: List[RelationshipPayload] = []
@@ -110,7 +127,29 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
                 metadata={"url": post.url, "created_at": post.created_at}
             ))
 
-            # Store Evidence
+            # If post is a reel or has video stream, emit VIDEO entity for media pipeline
+            if getattr(post, "post_type", None) in ["reel", "video"] or getattr(post, "video_url", None):
+                v_target = post.video_url or post.url
+                if not any(e.type == EntityType.VIDEO and e.value == v_target for e in entities):
+                    entities.append(EntityPayload(
+                        type=EntityType.VIDEO,
+                        value=v_target,
+                        confidence=0.95,
+                        sources=[self.manifest.id, post.platform.value],
+                        metadata={
+                            "url": v_target,
+                            "video_url": post.video_url or v_target,
+                            "platform": post.platform.value,
+                            "title": f"{post.platform.value.upper()} {getattr(post, 'post_type', 'Reel').upper()}: {post.text[:60] if post.text else post.author}",
+                            "author": post.author,
+                            "post_type": getattr(post, "post_type", "reel"),
+                            "canonical_url": post.url,
+                            "comments_count": getattr(post, "comments_count", 0)
+                        }
+                    ))
+
+            # Store Evidence with full reel, media, comments and metrics
+            comments_data = [c.dict() if hasattr(c, "dict") else dict(c) for c in (getattr(post, "comments", []) or [])]
             evidence.append(EvidencePayload(
                 source=f"{post.platform.value.upper()} Wire Dispatch",
                 provider=post.platform.value,
@@ -125,6 +164,11 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
                     "created_at": post.created_at,
                     "likes": post.likes_count,
                     "views": post.views_count,
+                    "shares": getattr(post, "shares_count", 0),
+                    "comments_count": getattr(post, "comments_count", len(comments_data)),
+                    "post_type": getattr(post, "post_type", "post"),
+                    "video_url": getattr(post, "video_url", None),
+                    "comments": comments_data,
                     "entities": post.entities,
                     "cib_clusters": [c.dict() for c in resp.cib_clusters]
                 },
@@ -133,7 +177,6 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
             ))
 
         # Extract structured entities directly from social URL inputs
-        from urllib.parse import urlparse
         if context.query.startswith(("http://", "https://")):
             parsed_u = urlparse(context.query)
             clean_host = parsed_u.netloc.lower().replace("www.", "")
@@ -153,7 +196,7 @@ class SocialMediaIntelligenceModule(IntelligenceModule):
             # Social handle extraction from URL
             if path_segs and clean_host in ["twitter.com", "x.com", "instagram.com", "reddit.com", "t.me", "tiktok.com", "threads.net"]:
                 extracted_handle = path_segs[0].lstrip("@")
-                if extracted_handle and extracted_handle not in ["p", "watch", "status", "channel", "c", "explore"]:
+                if extracted_handle and extracted_handle not in ["p", "reel", "reels", "watch", "status", "channel", "c", "explore"]:
                     if not any(e.value.lower() == extracted_handle.lower() for e in entities):
                         u_ent = EntityPayload(
                             type=EntityType.USERNAME,

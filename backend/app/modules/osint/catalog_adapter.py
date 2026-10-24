@@ -107,16 +107,24 @@ class OSINTPlatformAdapter(ProviderAdapter):
         target = request.query.strip()
         target_type = request.target_type.lower()
 
+        # Multi-word queries without handle prefix should never be stripped into a synthetic handle
+        if any(c.isspace() for c in target) and not target.startswith("@"):
+            return ProviderResponse(
+                provider_id=self.provider_id,
+                status="skipped",
+                duration_ms=(time.time() - start_time) * 1000
+            )
+
         # Extract handle from domain or email if applicable
-        clean_handle = target
-        if target_type == "domain" and "." in target:
-            clean_handle = target.split(".")[0]
+        clean_handle = target.lstrip("@")
+        if target_type == "domain" and "." in clean_handle:
+            clean_handle = clean_handle.split(".")[0]
         elif target_type == "email" and "@" in target:
             clean_handle = target.split("@")[0]
 
         # Clean handle characters
-        clean_handle = clean_handle.replace(" ", "").strip()
-        if not clean_handle:
+        clean_handle = clean_handle.strip()
+        if not clean_handle or any(c.isspace() for c in clean_handle):
             return ProviderResponse(
                 provider_id=self.provider_id,
                 status="skipped",
@@ -241,9 +249,30 @@ class OSINTPlatformAdapter(ProviderAdapter):
                 soft_404_title_keywords = [
                     "page not found", "profile not found", "user not found", 
                     "account not found", "404 not found", "user does not exist",
-                    "this page isn't available", "account suspended"
+                    "this page isn't available", "account suspended",
+                    "profile isn't available", "profile isnt available",
+                    "the link may be broken", "profile may have been removed",
+                    "this account doesn't exist", "this account doesnt exist",
+                    "couldn't find this account", "could not find this account",
+                    "sorry, this page isn't available", "this content isn't available right now"
                 ]
-                if any(kw.lower() in body_lower for kw in self._not_found_keywords) or any(kw in page_title for kw in soft_404_title_keywords):
+                soft_404_body_keywords = [
+                    "profile isn't available", "profile isnt available",
+                    "the link may be broken or the profile may have been removed",
+                    "this account doesn't exist", "this account doesnt exist",
+                    "couldn't find this account", "could not find this account",
+                    "sorry, this page isn't available", "this content isn't available right now"
+                ]
+                final_url = str(resp.url).lower()
+                redirected_to_login = (
+                    ("/login" in final_url or "/accounts/login" in final_url)
+                    and not any(kw in check_url.lower() for kw in ["/login", "/auth"])
+                )
+
+                if (any(kw.lower() in body_lower for kw in self._not_found_keywords)
+                    or any(kw in page_title for kw in soft_404_title_keywords)
+                    or any(kw in body_lower for kw in soft_404_body_keywords)
+                    or redirected_to_login):
                     return ProviderResponse(
                         provider_id=self.provider_id,
                         status="success",

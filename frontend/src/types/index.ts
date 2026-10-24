@@ -374,5 +374,6 @@ export interface ANPRDetectionRecord {
   detector_version: string;
   processed_at: string;
   limitations?: string;
+  metadata?: Record<string, any>;
 }
 
