@@ -3,6 +3,7 @@ import base64
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
 from pydantic import BaseModel
 
@@ -154,6 +155,62 @@ async def analyze_audio_endpoint(
 
     result = media_intelligence_service.analyze_audio(audio_bytes, filename=fn)
     return result
+
+@router.post("/analyze/url")
+async def analyze_url_endpoint(
+    req: AnalyzeUrlRequest,
+    current_user: UserRecord = Depends(get_current_user)
+):
+    """
+    Downloads media from an investigator-provided URL and performs forensic extraction.
+    """
+    url = req.url.strip()
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Invalid media URL: must begin with http:// or https://")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.get(
+                url,
+                headers={"User-Agent": "Sential-Intelligence-Forensics/2.0 (+https://sential.io/security)"}
+            )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch media from URL (HTTP {resp.status_code})")
+            
+            content_type = resp.headers.get("content-type", "").lower()
+            raw_bytes = resp.content
+
+            if len(raw_bytes) == 0:
+                raise HTTPException(status_code=400, detail="Retrieved empty file from media URL")
+
+            if len(raw_bytes) > media_intelligence_service.max_upload_size:
+                raise HTTPException(status_code=413, detail="Remote media exceeds maximum upload limit")
+
+            # Determine type
+            determined_type = req.media_type
+            filename = url.split("?")[0].split("/")[-1] or "media_evidence"
+            
+            if "video" in content_type:
+                determined_type = "video"
+            elif "audio" in content_type:
+                determined_type = "audio"
+            elif "image" in content_type:
+                determined_type = "image"
+
+            if determined_type == "video":
+                analysis = media_intelligence_service.analyze_video(raw_bytes, filename=filename)
+                return {"media_type": "video", "result": analysis.dict()}
+            elif determined_type == "audio":
+                analysis = media_intelligence_service.analyze_audio(raw_bytes, filename=filename)
+                return {"media_type": "audio", "result": analysis.dict()}
+            else:
+                analysis = media_intelligence_service.analyze_image(raw_bytes, filename=filename)
+                return {"media_type": "image", "result": analysis.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch and analyze media URL: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Forensic acquisition failed for URL: {str(e)}")
 
 @router.post("/compare-hash", response_model=MediaComparisonResponse)
 async def compare_hashes_endpoint(

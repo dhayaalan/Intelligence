@@ -173,9 +173,8 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
 
       {/* Modern Modular Sidebar */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b13]/95 backdrop-blur-md flex flex-col justify-between ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${isCollapsed ? 'w-16' : 'w-64'}`}
+        className={`fixed md:static inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b13]/95 backdrop-blur-md flex flex-col justify-between ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          } ${isCollapsed ? 'w-16' : 'w-64'}`}
       >
         {/* Collapse toggle header on desktop */}
         <div className={`hidden md:flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} border-b border-slate-200/80 dark:border-slate-800/80`}>
@@ -221,11 +220,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  activeNav === item.id
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
                     ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
                 <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
@@ -253,11 +251,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  activeNav === item.id
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
                     ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
                 <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
@@ -273,8 +270,6 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
               </div>
             )}
             {[
-              { id: 'entities' as NavView, label: 'Entities & Graph', icon: <Share2 className="w-4 h-4" /> },
-              { id: 'evidence' as NavView, label: 'Evidence Vault', icon: <Layers className="w-4 h-4" /> },
               { id: 'reports' as NavView, label: 'Reports', icon: <FileText className="w-4 h-4" /> },
             ].map((item) => (
               <button
@@ -282,11 +277,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  activeNav === item.id
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
                     ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
                 <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
@@ -315,11 +309,10 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                   type="button"
                   onClick={() => handleNavClick(item.id)}
                   title={isCollapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    activeNav === item.id
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
                       ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                    } ${isCollapsed ? 'justify-center px-0' : ''}`}
                 >
                   <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                   {!isCollapsed && <span>{item.label}</span>}
