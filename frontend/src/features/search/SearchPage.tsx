@@ -145,6 +145,8 @@ export const AVAILABLE_SCOPES = [
 interface SearchPageProps {
   initialTarget?: string;
   initialTargetType?: string;
+  initialQuery?: string;
+  initialModuleFilter?: string;
   onOpenInvestigation: (target: string, targetType: string, searchId?: string) => void;
   onNavigateToInvestigation?: (invId: string) => void;
 }
@@ -152,20 +154,22 @@ interface SearchPageProps {
 export const SearchPage: React.FC<SearchPageProps> = ({
   initialTarget,
   initialTargetType,
+  initialQuery,
+  initialModuleFilter,
   onOpenInvestigation,
   onNavigateToInvestigation,
 }) => {
   const { user, login } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [query, setQuery] = useState(initialTarget || '');
+  const [query, setQuery] = useState(initialQuery || initialTarget || '');
   const [targetType, setTargetType] = useState('AUTO_DETECT');
   const [selectedScopes, setSelectedScopes] = useState<string[]>(['ALL INTELLIGENCE']);
-  const [selectedModules, setSelectedModules] = useState<string[]>([
-    'osint',
-    'threat_intelligence',
-    'news_intelligence',
-  ]);
+  const [selectedModules, setSelectedModules] = useState<string[]>(
+    initialModuleFilter && initialModuleFilter !== 'all'
+      ? [initialModuleFilter]
+      : ['osint', 'threat_intelligence', 'news_intelligence', 'social_media_intelligence', 'media_intelligence']
+  );
   const [uploadedImage, setUploadedImage] = useState<{ name: string; size: string; preview: string } | null>(null);
   const [imageOcrEntities, setImageOcrEntities] = useState<any[]>([]);
 
@@ -198,6 +202,12 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     | 'evidence'
   >('overview');
   const [extraCrawledPosts, setExtraCrawledPosts] = useState<SocialResultItem[]>([]);
+
+  useEffect(() => {
+    if (initialQuery && initialQuery !== query) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery]);
   const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
   const [newsIntelSubTab, setNewsIntelSubTab] = useState<'findings' | 'articles'>('findings');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);

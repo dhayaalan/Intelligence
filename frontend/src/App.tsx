@@ -3,8 +3,6 @@ import { useAuth } from './core/auth/AuthContext';
 import { LoginPage } from './features/auth/LoginPage';
 import { Navbar } from './components/layout/Navbar';
 import { InvestigatorShell } from './components/layout/InvestigatorShell';
-import { SuperAdminLayout } from './features/super_admin/SuperAdminLayout';
-import { TenantAdminLayout } from './features/tenant_admin/TenantAdminLayout';
 import { CommandPalette } from './features/command_palette/CommandPalette';
 import { initializeFrontendModules } from './modules';
 
@@ -12,6 +10,8 @@ export const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [universalSearchQuery, setUniversalSearchQuery] = useState<string | undefined>();
+  const [universalModuleFilter, setUniversalModuleFilter] = useState<string | undefined>();
 
   useEffect(() => {
     initializeFrontendModules();
@@ -29,29 +29,25 @@ export const AppContent: React.FC = () => {
     return <LoginPage />;
   }
 
-  // 1. DEDICATED SUPER ADMIN EXPERIENCE (Sections 6 & 32)
-  if (user.role === 'SUPER_ADMIN') {
-    return <SuperAdminLayout />;
-  }
-
-  // 2. DEDICATED TENANT ADMIN EXPERIENCE (Sections 9 & 33)
-  if (user.role === 'TENANT_ADMIN') {
-    return <TenantAdminLayout />;
-  }
-
-  // 3. INVESTIGATOR & ANALYST EXPERIENCE (Search, Cases, Graph, Evidence, Findings, Reports)
+  // Unified Investigator-First Platform Shell across all authorized personas
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       <Navbar
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         isSidebarOpen={isSidebarOpen}
+        onExecuteUniversalSearch={(query, moduleFilter) => {
+          setUniversalSearchQuery(query);
+          setUniversalModuleFilter(moduleFilter);
+        }}
       />
 
       <div className="flex-1 flex flex-col min-h-0">
         <InvestigatorShell
           isSidebarOpen={isSidebarOpen}
           onCloseSidebar={() => setIsSidebarOpen(false)}
+          universalSearchQuery={universalSearchQuery}
+          universalModuleFilter={universalModuleFilter}
         />
       </div>
 
@@ -60,9 +56,10 @@ export const AppContent: React.FC = () => {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         onNavigate={(_view) => { }}
-        onExecuteSearch={(_query) => { }}
+        onExecuteSearch={(query) => {
+          setUniversalSearchQuery(query);
+        }}
       />
     </div>
   );
 };
-

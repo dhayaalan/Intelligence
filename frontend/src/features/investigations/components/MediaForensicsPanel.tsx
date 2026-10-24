@@ -30,7 +30,7 @@ import { apiRequest } from '../../../core/api/client';
 import { cn } from '../../../lib/utils';
 
 interface MediaForensicsPanelProps {
-  investigationId: string;
+  investigationId?: string;
   onAnalysisLinked?: () => void;
   onNavigateToSearch?: (query: string, targetType?: string) => void;
 }

@@ -1,49 +1,101 @@
 import React, { useState } from 'react';
 import {
-  Search, Newspaper, FolderGit2, Layers, ShieldAlert, FileText, Lock,
-  Share2, Globe, ChevronLeft, ChevronRight, LogOut, Bot, MessageSquare, Wrench
+  Search,
+  FolderGit2,
+  Clock,
+  Globe,
+  MessageSquare,
+  Newspaper,
+  ShieldCheck,
+  ShieldAlert,
+  MapPin,
+  Share2,
+  Layers,
+  FileText,
+  Users,
+  Settings,
+  Activity,
+  Wrench,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Building,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { SearchPage } from '../../features/search/SearchPage';
-import { NewsIntelligencePage } from '../../features/news_intelligence/NewsIntelligencePage';
-import { SocialIntelligencePage } from '../../features/social_intelligence/SocialIntelligencePage';
-import { AgentsPage } from '../../features/agents/AgentsPage';
 import { InvestigationsPage } from '../../features/investigations/InvestigationsPage';
-import { FindingsPage } from '../../features/findings/FindingsPage';
-import { EvidencePage } from '../../features/evidence/EvidencePage';
-import { EntitiesPage } from '../../features/entities/EntitiesPage';
-import { ReportsPage } from '../../features/reports/ReportsPage';
-import { GraphStudioPage } from '../../features/graph/GraphStudioPage';
+import { RecentActivityPage } from '../../features/recent/RecentActivityPage';
+import { OsintIntelligencePage } from '../../features/osint/OsintIntelligencePage';
+import { SocialIntelligencePage } from '../../features/social_intelligence/SocialIntelligencePage';
+import { NewsIntelligencePage } from '../../features/news_intelligence/NewsIntelligencePage';
+import { MediaForensicsPage } from '../../features/media_forensics/MediaForensicsPage';
+import { ThreatIntelligencePage } from '../../features/threat_intelligence/ThreatIntelligencePage';
 import { MapPage } from '../../features/map/MapPage';
+import { GraphStudioPage } from '../../features/graph/GraphStudioPage';
+import { EvidencePage } from '../../features/evidence/EvidencePage';
+import { ReportsPage } from '../../features/reports/ReportsPage';
+import { AdministrationPage, AdminTab } from '../../features/administration/AdministrationPage';
 import { apiRequest } from '../../core/api/client';
-import { useTools, ToolItem } from '../../core/api/hooks';
-import { ToolGrid, ToolRunModal } from '../tools';
-import { PageHeader } from '../common/PageHeader';
 
-type NavView = 'search' | 'social' | 'agents' | 'news' | 'tools' | 'investigations' | 'entities' | 'graph' | 'map' | 'findings' | 'evidence' | 'reports';
-
-
-interface NavItem {
-  id: NavView;
-  label: string;
-  icon: React.ReactNode;
-  dividerBefore?: boolean;
-}
+export type NavView =
+  | 'search'
+  | 'investigations'
+  | 'recent'
+  | 'osint'
+  | 'social'
+  | 'news'
+  | 'media'
+  | 'threat'
+  | 'location'
+  | 'entities'
+  | 'evidence'
+  | 'reports'
+  | 'admin-users'
+  | 'admin-modules'
+  | 'admin-providers'
+  | 'admin-jobs'
+  | 'admin-audit'
+  | 'admin-settings';
 
 interface InvestigatorShellProps {
   isSidebarOpen: boolean;
   onCloseSidebar: () => void;
+  universalSearchQuery?: string;
+  universalModuleFilter?: string;
 }
 
-export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarOpen, onCloseSidebar }) => {
+export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
+  isSidebarOpen,
+  onCloseSidebar,
+  universalSearchQuery,
+  universalModuleFilter,
+}) => {
   const { user, logout } = useAuth();
+
   const getInitialNav = (): { nav: NavView; invId: string | null } => {
     if (typeof window !== 'undefined') {
       const parts = window.location.pathname.replace(/^\/+/, '').split('/');
       const path = (parts[0] || '').toLowerCase();
       const validNavs: NavView[] = [
-        'search', 'social', 'agents', 'news', 'tools', 'investigations',
-        'entities', 'graph', 'map', 'findings', 'evidence', 'reports'
+        'search',
+        'investigations',
+        'recent',
+        'osint',
+        'social',
+        'news',
+        'media',
+        'threat',
+        'location',
+        'entities',
+        'evidence',
+        'reports',
+        'admin-users',
+        'admin-modules',
+        'admin-providers',
+        'admin-jobs',
+        'admin-audit',
+        'admin-settings',
       ];
       if (validNavs.includes(path as NavView)) {
         return { nav: path as NavView, invId: parts[1] || null };
@@ -55,7 +107,6 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
   const initialRoute = getInitialNav();
   const [activeNav, setActiveNav] = useState<NavView>(initialRoute.nav);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [searchTarget, setSearchTarget] = useState<{ query: string; targetType?: string } | null>(null);
   const [selectedInvId, setSelectedInvId] = useState<string | null>(initialRoute.invId);
   const [investigationsKey, setInvestigationsKey] = useState<number>(0);
 
@@ -70,23 +121,17 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const { data: tools = [] } = useTools();
-  const [runningTool, setRunningTool] = useState<ToolItem | null>(null);
-
-  const navItems: NavItem[] = [
-    { id: 'search', label: 'Search', icon: <Search className="w-4 h-4" /> },
-    { id: 'investigations', label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
-    { id: 'tools', label: 'Tools Workbench', icon: <Wrench className="w-4 h-4" /> },
-    { id: 'graph', label: 'Graph Studio', icon: <Share2 className="w-4 h-4" /> },
-    { id: 'map', label: 'OSINT Map', icon: <Globe className="w-4 h-4" /> },
-    { id: 'news', label: 'News Intelligence', icon: <Newspaper className="w-4 h-4" />, dividerBefore: true },
-    { id: 'social', label: 'Social Intelligence', icon: <MessageSquare className="w-4 h-4" /> },
-    { id: 'agents', label: 'Agents', icon: <Bot className="w-4 h-4" /> },
-    { id: 'findings', label: 'Findings', icon: <ShieldAlert className="w-4 h-4" />, dividerBefore: true },
-    { id: 'evidence', label: 'Evidence', icon: <Layers className="w-4 h-4" /> },
-    { id: 'entities', label: 'Entities', icon: <Layers className="w-4 h-4" /> },
-    { id: 'reports', label: 'Reports', icon: <FileText className="w-4 h-4" /> },
-  ];
+  const handleNavClick = (id: NavView) => {
+    if (id === 'investigations') {
+      setSelectedInvId(null);
+      setInvestigationsKey((k) => k + 1);
+    }
+    setActiveNav(id);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/${id}`);
+    }
+    onCloseSidebar();
+  };
 
   const handleOpenInvestigationFromSearch = async (target: string, targetType: string, searchId?: string) => {
     try {
@@ -112,189 +157,170 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
     }
   };
 
-  const handleNavClick = (id: NavView) => {
-    if (id === 'investigations') {
-      setSelectedInvId(null);
-      setInvestigationsKey((k) => k + 1);
-    }
-    setActiveNav(id);
-    if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/${id}`);
-    }
-    onCloseSidebar(); // Close mobile sidebar on navigation
-  };
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isTenantAdmin = user?.role === 'TENANT_ADMIN';
+  const hasAdminAccess = isSuperAdmin || isTenantAdmin;
 
   return (
-    <div className="flex-1 flex overflow-hidden relative">
-      {/* Sidebar */}
-      <aside
-        className={`${isCollapsed ? 'md:w-20' : 'md:w-64'
-          } w-64 border-r border-slate-200/80 bg-white/95 backdrop-blur-md flex flex-col fixed top-14 left-0 bottom-0 transition-all duration-300 z-30 dark:border-slate-800/80 dark:bg-[#0e131f]/95 shadow-xs ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
-      >
-        {/* Collapse toggle header on desktop */}
-        <div className={`hidden md:flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} border-b border-slate-200/80 dark:border-slate-800/80`}>
-          {!isCollapsed ? (
-            <>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold px-1">
-                Workspace
-              </span>
-              <button
-                onClick={() => setIsCollapsed(true)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Collapse Sidebar"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setIsCollapsed(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Expand Sidebar"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Scrollable Navigation Area */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 scrollbar-thin">
-          {!isCollapsed && (
-            <div className="px-2.5 pb-2 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold md:hidden">
-              Intelligence Workspace
-            </div>
-          )}
-
-          {navItems.map((item) => {
-            const isActive = activeNav === item.id;
-
-            return (
-              <React.Fragment key={item.id}>
-                {item.dividerBefore && (
-                  <div className="my-2 border-t border-slate-200/80 dark:border-slate-800/80" />
-                )}
-                <button
-                  onClick={() => handleNavClick(item.id)}
-                  title={item.label}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center h-10 px-0' : 'justify-start px-3 py-2'
-                    } rounded-xl text-xs font-medium transition-all group cursor-pointer ${isActive
-                      ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900/80'
-                    }`}
-                >
-                  <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-                    <span
-                      className={`transition-colors ${isActive
-                        ? 'text-white dark:text-slate-950'
-                        : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'
-                        }`}
-                    >
-                      {item.icon}
-                    </span>
-                    {!isCollapsed && <span>{item.label}</span>}
-                  </div>
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        {/* Sidebar Footer: Profile & Intel Engines */}
-        <div className="p-3 border-t border-slate-200/80 bg-slate-50/60 space-y-3 dark:border-slate-800/80 dark:bg-[#0e131f]/60 shrink-0">
-          {!isCollapsed ? (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center font-bold text-xs font-mono dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300 shrink-0 shadow-2xs">
-                    {user?.name ? user.name.substring(0, 2).toUpperCase() : 'US'}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{user?.name || 'User'}</div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{user?.tenant_id}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={logout}
-                  title="Sign Out"
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-2 rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f1422] text-xs font-mono space-y-1">
-                <div className="flex justify-between items-center text-slate-500 text-[10px]">
-                  <span>TENANT ISOLATION</span>
-                  <span className="text-emerald-600 font-bold dark:text-emerald-400">ENFORCED</span>
-                </div>
-                <div className="flex justify-between items-center text-[10px] text-slate-400">
-                  <span>ENGINES</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">368 Active</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <div
-                className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center font-bold text-xs font-mono dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300 shadow-2xs cursor-default"
-                title={`${user?.name || 'User'} (${user?.tenant_id || ''})`}
-              >
-                {user?.name ? user.name.substring(0, 2).toUpperCase() : 'US'}
-              </div>
-              <button
-                onClick={logout}
-                title="Sign Out"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* Mobile Overlay */}
+    <div className="flex-1 flex overflow-hidden">
+      {/* Backdrop for mobile */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-20 md:hidden"
           onClick={onCloseSidebar}
+          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-xs transition-opacity"
         />
       )}
 
-      {/* Dynamic Route Content with Smooth Transition */}
-      <main
-        className={`flex-1 ${isCollapsed ? 'md:ml-20' : 'md:ml-64'
-          } overflow-y-auto h-[calc(100vh-3.5rem)] px-3 sm:px-5 py-5 bg-[#f8fafc] dark:bg-[#090d16] w-full min-w-0 transition-all duration-300`}
+      {/* Modern Modular Sidebar */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b13]/95 backdrop-blur-md flex flex-col justify-between ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          } ${isCollapsed ? 'w-16' : 'w-64'}`}
       >
+        <div className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+          {/* SECTION 1: WORKSPACE */}
+          <div className="space-y-1">
+            {!isCollapsed && (
+              <div className="px-3 pb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                Workspace
+              </div>
+            )}
+            {[
+              { id: 'search' as NavView, label: 'Search', icon: <Search className="w-4 h-4" /> },
+              { id: 'investigations' as NavView, label: 'Investigations', icon: <FolderGit2 className="w-4 h-4" /> },
+              { id: 'recent' as NavView, label: 'Recent Activity', icon: <Clock className="w-4 h-4" /> },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavClick(item.id)}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+              >
+                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                {!isCollapsed && <span>{item.label}</span>}
+              </button>
+            ))}
+          </div>
 
+          {/* SECTION 2: INTELLIGENCE */}
+          <div className="space-y-1">
+            {!isCollapsed && (
+              <div className="px-3 pb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                Intelligence
+              </div>
+            )}
+            {[
+              { id: 'osint' as NavView, label: 'OSINT', icon: <Globe className="w-4 h-4" /> },
+              { id: 'social' as NavView, label: 'Social Intelligence', icon: <MessageSquare className="w-4 h-4" /> },
+              { id: 'news' as NavView, label: 'News Intelligence', icon: <Newspaper className="w-4 h-4" /> },
+              { id: 'media' as NavView, label: 'Media & Forensics', icon: <ShieldCheck className="w-4 h-4" /> },
+              { id: 'threat' as NavView, label: 'Threat Intelligence', icon: <ShieldAlert className="w-4 h-4" /> },
+              { id: 'location' as NavView, label: 'Location Intelligence', icon: <MapPin className="w-4 h-4" /> },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavClick(item.id)}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+              >
+                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                {!isCollapsed && <span>{item.label}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* SECTION 3: INVESTIGATION RESOURCES */}
+          <div className="space-y-1">
+            {!isCollapsed && (
+              <div className="px-3 pb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                Investigation Resources
+              </div>
+            )}
+            {[
+              { id: 'entities' as NavView, label: 'Entities & Graph', icon: <Share2 className="w-4 h-4" /> },
+              { id: 'evidence' as NavView, label: 'Evidence Vault', icon: <Layers className="w-4 h-4" /> },
+              { id: 'reports' as NavView, label: 'Reports', icon: <FileText className="w-4 h-4" /> },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavClick(item.id)}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+              >
+                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                {!isCollapsed && <span>{item.label}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* SECTION 4: ADMINISTRATION (Role-Gated) */}
+          {hasAdminAccess && (
+            <div className="space-y-1 pt-1">
+              {!isCollapsed && (
+                <div className="px-3 pb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                  Administration
+                </div>
+              )}
+              {[
+                { id: 'admin-users' as NavView, label: 'Users & Roles', icon: <Users className="w-4 h-4" /> },
+                { id: 'admin-modules' as NavView, label: 'Module Entitlements', icon: <Layers className="w-4 h-4" /> },
+                { id: 'admin-providers' as NavView, label: 'Provider Config', icon: <Wrench className="w-4 h-4" /> },
+                { id: 'admin-jobs' as NavView, label: 'Collection Jobs', icon: <Clock className="w-4 h-4" /> },
+                { id: 'admin-audit' as NavView, label: 'Audit Logs', icon: <Activity className="w-4 h-4" /> },
+                { id: 'admin-settings' as NavView, label: 'Platform Settings', icon: <Settings className="w-4 h-4" /> },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleNavClick(item.id)}
+                  title={isCollapsed ? item.label : undefined}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
+                      ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
+                    } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                  {!isCollapsed && <span>{item.label}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar Footer & Collapse Toggle */}
+        <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <button
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            className="hidden md:flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full cursor-pointer"
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Workspace Canvas */}
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-[#070b13] overflow-hidden">
         {activeNav === 'search' && (
           <SearchPage
-            initialTarget={searchTarget?.query}
-            initialTargetType={searchTarget?.targetType}
             onOpenInvestigation={handleOpenInvestigationFromSearch}
-            onNavigateToInvestigation={(invId) => {
-              setSelectedInvId(invId);
-              setActiveNav('investigations');
-            }}
+            initialQuery={universalSearchQuery}
+            initialModuleFilter={universalModuleFilter}
           />
         )}
-        {activeNav === 'social' && <SocialIntelligencePage />}
-        {activeNav === 'agents' && <AgentsPage />}
-        {activeNav === 'news' && <NewsIntelligencePage />}
-        {activeNav === 'tools' && (
-          <div className="max-w-7xl mx-auto space-y-6">
-            <PageHeader
-              title="Intelligence Tool Workbench"
-              description="Execute deterministic reconnaissance probers, DNS enumeration, CT-logs, WHOIS, and threat intelligence engines on target indicators."
-            />
-            <ToolGrid
-              tools={tools}
-              onRunTool={(tool) => setRunningTool(tool)}
-              onViewDetails={(tool) => setRunningTool(tool)}
-            />
-          </div>
-        )}
+
         {activeNav === 'investigations' && (
           <InvestigationsPage
             key={investigationsKey}
@@ -302,39 +328,59 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({ isSidebarO
             onSelectInvestigation={(id) => {
               setSelectedInvId(id);
               if (typeof window !== 'undefined') {
-                window.history.pushState(null, '', id ? `/investigations/${id}` : '/investigations');
+                window.history.pushState(null, '', `/investigations/${id}`);
               }
             }}
-            onClearSelectedInvestigation={() => {
-              setSelectedInvId(null);
-              if (typeof window !== 'undefined') {
-                window.history.pushState(null, '', '/investigations');
-              }
-            }}
-            onNavigateToSearch={(target, targetType) => {
-              setSearchTarget({ query: target, targetType });
+            onNavigateToSearch={(query) => {
               setActiveNav('search');
-              if (typeof window !== 'undefined') {
-                window.history.pushState(null, '', '/search');
-              }
             }}
           />
         )}
-        {activeNav === 'entities' && <EntitiesPage />}
-        {activeNav === 'graph' && <GraphStudioPage />}
-        {activeNav === 'map' && <MapPage />}
-        {activeNav === 'findings' && <FindingsPage />}
-        {activeNav === 'evidence' && <EvidencePage />}
-        {activeNav === 'reports' && <ReportsPage />}
-      </main>
 
-      {runningTool && (
-        <ToolRunModal
-          tool={runningTool}
-          isOpen={Boolean(runningTool)}
-          onClose={() => setRunningTool(null)}
-        />
-      )}
+        {activeNav === 'recent' && (
+          <RecentActivityPage
+            onNavigateToInvestigation={(id) => {
+              setSelectedInvId(id);
+              setActiveNav('investigations');
+            }}
+            onNavigateToSearch={(query) => {
+              setActiveNav('search');
+            }}
+          />
+        )}
+
+        {activeNav === 'osint' && (
+          <OsintIntelligencePage onOpenInvestigation={handleOpenInvestigationFromSearch} />
+        )}
+
+        {activeNav === 'social' && <SocialIntelligencePage />}
+
+        {activeNav === 'news' && <NewsIntelligencePage />}
+
+        {activeNav === 'media' && (
+          <MediaForensicsPage
+            onNavigateToSearch={(query) => setActiveNav('search')}
+            onNavigateToInvestigation={(id) => {
+              setSelectedInvId(id);
+              setActiveNav('investigations');
+            }}
+          />
+        )}
+
+        {activeNav === 'threat' && <ThreatIntelligencePage />}
+
+        {activeNav === 'location' && <MapPage />}
+
+        {activeNav === 'entities' && <GraphStudioPage />}
+
+        {activeNav === 'evidence' && <EvidencePage />}
+
+        {activeNav === 'reports' && <ReportsPage />}
+
+        {activeNav.startsWith('admin-') && (
+          <AdministrationPage initialTab={activeNav.replace('admin-', '') as AdminTab} />
+        )}
+      </main>
     </div>
   );
 };
