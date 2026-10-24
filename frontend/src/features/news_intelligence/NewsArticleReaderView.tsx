@@ -236,7 +236,7 @@ export const NewsArticleReaderView: React.FC<NewsArticleReaderViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 space-y-4 max-w-7xl mx-auto w-full pb-16">
+    <div className="flex-1 flex flex-col min-h-0 space-y-4 w-full pb-16">
       {/* 1. TOP BREADCRUMB & RESEARCH ACTIONS BAR */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#0c101d] border border-slate-200 dark:border-slate-800 shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-mono">

@@ -187,7 +187,7 @@ export const OsintIntelligencePage: React.FC<OsintIntelligencePageProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <PageHeader
             title="Open-Source Intelligence (OSINT)"

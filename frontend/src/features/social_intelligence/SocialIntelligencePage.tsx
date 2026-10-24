@@ -28,8 +28,10 @@ import {
   Copy,
   Check,
   Zap,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Fingerprint
 } from 'lucide-react';
+import { detectEntityType } from '../../lib/entityDetector';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -174,10 +176,72 @@ export const SocialIntelligencePage: React.FC = () => {
 
   const posts = searchMutation.data?.results || [];
   const cibClusters = searchMutation.data?.cib_clusters || [];
+  const detected = detectEntityType(query);
+
+  // Extract identified entities from social results
+  const getSocialEntities = () => {
+    const seen = new Set<string>();
+    const list: Array<{ id: string; name: string; type: string; platform: string; count: number }> = [];
+
+    // Root query entity
+    if (query.trim()) {
+      list.push({
+        id: `query_${query.trim()}`,
+        name: query.trim(),
+        type: detected.type,
+        platform: 'Target Query',
+        count: posts.length,
+      });
+      seen.add(query.trim().toLowerCase());
+    }
+
+    for (const post of posts) {
+      if (post.author && !seen.has(post.author.toLowerCase())) {
+        list.push({
+          id: `author_${post.author}`,
+          name: post.author.startsWith('@') ? post.author : `@${post.author}`,
+          type: 'HANDLE',
+          platform: post.platform,
+          count: (post.likes_count || 0) + (post.reposts_count || 0),
+        });
+        seen.add(post.author.toLowerCase());
+      }
+      if (Array.isArray(post.entities)) {
+        for (const ent of post.entities) {
+          if (ent && !seen.has(ent.toLowerCase())) {
+            list.push({
+              id: `ent_${ent}`,
+              name: ent,
+              type: 'ENTITY',
+              platform: post.platform,
+              count: 1,
+            });
+            seen.add(ent.toLowerCase());
+          }
+        }
+      }
+      const tags = post.text?.match(/#[a-zA-Z0-9_]+/g) || [];
+      for (const tag of tags) {
+        if (!seen.has(tag.toLowerCase())) {
+          list.push({
+            id: `tag_${tag}`,
+            name: tag,
+            type: 'HASHTAG',
+            platform: post.platform,
+            count: 1,
+          });
+          seen.add(tag.toLowerCase());
+        }
+      }
+    }
+    return list.slice(0, 8);
+  };
+
+  const identifiedSocialEntities = getSocialEntities();
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         {/* Workspace Header */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 relative overflow-hidden shadow-xs dark:border-slate-800 dark:bg-[#0f1422]">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -214,8 +278,18 @@ export const SocialIntelligencePage: React.FC = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search keywords, hashtags (#threat), Telegram channels (@wire), or YouTube URLs..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-white font-mono"
+                className="w-full pl-10 pr-32 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-white font-mono"
               />
+              {query.trim() && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold flex items-center gap-1 ${detected.badgeColor}`}
+                  >
+                    <Fingerprint className="w-3 h-3" />
+                    <span>{detected.type}</span>
+                  </span>
+                </div>
+              )}
             </div>
 
             <Button
@@ -235,6 +309,28 @@ export const SocialIntelligencePage: React.FC = () => {
                 </>
               )}
             </Button>
+          </div>
+
+          {/* Preset Topics */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
+            <span className="text-slate-400 font-mono text-[11px] font-semibold">SAMPLE TOPICS:</span>
+            {[
+              { label: 'malware threat campaign', tag: 'Malware' },
+              { label: '#infosec zero-day', tag: 'Vulnerability' },
+              { label: '@shodanhq', tag: 'Handle' },
+              { label: 'botnet disinformation', tag: 'CIB Burst' },
+              { label: 'defense aerospace readiness', tag: 'Geopolitical' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setQuery(preset.label)}
+                className="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
+              >
+                <span>{preset.label}</span>
+                <span className="text-[10px] text-slate-400 ml-1">[{preset.tag}]</span>
+              </button>
+            ))}
           </div>
 
           {/* Platform Filters and Options */}
@@ -360,6 +456,46 @@ export const SocialIntelligencePage: React.FC = () => {
       {/* 1. SOCIAL POSTS FEED TAB */}
       {activeTab === 'feed' && (
         <div className="space-y-6">
+          {/* Prominent Identified Social Entities & Persona Footprint Matrix */}
+          {identifiedSocialEntities.length > 0 && (
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-cyan-500" />
+                  <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-900 dark:text-white">
+                    Identified Social Entities & Persona Footprint ({identifiedSocialEntities.length})
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-mono">Cross-Platform Attribution</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {identifiedSocialEntities.map((ent) => (
+                  <div
+                    key={ent.id}
+                    className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+                          {ent.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono capitalize">
+                        {ent.platform}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQuery(ent.name.replace(/^@/, ''))}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 cursor-pointer transition-colors shrink-0"
+                    >
+                      Pivot
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {posts.length === 0 ? (
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Diagnostic Box if search was performed */}

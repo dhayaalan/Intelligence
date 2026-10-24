@@ -148,7 +148,7 @@ export const ReportsPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="w-full space-y-4">
           <div className="h-6 w-48 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
           <div className="h-4 w-96 bg-zinc-100 dark:bg-zinc-800/60 rounded animate-pulse" />
           {[1, 2].map((i) => (
@@ -161,7 +161,7 @@ export const ReportsPage: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div>
