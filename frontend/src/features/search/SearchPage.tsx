@@ -1026,9 +1026,10 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   }
 
   return (
-    <div className="w-full space-y-6">
-      {/* Search Workspace Card with Scope Selector & Multi-Source Ingestion */}
-      <div className="w-full rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 relative overflow-hidden shadow-xs dark:border-slate-800 dark:bg-[#0f1422]">
+    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Search Workspace Card with Scope Selector & Multi-Source Ingestion */}
+        <div className="w-full rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 relative overflow-hidden shadow-xs dark:border-slate-800 dark:bg-[#0f1422]">
         {/* Hidden File Input for Forensic Image Ingestion */}
         <input
           ref={fileInputRef}
@@ -3237,7 +3238,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         </div>
       )}
     </div>
-  );
+  </div>
+);
 };
 
 export default SearchPage;

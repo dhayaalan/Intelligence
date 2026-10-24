@@ -96,15 +96,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Center: Persistent Universal Search Bar */}
-      <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center gap-1.5 flex-1 max-w-xl mx-4">
-        <div className="relative flex-1 flex items-center">
+      <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center gap-2 flex-1 max-w-2xl mx-2 lg:mx-6 min-w-0">
+        <div className="relative flex-1 flex items-center min-w-0">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
           <input
             type="text"
             value={navSearchQuery}
             onChange={(e) => setNavSearchQuery(e.target.value)}
-            placeholder="Universal search (domain, IP, handle, email, hash, plate, URL)..."
-            className="w-full pl-9 pr-14 py-1.5 rounded-lg bg-slate-100/80 border border-slate-200/80 text-xs text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 dark:bg-slate-900/80 dark:border-slate-800 transition-all"
+            placeholder="Universal search (domain, IP, handle, email, hash)..."
+            className="w-full pl-9 pr-12 py-1.5 rounded-lg bg-slate-100/80 border border-slate-200/80 text-xs text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 dark:bg-slate-900/80 dark:border-slate-800 transition-all"
           />
           <button
             type="button"
@@ -175,9 +175,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Role & User Clearance Pill */}
         {user && (
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
             <div className="hidden sm:flex flex-col items-end text-right font-mono">
-              <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[120px]">
+              <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[180px] lg:max-w-[220px]" title={user.name || user.email}>
                 {user.name || user.email}
               </span>
               <span

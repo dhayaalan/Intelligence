@@ -84,7 +84,7 @@ export const MapPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 w-full h-[calc(100vh-8rem)] flex flex-col">
+    <div className="flex-1 flex flex-col h-full p-4 sm:p-6 lg:p-8 space-y-4 overflow-hidden bg-slate-50 dark:bg-[#070b13]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
         <div>

@@ -147,84 +147,87 @@ export const ReportsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="w-full space-y-4">
-        <div className="h-6 w-48 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-        <div className="h-4 w-96 bg-zinc-100 dark:bg-zinc-800/60 rounded animate-pulse" />
-        {[1, 2].map((i) => (
-          <div key={i} className="h-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl animate-pulse" />
-        ))}
+      <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto space-y-4">
+          <div className="h-6 w-48 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="h-4 w-96 bg-zinc-100 dark:bg-zinc-800/60 rounded animate-pulse" />
+          {[1, 2].map((i) => (
+            <div key={i} className="h-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">INTELLIGENCE</span>
-            <span className="text-zinc-300 dark:text-zinc-700">//</span>
-            <span className="text-xs font-mono text-black dark:text-white font-bold">DOSSIERS</span>
+    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">INTELLIGENCE</span>
+              <span className="text-zinc-300 dark:text-zinc-700">//</span>
+              <span className="text-xs font-mono text-black dark:text-white font-bold">DOSSIERS</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950 dark:text-white flex items-center gap-2 font-sans">
+              <FileText className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
+              <span>Intelligence Dossier Studio</span>
+            </h1>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+              Compile, review, and export court-admissible dossiers and executive briefings.
+            </p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950 dark:text-white flex items-center gap-2 font-sans">
-            <FileText className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
-            <span>Intelligence Dossier Studio</span>
-          </h1>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-            Compile, review, and export court-admissible dossiers and executive briefings.
-          </p>
+
+          <Badge variant="purple" size="md">
+            <Shield className="w-3.5 h-3.5 mr-1" />
+            Court-Admissible Standards
+          </Badge>
         </div>
 
-        <Badge variant="purple" size="md">
-          <Shield className="w-3.5 h-3.5 mr-1" />
-          Court-Admissible Standards
-        </Badge>
-      </div>
+        {/* Report Builder: Generate from Investigation */}
+        {investigations.length > 0 && (
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Generate New Dossier</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                    Select an active investigation to compile a comprehensive intelligence dossier.
+                  </p>
+                </div>
 
-      {/* Report Builder: Generate from Investigation */}
-      {investigations.length > 0 && (
-        <Card className="border-zinc-200 dark:border-zinc-800">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <h3 className="text-xs font-bold text-zinc-900 dark:text-white">Generate New Dossier</h3>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-                  Select an active investigation to compile a comprehensive intelligence dossier.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <select
-                  className="h-9 px-3 rounded-md bg-white border border-zinc-200 text-xs text-zinc-800 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white font-mono max-w-xs dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-200 shadow-2xs"
-                  value={selectedInvId}
-                  onChange={(e) => setSelectedInvId(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Select Investigation...
-                  </option>
-                  {investigations.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.title}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <select
+                    className="h-9 px-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono min-w-[240px] shadow-2xs"
+                    value={selectedInvId}
+                    onChange={(e) => setSelectedInvId(e.target.value)}
+                  >
+                    <option value="" disabled>
+                      Select Investigation...
                     </option>
-                  ))}
-                </select>
+                    {investigations.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.title}
+                      </option>
+                    ))}
+                  </select>
 
-                <Button
-                  variant="primary"
-                  size="sm"
-                  isLoading={isGenerating}
-                  disabled={!selectedInvId}
-                  onClick={handleGenerateReport}
-                >
-                  <FileText className="w-3.5 h-3.5 mr-1" />
-                  Generate
-                </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    isLoading={isGenerating}
+                    disabled={!selectedInvId}
+                    onClick={handleGenerateReport}
+                  >
+                    <FileText className="w-3.5 h-3.5 mr-1" />
+                    Generate
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
       {/* Reports List */}
       <div className="space-y-3">
@@ -339,7 +342,9 @@ export const ReportsPage: React.FC = () => {
         )}
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default ReportsPage;
+

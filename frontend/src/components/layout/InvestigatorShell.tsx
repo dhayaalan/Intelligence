@@ -173,9 +173,36 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
 
       {/* Modern Modular Sidebar */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b13]/95 backdrop-blur-md flex flex-col justify-between ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          } ${isCollapsed ? 'w-16' : 'w-64'}`}
+        className={`fixed md:static inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b13]/95 backdrop-blur-md flex flex-col justify-between ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        } ${isCollapsed ? 'w-16' : 'w-64'}`}
       >
+        {/* Collapse toggle header on desktop */}
+        <div className={`hidden md:flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} border-b border-slate-200/80 dark:border-slate-800/80`}>
+          {!isCollapsed ? (
+            <>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold px-1">
+                Navigation
+              </span>
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Expand Sidebar"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
           {/* SECTION 1: WORKSPACE */}
           <div className="space-y-1">
@@ -194,12 +221,13 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
-                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  activeNav === item.id
+                    ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
-                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
               </button>
             ))}
@@ -225,12 +253,13 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
-                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  activeNav === item.id
+                    ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
-                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
               </button>
             ))}
@@ -253,12 +282,13 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                 type="button"
                 onClick={() => handleNavClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
-                    ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  activeNav === item.id
+                    ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
-                <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                 {!isCollapsed && <span>{item.label}</span>}
               </button>
             ))}
@@ -285,12 +315,13 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
                   type="button"
                   onClick={() => handleNavClick(item.id)}
                   title={isCollapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeNav === item.id
-                      ? 'bg-indigo-600 text-white font-semibold shadow-xs shadow-indigo-600/30'
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    activeNav === item.id
+                      ? 'bg-slate-900 text-white font-semibold shadow-xs dark:bg-white dark:text-slate-950'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
-                    } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                  } ${isCollapsed ? 'justify-center px-0' : ''}`}
                 >
-                  <span className={activeNav === item.id ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
+                  <span className={activeNav === item.id ? 'text-white dark:text-slate-950' : 'text-slate-400'}>{item.icon}</span>
                   {!isCollapsed && <span>{item.label}</span>}
                 </button>
               ))}
@@ -298,16 +329,21 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
           )}
         </div>
 
-        {/* Sidebar Footer & Collapse Toggle */}
-        <div className="p-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <button
-            onClick={() => setIsCollapsed((prev) => !prev)}
-            className="hidden md:flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full cursor-pointer"
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
+        {/* Sidebar Footer: Tenant Isolation Enforced */}
+        <div className="p-3 border-t border-slate-200/80 bg-slate-50/60 dark:border-slate-800/80 dark:bg-[#070b13]/60 text-xs font-mono shrink-0">
+          {!isCollapsed ? (
+            <div className="flex justify-between items-center text-[10px] text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <Building className="w-3 h-3 text-slate-400" />
+                <span>TENANT ISOLATION</span>
+              </span>
+              <span className="text-emerald-600 font-bold dark:text-emerald-400">ENFORCED</span>
+            </div>
+          ) : (
+            <div className="flex justify-center" title="Tenant Isolation Enforced">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            </div>
+          )}
         </div>
       </aside>
 

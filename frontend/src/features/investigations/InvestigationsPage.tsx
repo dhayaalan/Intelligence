@@ -258,9 +258,10 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
   }
 
   return (
-    <div className="w-full pb-12 space-y-6">
-      {/* 1. HERO HEADER WITH ELEVATED BRANDING (SAAS APPLICATION INVESTIGATION) */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-900/40">
+    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto pb-12 space-y-6">
+        {/* 1. HERO HEADER WITH ELEVATED BRANDING (SAAS APPLICATION INVESTIGATION) */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-900/40">
         <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 -mb-12 w-64 h-64 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -1259,5 +1260,8 @@ export const InvestigationsPage: React.FC<InvestigationsPageProps> = ({
         )}
       </Dialog>
     </div>
-  );
+  </div>
+);
 };
+
+export default InvestigationsPage;
