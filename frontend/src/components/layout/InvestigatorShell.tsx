@@ -63,6 +63,8 @@ interface InvestigatorShellProps {
   onCloseSidebar: () => void;
   universalSearchQuery?: string;
   universalModuleFilter?: string;
+  universalSelectedModules?: string[];
+  searchTriggerTimestamp?: number;
 }
 
 export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
@@ -70,6 +72,8 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
   onCloseSidebar,
   universalSearchQuery,
   universalModuleFilter,
+  universalSelectedModules,
+  searchTriggerTimestamp,
 }) => {
   const { user, logout } = useAuth();
 
@@ -120,6 +124,16 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Automatically navigate to /search canvas when a universal search is executed from Navbar
+  React.useEffect(() => {
+    if (searchTriggerTimestamp && searchTriggerTimestamp > 0) {
+      setActiveNav('search');
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', '/search');
+      }
+    }
+  }, [searchTriggerTimestamp]);
 
   const handleNavClick = (id: NavView) => {
     if (id === 'investigations') {
@@ -347,6 +361,8 @@ export const InvestigatorShell: React.FC<InvestigatorShellProps> = ({
             onOpenInvestigation={handleOpenInvestigationFromSearch}
             initialQuery={universalSearchQuery}
             initialModuleFilter={universalModuleFilter}
+            initialModules={universalSelectedModules}
+            searchTriggerTimestamp={searchTriggerTimestamp}
           />
         )}
 

@@ -147,6 +147,8 @@ interface SearchPageProps {
   initialTargetType?: string;
   initialQuery?: string;
   initialModuleFilter?: string;
+  initialModules?: string[];
+  searchTriggerTimestamp?: number;
   onOpenInvestigation: (target: string, targetType: string, searchId?: string) => void;
   onNavigateToInvestigation?: (invId: string) => void;
 }
@@ -156,6 +158,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   initialTargetType,
   initialQuery,
   initialModuleFilter,
+  initialModules,
+  searchTriggerTimestamp,
   onOpenInvestigation,
   onNavigateToInvestigation,
 }) => {
@@ -166,7 +170,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const [targetType, setTargetType] = useState('AUTO_DETECT');
   const [selectedScopes, setSelectedScopes] = useState<string[]>(['ALL INTELLIGENCE']);
   const [selectedModules, setSelectedModules] = useState<string[]>(
-    initialModuleFilter && initialModuleFilter !== 'all'
+    initialModules && initialModules.length > 0
+      ? initialModules
+      : initialModuleFilter && initialModuleFilter !== 'all'
       ? [initialModuleFilter]
       : ['osint', 'threat_intelligence', 'news_intelligence', 'social_media_intelligence', 'media_intelligence']
   );
@@ -208,6 +214,18 @@ export const SearchPage: React.FC<SearchPageProps> = ({
       setQuery(initialQuery);
     }
   }, [initialQuery]);
+
+  useEffect(() => {
+    if (initialModules && initialModules.length > 0) {
+      setSelectedModules(initialModules);
+    }
+  }, [initialModules]);
+
+  useEffect(() => {
+    if (searchTriggerTimestamp && searchTriggerTimestamp > 0 && (initialQuery || query)) {
+      handleSearch(undefined, initialQuery || query, initialModules);
+    }
+  }, [searchTriggerTimestamp]);
   const [mediaSubTab, setMediaSubTab] = useState<'images' | 'videos'>('images');
   const [newsIntelSubTab, setNewsIntelSubTab] = useState<'findings' | 'articles'>('findings');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
@@ -329,12 +347,15 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleSearch = async (e?: React.FormEvent, presetQuery?: string) => {
+  const handleSearch = async (e?: React.FormEvent, presetQuery?: string, overrideModules?: string[]) => {
     if (e) e.preventDefault();
     const searchQuery = (presetQuery || query).trim() || uploadedImage?.name || '';
     if (!searchQuery) return;
 
     if (presetQuery) setQuery(presetQuery);
+    const modulesToUse = overrideModules || selectedModules;
+    if (overrideModules) setSelectedModules(overrideModules);
+
     setIsSearching(true);
     setSearchResult(null); // Clear stale results immediately so workspace reloads cleanly
     setError(null);
@@ -356,7 +377,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
           target_type: uploadedImage ? 'IMAGE' : targetType === 'AUTO_DETECT' ? undefined : targetType,
           search_mode: 'ACTIVE',
           options: { search_mode: 'ACTIVE', deep_scan: true },
-          selected_modules: selectedModules,
+          selected_modules: modulesToUse,
           selected_scopes: selectedScopes,
         }),
       });

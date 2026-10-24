@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Shield,
   Search,
@@ -11,16 +11,80 @@ import {
   Filter,
   CheckCircle2,
   ChevronDown,
-  UserCheck
+  Play,
+  Check,
+  CheckSquare,
+  Square,
+  Globe,
+  ShieldAlert,
+  Users,
+  Newspaper,
+  Camera,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { useTheme } from '../../core/theme/ThemeContext';
+
+export interface ModuleOption {
+  id: string;
+  label: string;
+  shortLabel: string;
+  desc: string;
+  icon: React.ReactNode;
+}
+
+export const AVAILABLE_MODULES: ModuleOption[] = [
+  {
+    id: 'osint',
+    label: 'Open-Source Intelligence (OSINT)',
+    shortLabel: 'OSINT',
+    desc: 'Domain, WHOIS, DNS, and identity recon',
+    icon: <Globe className="w-3.5 h-3.5 text-indigo-500" />,
+  },
+  {
+    id: 'threat_intelligence',
+    label: 'Threat Intelligence & Attack Surface',
+    shortLabel: 'Threat Intel',
+    desc: 'OWASP ZAP, Shodan port recon, and CVEs',
+    icon: <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />,
+  },
+  {
+    id: 'social_media_intelligence',
+    label: 'Social Media Intelligence',
+    shortLabel: 'Social Intel',
+    desc: 'Cross-platform usernames, avatars, and posts',
+    icon: <Users className="w-3.5 h-3.5 text-blue-500" />,
+  },
+  {
+    id: 'news_intelligence',
+    label: 'News Intelligence & Wire',
+    shortLabel: 'News Intel',
+    desc: 'Real-time media leaks, articles, and sentiment',
+    icon: <Newspaper className="w-3.5 h-3.5 text-amber-500" />,
+  },
+  {
+    id: 'media_intelligence',
+    label: 'Media Forensics & Deepfake Intel',
+    shortLabel: 'Media Forensics',
+    desc: 'C2PA manifests, EXIF metadata, and ANPR',
+    icon: <Camera className="w-3.5 h-3.5 text-purple-500" />,
+  },
+  {
+    id: 'geo_intelligence',
+    label: 'Location & Geospatial Intelligence',
+    shortLabel: 'Location (GIS)',
+    desc: 'Coordinate resolution, maps, and flight radar',
+    icon: <MapPin className="w-3.5 h-3.5 text-emerald-500" />,
+  },
+];
+
+const ALL_MODULE_IDS = AVAILABLE_MODULES.map((m) => m.id);
 
 interface NavbarProps {
   onOpenCommandPalette: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
-  onExecuteUniversalSearch?: (query: string, moduleFilter?: string) => void;
+  onExecuteUniversalSearch?: (query: string, selectedModules: string[]) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,18 +96,46 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [navSearchQuery, setNavSearchQuery] = useState('');
-  const [selectedModuleFilter, setSelectedModuleFilter] = useState('all');
+  const [selectedModules, setSelectedModules] = useState<string[]>(ALL_MODULE_IDS);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const moduleOptions = [
-    { id: 'all', label: 'All Modules' },
-    { id: 'osint', label: 'OSINT' },
-    { id: 'social_media_intelligence', label: 'Social Intel' },
-    { id: 'news_intelligence', label: 'News Intel' },
-    { id: 'media_intelligence', label: 'Media Forensics' },
-    { id: 'threat_intelligence', label: 'Threat Intel' },
-    { id: 'geo_intelligence', label: 'Location (GIS)' },
-  ];
+  const isAllSelected = selectedModules.length === ALL_MODULE_IDS.length;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+    if (isFilterDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterDropdownOpen]);
+
+  const toggleModule = (id: string) => {
+    if (selectedModules.includes(id)) {
+      // Don't allow 0 modules; if only 1 is active, keep it
+      if (selectedModules.length > 1) {
+        setSelectedModules(selectedModules.filter((m) => m !== id));
+      }
+    } else {
+      setSelectedModules([...selectedModules, id]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      // If all selected, keep only OSINT and Threat Intel as minimal default
+      setSelectedModules(['osint', 'threat_intelligence']);
+    } else {
+      setSelectedModules(ALL_MODULE_IDS);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +144,17 @@ export const Navbar: React.FC<NavbarProps> = ({
       return;
     }
     if (onExecuteUniversalSearch) {
-      onExecuteUniversalSearch(navSearchQuery.trim(), selectedModuleFilter);
+      onExecuteUniversalSearch(navSearchQuery.trim(), selectedModules);
     }
+  };
+
+  const getDropdownLabel = () => {
+    if (isAllSelected) return 'All Modules (6)';
+    if (selectedModules.length === 1) {
+      const match = AVAILABLE_MODULES.find((m) => m.id === selectedModules[0]);
+      return match ? match.shortLabel : '1 Module';
+    }
+    return `${selectedModules.length} Modules`;
   };
 
   return (
@@ -95,7 +196,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </div>
 
-      {/* Center: Persistent Universal Search Bar */}
+      {/* Center: Persistent Universal Search Bar with Multi-Module Selector & Execute Button */}
       <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center gap-2 flex-1 max-w-2xl mx-2 lg:mx-6 min-w-0">
         <div className="relative flex-1 flex items-center min-w-0">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
@@ -109,50 +210,101 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="absolute right-2 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-            title="Open Command Palette"
+            className="absolute right-2 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            title="Open Command Palette (⌘K)"
           >
             ⌘K
           </button>
         </div>
 
-        {/* Module Scope Dropdown */}
-        <div className="relative">
+        {/* Multi-Module Scope Dropdown */}
+        <div className="relative" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setIsFilterDropdownOpen((prev) => !prev)}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900 text-[11px] font-mono text-slate-600 dark:text-slate-300 flex items-center gap-1.5 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900 text-[11px] font-mono text-slate-700 dark:text-slate-300 flex items-center gap-1.5 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            title="Select target intelligence modules"
           >
-            <Filter className="w-3 h-3 text-slate-400" />
-            <span className="truncate max-w-[90px]">
-              {moduleOptions.find((m) => m.id === selectedModuleFilter)?.label || 'All'}
-            </span>
+            <Filter className="w-3 h-3 text-indigo-500" />
+            <span className="truncate max-w-[110px] font-semibold">{getDropdownLabel()}</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
 
           {isFilterDropdownOpen && (
-            <div className="absolute right-0 mt-1 w-44 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-50 text-xs font-mono">
-              {moduleOptions.map((opt) => (
+            <div className="absolute right-0 mt-1.5 w-72 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl py-2 z-50 text-xs font-mono animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between px-3 pb-2 border-b border-slate-100 dark:border-slate-800 text-[11px]">
+                <span className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Target Modules ({selectedModules.length}/6)
+                </span>
                 <button
-                  key={opt.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedModuleFilter(opt.id);
-                    setIsFilterDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 transition-colors cursor-pointer flex items-center justify-between ${
-                    selectedModuleFilter === opt.id
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
+                  onClick={handleSelectAll}
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold text-[10px] cursor-pointer"
                 >
-                  <span>{opt.label}</span>
-                  {selectedModuleFilter === opt.id && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />}
+                  {isAllSelected ? 'Deselect All' : 'Select All'}
                 </button>
-              ))}
+              </div>
+
+              <div className="max-h-64 overflow-y-auto py-1 divide-y divide-slate-100/60 dark:divide-slate-800/60">
+                {AVAILABLE_MODULES.map((opt) => {
+                  const isChecked = selectedModules.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleModule(opt.id)}
+                      className={`w-full text-left px-3 py-2 transition-colors cursor-pointer flex items-start gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
+                        isChecked ? 'bg-indigo-50/40 dark:bg-indigo-950/20' : ''
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {isChecked ? (
+                          <div className="w-4 h-4 rounded bg-indigo-600 text-white flex items-center justify-center">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <div className="w-4 h-4 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {opt.icon}
+                          <span className={`font-semibold text-xs truncate ${isChecked ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>
+                            {opt.shortLabel}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                          {opt.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="px-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                <span>Multi-module execution enabled</span>
+                <button
+                  type="button"
+                  onClick={() => setIsFilterDropdownOpen(false)}
+                  className="font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Explicit Execute Search Button */}
+        <button
+          type="submit"
+          className="h-8 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-mono text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shadow-indigo-600/30 shrink-0"
+          title="Execute multi-module intelligence search across selected engines"
+        >
+          <Play className="w-3 h-3 fill-current" />
+          <span>Execute</span>
+        </button>
       </form>
 
       {/* Right Controls: Core Health, Theme, User Profile */}

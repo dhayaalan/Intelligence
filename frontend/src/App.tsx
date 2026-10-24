@@ -11,7 +11,8 @@ export const AppContent: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [universalSearchQuery, setUniversalSearchQuery] = useState<string | undefined>();
-  const [universalModuleFilter, setUniversalModuleFilter] = useState<string | undefined>();
+  const [universalSelectedModules, setUniversalSelectedModules] = useState<string[] | undefined>();
+  const [searchTriggerTimestamp, setSearchTriggerTimestamp] = useState<number>(0);
 
   useEffect(() => {
     initializeFrontendModules();
@@ -36,9 +37,10 @@ export const AppContent: React.FC = () => {
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         isSidebarOpen={isSidebarOpen}
-        onExecuteUniversalSearch={(query, moduleFilter) => {
+        onExecuteUniversalSearch={(query, modules) => {
           setUniversalSearchQuery(query);
-          setUniversalModuleFilter(moduleFilter);
+          setUniversalSelectedModules(modules);
+          setSearchTriggerTimestamp(Date.now());
         }}
       />
 
@@ -47,7 +49,8 @@ export const AppContent: React.FC = () => {
           isSidebarOpen={isSidebarOpen}
           onCloseSidebar={() => setIsSidebarOpen(false)}
           universalSearchQuery={universalSearchQuery}
-          universalModuleFilter={universalModuleFilter}
+          universalSelectedModules={universalSelectedModules}
+          searchTriggerTimestamp={searchTriggerTimestamp}
         />
       </div>
 
@@ -58,6 +61,7 @@ export const AppContent: React.FC = () => {
         onNavigate={(_view) => { }}
         onExecuteSearch={(query) => {
           setUniversalSearchQuery(query);
+          setSearchTriggerTimestamp(Date.now());
         }}
       />
     </div>
