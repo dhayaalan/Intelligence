@@ -1381,6 +1381,131 @@ export const SearchPage: React.FC<SearchPageProps> = ({
         </div>
       )}
 
+      {/* Initial State: Intelligence Launchpad & Operational Cockpit */}
+      {!searchResult && !isSearching && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Quick Target Pivots */}
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="font-bold uppercase tracking-wider">Quick Recon Pivots:</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { label: 'github.com', type: 'Domain' },
+                  { label: '8.8.8.8', type: 'IP' },
+                  { label: 'torvalds', type: 'Handle' },
+                  { label: 'support@cloudflare.com', type: 'Email' },
+                  { label: 'CVE-2024-3094', type: 'CVE' },
+                  { label: 'malware threat campaign', type: 'Topic' },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setQuery(item.label);
+                      handleSearch(undefined, item.label);
+                    }}
+                    className="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>{item.label}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">[{item.type}]</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Integrated Intelligence Capabilities Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400">
+                <Globe className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">OSINT Reconnaissance</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                335+ tools covering DNS/RDAP records, certificate transparency, subdomains, reverse IP, ASN networks, and username footprints.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span>Passive Recon Active</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+                <ShieldAlert className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Threat Intelligence</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Shodan InternetDB port census, OWASP ZAP passive attack surface crawl, OpenAPI schema parsing, and CVE/KEV correlation.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <span>VAPT Scope Enforced</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-cyan-600 dark:text-cyan-400">
+                <Share2 className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Social Media Intelligence</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Harvester for Bluesky, Telegram, Reddit, Mastodon, and YouTube with Coordinated Inauthentic Behavior (CIB) detection.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                <span>5 Collectors Operational</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+                <Newspaper className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">News Intelligence</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Global RSS/Atom feeds, canonical URL normalization, factor-based source credibility scoring, and syndication tracking.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Live Wire Ingestion</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-purple-600 dark:text-purple-400">
+                <ShieldCheck className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Media Forensics</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Cryptographic SHA-256 verification, dual perceptual hashing (dHash/pHash), EXIF/GPS coordinate mining, and C2PA credentials.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                <span>Provenance Engine Ready</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs space-y-2">
+              <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
+                <MapPin className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Location Intelligence</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Geographic threat mapping, origin IP plotting, validated coordinates, radius containment, and live camera catalog.
+              </p>
+              <div className="text-[10px] font-mono text-slate-400 pt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Geospatial Radar Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Result Presentation */}
       {searchResult && (
         <div className="space-y-4">

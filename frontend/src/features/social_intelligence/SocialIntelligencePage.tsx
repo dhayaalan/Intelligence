@@ -176,9 +176,10 @@ export const SocialIntelligencePage: React.FC = () => {
   const cibClusters = searchMutation.data?.cib_clusters || [];
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6">
-      {/* Workspace Header */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 relative overflow-hidden shadow-xs dark:border-slate-800 dark:bg-[#0f1422]">
+    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#070b13] p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Workspace Header */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 relative overflow-hidden shadow-xs dark:border-slate-800 dark:bg-[#0f1422]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -358,36 +359,175 @@ export const SocialIntelligencePage: React.FC = () => {
 
       {/* 1. SOCIAL POSTS FEED TAB */}
       {activeTab === 'feed' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {posts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-800 space-y-3">
-              <Share2 className="w-8 h-8 mx-auto text-slate-400" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {searchMutation.data ? "No authentic social posts returned for this query" : "No social media dispatches collected yet"}
-              </p>
-              {searchMutation.data?.provider_statuses && Object.keys(searchMutation.data.provider_statuses).length > 0 && (
-                <div className="max-w-md mx-auto pt-2 text-left space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block text-center">
-                    Collector Diagnostics & Platform Quota Status:
-                  </span>
-                  <div className="space-y-1.5 font-mono text-[11px]">
-                    {Object.entries(searchMutation.data.provider_statuses).map(([plat, status_str]) => (
-                      <div
-                        key={plat}
-                        className="p-2 rounded-lg border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between"
-                      >
-                        <strong className="capitalize text-slate-900 dark:text-white">{plat}:</strong>
-                        <span className="text-right truncate ml-2 text-xs">{status_str}</span>
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Diagnostic Box if search was performed */}
+              {searchMutation.data ? (
+                <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900/40">
+                  <Share2 className="w-8 h-8 mx-auto text-slate-400" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    No authentic social posts returned for this query
+                  </p>
+                  {searchMutation.data?.provider_statuses && Object.keys(searchMutation.data.provider_statuses).length > 0 && (
+                    <div className="max-w-md mx-auto pt-2 text-left space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block text-center">
+                        Collector Diagnostics & Platform Quota Status:
+                      </span>
+                      <div className="space-y-1.5 font-mono text-[11px]">
+                        {Object.entries(searchMutation.data.provider_statuses).map(([plat, status_str]) => (
+                          <div
+                            key={plat}
+                            className="p-2 rounded-lg border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between"
+                          >
+                            <strong className="capitalize text-slate-900 dark:text-white">{plat}:</strong>
+                            <span className="text-right truncate ml-2 text-xs">{status_str}</span>
+                          </div>
+                        ))}
                       </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-400">
+                    Zero synthetic data injected. External platforms restricting automated access require authenticated API credentials.
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Sample Social Recon Queries */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                    <span className="font-bold uppercase tracking-wider">Sample Intelligence Topics:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { topic: 'malware threat campaign', tag: 'Malware' },
+                      { topic: '#infosec zero-day', tag: 'Vulnerability' },
+                      { topic: 'SCADA critical infrastructure', tag: 'Threat Intel' },
+                      { topic: 'botnet disinformation campaign', tag: 'CIB Burst' },
+                      { topic: 'defense aerospace readiness', tag: 'Geopolitical' },
+                    ].map((item) => (
+                      <button
+                        key={item.topic}
+                        type="button"
+                        onClick={() => {
+                          setQuery(item.topic);
+                          searchMutation.mutate({
+                            query: item.topic,
+                            platforms: selectedPlatforms,
+                            limit: 25,
+                            detect_cib: detectCib,
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>{item.topic}</span>
+                        <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold">[{item.tag}]</span>
+                      </button>
                     ))}
                   </div>
                 </div>
-              )}
-              <p className="text-xs text-slate-400">
-                {searchMutation.data
-                  ? "Zero synthetic data injected. External platforms restricting automated access require authenticated API credentials."
-                  : "Enter a query above and dispatch collectors."}
-              </p>
+              </div>
+
+              {/* 5-Collector Operational Capabilities Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold text-sm">
+                      <Radio className="w-4 h-4" />
+                      <span>Bluesky AT-Proto Firehose</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">LIVE</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Real-time ingestion over decentralized AT-Protocol repos. Tracks viral threat indicators, hashtag velocity, and post syndication.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: Public Repo Search & Author Index
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
+                      <Share2 className="w-4 h-4" />
+                      <span>Telegram Channel Recon</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">READY</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Monitors public intelligence channels and dark-web mirror wires. Harvests forwarded chains, message views, and attached media metadata.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: Channel Message Scraper & Entity Extractor
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-orange-500 font-bold text-sm">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Reddit Chatter & Leaks</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">ACTIVE</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Targeted subreddit reconnaissance across cyber security, vulnerabilities, and leaked data disclosure communities.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: Subreddit Search & Comment Thread Mining
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-500 font-bold text-sm">
+                      <Layers className="w-4 h-4" />
+                      <span>Mastodon Fediverse Nodes</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">FEDERATED</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Decentralized queries across ActivityPub fediverse instances with hashtag tracking and federation reach estimation.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: ActivityPub Public API Endpoints
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-rose-500 font-bold text-sm">
+                      <Video className="w-4 h-4" />
+                      <span>YouTube Forensics & NLP</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">READY</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Automated subtitle audio transcript parsing, commentary stance extraction, and forensic video metadata validation.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: YouTube Transcript API & Metadata Analyzer
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-500 font-bold text-sm">
+                      <Zap className="w-4 h-4" />
+                      <span>Anti-Block URL Web Crawler</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">BYPASS READY</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Bypasses aggressive paywalls and anti-bot obstacles to scrape single post threads, extract inline media, and verify claims.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1">
+                    Telemetry: Multi-Engine Headless Crawler & HTML Sanitizer
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             posts.map((post) => (
@@ -1496,6 +1636,7 @@ export const SocialIntelligencePage: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

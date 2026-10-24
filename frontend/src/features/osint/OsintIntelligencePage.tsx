@@ -148,6 +148,101 @@ export const OsintIntelligencePage: React.FC<OsintIntelligencePageProps> = ({
             </form>
           </div>
 
+          {/* Initial State: OSINT Reconnaissance Modules & Presets */}
+          {!osintResults && !isExecuting && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Quick Target Presets */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-xs font-mono font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Sample OSINT Targets:
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { target: 'github.com', type: 'DOMAIN' as const },
+                      { target: '1.1.1.1', type: 'IP' as const },
+                      { target: 'torvalds', type: 'USERNAME' as const },
+                      { target: 'admin@google.com', type: 'EMAIL' as const },
+                      { target: '+1-555-0199', type: 'PHONE' as const },
+                    ].map((chip) => (
+                      <button
+                        key={chip.target}
+                        type="button"
+                        onClick={() => {
+                          setTargetType(chip.type);
+                          setTargetValue(chip.target);
+                        }}
+                        className="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                      >
+                        <span>{chip.target}</span>
+                        <span className="text-[10px] text-slate-400 ml-1">[{chip.type}]</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Recon Workflows Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400">
+                    <Globe className="w-5 h-5" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Domain & Network Footprint</h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Maps top-level domain records, authoritative DNS servers, mail exchanges, Certificate Transparency subdomains, and historical WHOIS ownership.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>DNS • RDAP • crt.sh • Amass • Subfinder</span>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2.5 text-blue-600 dark:text-blue-400">
+                    <Server className="w-5 h-5" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Host & Infrastructure Census</h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Scans exposed open ports, detects banners, validates ASN routing blocks, and resolves physical IP geographic origin without active intrusion.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <span>Shodan InternetDB • IP-API • BGP ASN</span>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2.5 text-purple-600 dark:text-purple-400">
+                    <User className="w-5 h-5" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Identity & Username Recon</h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Cross-references handles across 335+ public services, developer portals, GitHub/GitLab commits, and online presence registers.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <span>WhatsMyName • Gravatar • Public API Queries</span>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
+                    <Mail className="w-5 h-5" />
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Email & Threat Attribution</h4>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Inspects MX records, disposable domain blocklists, RFC syntax compliance, and associated corporate organizational presence.
+                  </p>
+                  <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2 pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span>GLEIF LEI • SEC EDGAR • Carrier Lookup</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Results Overview */}
           {osintResults && (
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-xs">
