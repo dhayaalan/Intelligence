@@ -3,7 +3,7 @@
 # Production-ready, non-root user, healthchecked container for FastAPI core
 # ==============================================================================
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Prevent Python from writing .pyc files and enable unbuffered streaming
 ENV PYTHONDONTWRITEBYTECODE=1 \
